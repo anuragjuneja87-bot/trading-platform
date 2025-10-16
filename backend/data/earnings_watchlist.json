@@ -1,0 +1,26 @@
+{
+  "symbols": [
+    "JPM",
+    "WFC",
+    "BLK",
+    "UNH",
+    "GS",
+    "BAC",
+    "C",
+    "JNJ",
+    "PG",
+    "NFLX",
+    "TSLA",
+    "IBM",
+    "T",
+    "KO"
+  ],
+  "week_number": 42,
+  "last_updated": "2025-10-13T12:40:12.245584",
+  "source": "sunday_routine",
+  "week_data": {
+    "week": 42,
+    "this_week_count": 10,
+    "next_week_count": 4
+  }
+}

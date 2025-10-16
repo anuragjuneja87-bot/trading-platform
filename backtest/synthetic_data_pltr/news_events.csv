@@ -1,0 +1,48 @@
+date,timestamp,headline,sentiment,impact,price_change
+2025-07-14,2025-07-14T16:33:00,Analysts maintain Hold rating on PLTR,neutral,low,0.0
+2025-07-21,2025-07-21T17:55:00,PLTR wins Tech Giant as new enterprise client,very_positive,high,4.34
+2025-07-22,2025-07-22T07:15:00,PLTR included in new ETF portfolio,neutral,low,-0.38
+2025-07-24,2025-07-24T17:22:00,Institutional investors increase PLTR holdings by 8%,positive,medium,1.66
+2025-07-30,2025-07-30T09:32:00,Analyst upgrades PLTR to Buy with $32.36 price target,very_positive,high,4.6
+2025-08-05,2025-08-05T17:10:00,"PLTR reports strong QQ1 earnings, beats estimates by 21%",very_positive,high,8.13
+2025-08-07,2025-08-07T08:18:00,PLTR stock rallies on positive analyst commentary,very_positive,high,4.82
+2025-08-11,2025-08-11T09:01:00,Analyst upgrades PLTR to Buy with $44.04 price target,very_positive,high,2.44
+2025-08-12,2025-08-12T07:05:00,"PLTR reports strong QQ1 earnings, beats estimates by 16%",very_positive,high,4.57
+2025-08-15,2025-08-15T17:59:00,PLTR signs multi-year deal with enterprise leader,very_positive,high,5.73
+2025-08-18,2025-08-18T07:18:00,Analyst upgrades PLTR to Buy with $47.11 price target,very_positive,high,3.33
+2025-08-20,2025-08-20T18:47:00,PLTR wins Tech Giant as new enterprise client,very_positive,high,5.54
+2025-08-26,2025-08-26T07:52:00,PLTR announces $500M share buyback program,very_positive,high,3.22
+2025-09-01,2025-09-01T07:26:00,Short-seller releases critical report on PLTR,negative,medium,-1.49
+2025-09-02,2025-09-02T07:23:00,Analyst upgrades PLTR to Buy with $60.15 price target,very_positive,high,3.61
+2025-09-03,2025-09-03T17:25:00,PLTR secures major $420M government contract with DoD,very_positive,high,3.84
+2025-09-05,2025-09-05T16:13:00,PLTR announces partnership with IBM for AI expansion,very_positive,high,4.12
+2025-09-09,2025-09-09T16:23:00,PLTR announces partnership with IBM for AI expansion,positive,medium,1.75
+2025-09-15,2025-09-15T08:12:00,Options activity picks up in PLTR,neutral,low,0.23
+2025-09-16,2025-09-16T16:16:00,PLTR stock rallies on positive analyst commentary,positive,medium,1.07
+2025-09-19,2025-09-19T18:29:00,PLTR wins Tech Giant as new enterprise client,very_positive,high,2.19
+2025-09-22,2025-09-22T17:27:00,"PLTR reports strong QQ3 earnings, beats estimates by 14%",positive,medium,1.62
+2025-09-25,2025-09-25T16:42:00,Institutional investors increase PLTR holdings by 6%,very_positive,high,2.52
+2025-09-30,2025-09-30T17:59:00,PLTR signs multi-year deal with tech leader,very_positive,high,2.05
+2025-10-03,2025-10-03T09:34:00,PLTR loses major contract to competitor,negative,low,-0.52
+2025-10-06,2025-10-06T18:53:00,PLTR wins Fortune 500 as new enterprise client,very_positive,high,2.38
+2025-10-10,2025-10-10T18:07:00,PLTR wins Global Bank as new enterprise client,very_positive,high,8.33
+2025-10-14,2025-10-14T17:22:00,Breaking: PLTR unveils breakthrough in data analytics technology,very_positive,high,9.55
+2025-10-15,2025-10-15T09:11:00,Analyst upgrades PLTR to Buy with $116.15 price target,very_positive,high,3.13
+2025-10-16,2025-10-16T17:42:00,Breaking: PLTR unveils breakthrough in data analytics technology,very_positive,high,10.54
+2025-10-20,2025-10-20T07:24:00,Institutional investors increase PLTR holdings by 6%,very_positive,high,10.07
+2025-10-21,2025-10-21T18:53:00,Institutional investors increase PLTR holdings by 17%,very_positive,high,8.66
+2025-10-23,2025-10-23T16:36:00,Breaking: PLTR unveils breakthrough in AI technology,very_positive,high,12.7
+2025-10-24,2025-10-24T09:43:00,Analyst upgrades PLTR to Buy with $242.61 price target,very_positive,high,14.3
+2025-10-27,2025-10-27T17:46:00,PLTR announces $500M share buyback program,very_positive,high,8.0
+2025-10-28,2025-10-28T09:29:00,PLTR announces partnership with AWS for AI expansion,very_positive,high,12.52
+2025-10-30,2025-10-30T17:26:00,PLTR announces $500M share buyback program,very_positive,high,9.56
+2025-10-31,2025-10-31T16:54:00,Analyst upgrades PLTR to Buy with $393.48 price target,very_positive,high,10.06
+2025-11-03,2025-11-03T08:35:00,PLTR stock rallies on positive analyst commentary,very_positive,high,10.02
+2025-11-04,2025-11-04T08:46:00,PLTR announces $500M share buyback program,very_positive,high,8.07
+2025-11-05,2025-11-05T07:10:00,Breaking: PLTR unveils breakthrough in AI technology,very_positive,high,8.05
+2025-11-06,2025-11-06T18:20:00,PLTR wins Tech Giant as new enterprise client,very_positive,high,5.5
+2025-11-07,2025-11-07T16:20:00,PLTR stock rallies on positive analyst commentary,very_positive,high,9.91
+2025-11-11,2025-11-11T07:23:00,PLTR stock rallies on positive analyst commentary,very_positive,high,3.48
+2025-11-12,2025-11-12T08:23:00,PLTR signs multi-year deal with enterprise leader,very_positive,high,5.71
+2025-11-13,2025-11-13T08:39:00,PLTR stock rallies on positive analyst commentary,very_positive,high,7.3
+2025-11-14,2025-11-14T08:44:00,PLTR secures major $317M government contract with Navy,very_positive,high,3.13

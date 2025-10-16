@@ -1,0 +1,19 @@
+{
+  "pairs": [
+    {
+      "id": "nvda-nvdl",
+      "underlying": "NVDA",
+      "leveraged": "NVDL",
+      "name": "NVIDIA 1.5x",
+      "active": true
+    },
+    {
+      "id": "pltr-pltu",
+      "underlying": "PLTR",
+      "leveraged": "PLTU",
+      "name": "Palantir 2x",
+      "active": true
+    }
+  ],
+  "last_updated": "2025-10-12T16:01:52.234324"
+}

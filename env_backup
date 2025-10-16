@@ -1,0 +1,26 @@
+# Trading Platform Configuration
+# Copy this file to .env and fill in your values
+
+# Polygon.io API Key (Required)
+# Get your key from: https://polygon.io
+POLYGON_API_KEY=k6FIYK4k_5YrSlIn3qwnPCrnebB6PDrj
+TWITTER_BEARER_TOKEN=AAAAAAAAAAAAAAAAAAAAAE%2BYuQEAAAAAOgfYkChgttfJJQmwMAjZiKow3rU%3D4Qx8RAKKsk8TXZ5VyWuWmDanOMjnVgLtAvPZ7Bui7xtGMUR8yF
+# Discord Webhook URL
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1426757408490786816/KKs6CeCNvXC7C7P-BFJqwxmukeF-INVOE_S7a-wBukhxYKzUCK3PKUMcnHamx96WAJmf
+DISCORD_WEEKLY_EARNINGS=https://discord.com/api/webhooks/1427168440610848788/T9jDE4pUZ87Bg_SqRvXr5HPhY0f6y8vzbKHNJqKl6kO34MmDKppLxuCSsycoMdRknv7B
+DISCORD_REALTIME_EARNINGS=https://discord.com/api/webhooks/1427168277150564516/jVpIERY-Za7r77JG8lizRTe4g8qQ5uSBjlIMLud7GBy5qs9x33iRRN7o770Q-FDl-9LN
+DISCORD_NEWS_ONLY=https://discord.com/api/webhooks/1427151104818417694/nMpyL3t7k2eMt5Tdfns6GGu8Bvt6VSrBOvTD0dm2fGWHNPpD2eFs53yyjPIecN5i7T6n
+DISCORD_EARNINGS_REALTIME=https://discord.com/api/webhooks/1427168277150564516/jVpIERY-Za7r77JG8lizRTe4g8qQ5uSBjlIMLud7GBy5qs9x33iRRN7o770Q-FDl-9LN
+# Reddit (NEW - free and unlimited!)
+REDDIT_CLIENT_ID=pGNBpNTbx6FKNg4F_qiUzA
+REDDIT_CLIENT_SECRET=-6fTceGf6pHMkMJdTPWCQNrJsMSRNg
+#Pushover Details
+PUSHOVER_USER_KEY=uns63p77tkew39638675zd23da4aq4
+PUSHOVER_API_TOKEN=aryjm1ft18i9rwmm79afvpuyp5g6t4
+# Server Configuration
+PORT=5001
+DEBUG=True
+HOST=0.0.0.0
+
+# Cache Settings
+CACHE_DURATION=30

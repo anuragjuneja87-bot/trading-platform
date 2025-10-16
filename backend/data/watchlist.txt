@@ -1,0 +1,22 @@
+# Trading Watchlist
+# Add one symbol per line
+# Lines starting with # are comments
+
+# Indices
+SPY
+QQQ
+
+# Big Tech
+NVDA
+TSLA
+AAPL
+AMZN
+# AI/Tech Growth
+AMD
+PLTR
+ORCL
+AVGO
+NBIS
+CRWV
+# Add your symbols below:
+

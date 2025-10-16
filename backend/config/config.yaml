@@ -1,0 +1,563 @@
+# ========================================
+# ALWAYS-ON-TRADER Configuration
+# Enhanced with Multi-Channel Discord + News + Earnings + PHASE 1 + MARKET IMPACT
+# ========================================
+
+# API Keys
+polygon_api_key: ${POLYGON_API_KEY}
+
+# Watchlist Configuration
+watchlist:
+  file: "data/watchlist.txt"
+  
+  filtering:
+    market_hours:
+      mode: "all"
+      
+    after_hours:
+      mode: "priority"
+      priority_symbols: ["SPY", "QQQ", "VIX"]
+      fallback_count: 3
+      
+    weekend:
+      mode: "all"
+      symbols: ["SPY"]
+      
+    pre_market:
+      mode: "priority"
+      priority_symbols: ["SPY", "QQQ", "NVDA", "TSLA"]
+      fallback_count: 5
+
+# ========================================
+# DISCORD CONFIGURATION - Multi-Channel
+# ========================================
+discord:
+  enabled: true
+  
+  # Multi-channel webhooks
+  webhook_trading: ${DISCORD_WEBHOOK_URL}
+  webhook_news: ${DISCORD_NEWS_ONLY}
+  webhook_earnings_weekly: ${DISCORD_WEEKLY_EARNINGS}
+  webhook_earnings_realtime: ${DISCORD_REALTIME_EARNINGS}
+  
+  # NEW: Market impact alerts (uses DISCORD_NEWS_ALERTS)
+  webhook_market_impact: ${DISCORD_NEWS_ALERTS}
+  
+  # Legacy single webhook (for backward compatibility)
+  webhook_url: ${DISCORD_WEBHOOK_URL}
+  
+  # Alert channel routing
+  channels:
+    strong_signals: ${DISCORD_WEBHOOK_URL}
+    regular_signals: ${DISCORD_WEBHOOK_URL}
+    momentum_shifts: ${DISCORD_WEBHOOK_URL}
+    
+  # Alert level thresholds
+  thresholds:
+    strong_signal_confidence: 85
+    regular_signal_confidence: 70
+    minimum_confidence: 60
+    
+  # Rate limiting
+  rate_limits:
+    max_alerts_per_symbol_per_hour: 3
+    cooldown_between_same_alerts: 300
+    
+  # Alert formatting
+  formatting:
+    include_chart_link: true
+    include_bookmap_notes: true
+    include_news_headlines: true
+    max_headlines: 2
+    color_scheme:
+      strong_buy: 0x00ff00
+      buy: 0x00cc00
+      strong_sell: 0xff0000
+      sell: 0xcc0000
+      momentum_shift: 0xffff00
+      monitor: 0x888888
+
+# ========================================
+# NEWS MONITORING (Legacy - for watchlist stocks)
+# ========================================
+news_monitoring:
+  enabled: true
+  max_alerts_per_symbol_per_day: 10
+  check_interval_seconds: 180
+  min_impact_level: 'MEDIUM'
+  
+  strong_positive_keywords:
+    - "beats"
+    - "soars"
+    - "surge"
+    - "breakthrough"
+    - "record"
+    - "upgrade to buy"
+    - "raised target"
+  
+  strong_negative_keywords:
+    - "plunges"
+    - "crashes"
+    - "misses badly"
+    - "downgrade to sell"
+    - "investigation"
+    - "lawsuit"
+    - "halted"
+
+# ========================================
+# 🚨 NEW: MARKET IMPACT MONITOR
+# High-impact news alerts (macro, M&A, analyst, spillover)
+# Routes to: DISCORD_NEWS_ALERTS channel
+# ========================================
+market_impact_monitor:
+  enabled: true
+  check_interval: 60                    # Check every 60 seconds
+  lookback_hours: 2                     # Only check news from last 2 hours
+  max_alerts_per_hour: 20               # High tolerance for important news
+  
+  # Impact scoring threshold (0-10 scale)
+  min_impact_score: 7.0                 # Only alert if impact >= 7/10
+  
+  # Volume Confirmation Settings
+  volume_confirmation:
+    enabled: true                       # Require volume spike for confirmation
+    min_rvol: 2.0                       # 2.0x RVOL minimum (your requirement)
+    critical_rvol: 3.0                  # 3.0x+ = CRITICAL alert
+  
+  # Macro Event Keywords (Fed, tariffs, economic data)
+  macro_keywords:
+    - "Fed"
+    - "Federal Reserve"
+    - "Powell"
+    - "FOMC"
+    - "interest rate"
+    - "rate cut"
+    - "rate hike"
+    - "tariff"
+    - "tariffs"
+    - "trade war"
+    - "Trump tariff"
+    - "China tariff"
+    - "Treasury"
+    - "inflation"
+    - "CPI"
+    - "jobs report"
+    - "unemployment"
+    - "GDP"
+    - "recession"
+    - "economic data"
+    - "circuit breaker"
+    - "market halt"
+    - "trading halt"
+    - "emergency meeting"
+  
+  # Analyst Event Keywords
+  analyst_keywords:
+    - "upgrade"
+    - "downgrade"
+    - "price target"
+    - "initiated coverage"
+    - "raises target"
+    - "lowers target"
+    - "outperform"
+    - "underperform"
+    - "buy rating"
+    - "sell rating"
+    - "overweight"
+    - "underweight"
+  
+  # M&A Event Keywords
+  ma_keywords:
+    - "merger"
+    - "acquisition"
+    - "acquires"
+    - "acquired"
+    - "takeover"
+    - "buyout"
+    - "deal"
+    - "to acquire"
+    - "to buy"
+    - "agrees to buy"
+    - "merger agreement"
+    - "acquisition agreement"
+  
+  # Earnings Event Keywords
+  earnings_keywords:
+    - "beats estimates"
+    - "misses estimates"
+    - "earnings surprise"
+    - "blowout earnings"
+    - "disappointing earnings"
+    - "eps beat"
+    - "revenue beat"
+    - "guidance raised"
+    - "guidance lowered"
+  
+  # Thresholds for filtering
+  min_price_target_change_percent: 20   # Only alert on PT raises >20%
+  min_earnings_surprise_percent: 10     # Only alert on >10% earnings surprise
+  
+  # 🎯 SPILLOVER MAPPING (NVDA → related stocks)
+  # When NVDA has news, automatically check these stocks for volume spikes
+  spillover_map:
+    NVDA:
+      - NVTS      # AI infrastructure
+      - SMCI      # Server/AI hardware
+      - ARM       # Chip design
+      - AMD       # Direct competitor
+      - AVGO      # Networking chips
+      - TSM       # Manufacturer
+      - INTC      # Competitor
+      - MU        # Memory chips
+      - MRVL      # Networking
+    
+    TSLA:
+      - RIVN      # EV competitor
+      - LCID      # EV competitor
+      - F         # Traditional auto
+      - GM        # Traditional auto
+      - CHPT      # EV charging
+    
+    AAPL:
+      - QCOM      # Supplier
+      - CIRR      # Supplier
+      - SWKS      # Supplier
+    
+    MSFT:
+      - PLTR      # AI/Data analytics
+      - SNOW      # Cloud data
+      - DDOG      # Cloud monitoring
+      - NET       # Cloud infrastructure
+    
+    GOOGL:
+      - PLTR      # AI analytics
+      - AI        # AI software
+      - C3AI      # AI applications
+    
+    AMZN:
+      - SHOP      # E-commerce
+      - WMT       # Retail competitor
+      - EBAY      # E-commerce
+    
+    CRM:
+      - NOW       # Enterprise software
+      - SNOW      # Data cloud
+      - WDAY      # HR software
+      - DDOG      # Monitoring
+    
+    SQ:
+      - PYPL      # Payment competitor
+      - COIN      # Crypto
+      - HOOD      # Trading platform
+      - SOFI      # Fintech
+    
+    META:
+      - SNAP      # Social media
+      - PINS      # Social platform
+      - RBLX      # Gaming/social
+
+# ========================================
+# EARNINGS MONITORING
+# ========================================
+earnings_monitoring:
+  enabled: true
+  
+  weekly_enabled: true
+  weekly_day: 0
+  weekly_time: "07:00"
+  
+  realtime_enabled: true
+  realtime_check_interval: 300
+
+# ========================================
+# 🔍 OPENAI NEWS MONITOR
+# ========================================
+openai_monitor:
+  enabled: true
+  check_interval: 60
+  lookback_hours: 2
+  max_alerts_per_hour: 10
+  
+  keywords:
+    - "OpenAI"
+    - "Open AI"
+    - "ChatGPT"
+    - "GPT-4"
+    - "GPT-5"
+    - "Sam Altman"
+    - "Altman"
+  
+  volume_confirmation:
+    enabled: true
+    min_rvol_for_alert: 1.5
+    critical_rvol: 2.5
+    confirmation_window: 300
+  
+  monitor_all_tech: true
+  priority_tickers:
+    - NVDA
+    - AMD
+    - AVGO
+    - TSM
+    - INTC
+    - QCOM
+    - ASML
+    - MU
+    - MSFT
+    - GOOGL
+    - AMZN
+    - META
+    - ORCL
+  
+  min_impact_score: 6.0
+  include_unconfirmed: false
+  
+  tier1_sources:
+    - "bloomberg"
+    - "reuters"
+    - "wsj"
+    - "wall street journal"
+    - "financial times"
+  
+  tier2_sources:
+    - "cnbc"
+    - "yahoo finance"
+    - "marketwatch"
+    - "seeking alpha"
+    - "benzinga"
+  
+  discord_mentions:
+    critical_alerts: ""
+    high_alerts: ""
+  
+  log_all_checks: false
+  log_filtered_news: true
+  log_volume_data: true
+
+# ========================================
+# 🚀 PHASE 1: VOLUME ANALYSIS
+# ========================================
+volume_analysis:
+  enabled: true
+  
+  rvol_high_threshold: 2.0
+  rvol_extreme_threshold: 3.0
+  rvol_lookback_days: 20
+  
+  spike_threshold: 1.5
+  spike_lookback_bars: 10
+  
+  dryup_threshold: 0.5
+  dryup_lookback_bars: 15
+  
+  block_trade_percentile: 95
+  
+  rvol_weight: 3
+  spike_weight: 2
+  dryup_weight: 1
+  block_weight: 2
+
+# ========================================
+# 🚀 PHASE 1: KEY LEVEL DETECTION
+# ========================================
+key_levels:
+  enabled: true
+  
+  previous_day_levels: true
+  premarket_levels: true
+  vwap_bands: true
+  psychological_levels: true
+  pivot_points: true
+  
+  proximity_threshold: 0.005
+  minimum_confluence_score: 6
+  
+  confluence_weights:
+    previous_day_high: 3
+    previous_day_low: 3
+    previous_close: 2
+    vwap: 2
+    vwap_1sd: 2
+    vwap_2sd: 3
+    premarket_high: 2
+    premarket_low: 2
+    psychological: 2
+    pivot: 1
+  
+  high_confluence_resistance: 4
+  high_confluence_support: 4
+  previous_day_break_with_volume: 5
+
+# ========================================
+# 🚀 PHASE 1: RISK MANAGEMENT
+# ========================================
+risk_management:
+  minimum_risk_reward: 2.0
+  enforce_rr_filter: false              # DISABLED per user request
+  
+  max_risk_per_trade_percent: 1.0
+  account_size: 100000
+  
+  use_atr_stops: false
+  stop_loss_multiplier: 2.0
+
+# ========================================
+# 🚀 PHASE 1: SIGNAL METRICS TRACKING
+# ========================================
+signal_metrics:
+  enabled: true
+  track_performance: true
+  metrics_file: "data/metrics/signal_metrics.csv"
+  
+  auto_update_outcomes: false
+  
+  generate_daily_summary: true
+  daily_summary_time: "16:30"
+
+# Pushover Configuration
+pushover:
+  enabled: true
+  user_key: ${PUSHOVER_USER_KEY}
+  api_token: ${PUSHOVER_API_TOKEN}
+  
+  filter:
+    alert_types: ["STRONG BUY", "STRONG SELL", "MOMENTUM SHIFT"]
+    minimum_confidence: 80
+    
+  sounds:
+    strong_buy: "cashregister"
+    strong_sell: "alien"
+    momentum_shift: "intermission"
+    
+  priority:
+    strong_signals: 1
+    momentum_shift: 1
+    regular_signals: 0
+
+# ========================================
+# Market Schedule (ENHANCED WITH PHASE 1)
+# ========================================
+market_schedule:
+  timezone: "America/New_York"
+  
+  trading_hours:
+    monday_friday:
+      pre_market: "04:00-09:30"
+      market_open: "09:30-16:00"
+      after_hours: "16:00-20:00"
+    
+  scan_intervals:
+    pre_market: 300
+    first_hour: 60
+    midday: 120
+    power_hour: 60
+    after_hours: 300
+    weekend: 900
+    market_hours: 60
+    
+  first_scan:
+    pre_market_start: true
+    market_open: true
+    after_hours_start: false
+
+# ========================================
+# Analysis Configuration (ENHANCED WITH PHASE 1)
+# ========================================
+analysis:
+  signals:
+    use_gap_detection: true
+    use_news_sentiment: true
+    use_dark_pools: true
+    use_options_flow: true
+    use_camarilla_levels: true
+    use_volume_analysis: true
+    use_key_level_detection: true
+    
+  timeframes:
+    - "1H"
+    - "1D"
+    
+  thresholds:
+    default_signal_threshold: 8
+    strong_signal_threshold: 12
+    news_driven_threshold: 6
+    gap_driven_threshold: 6
+    high_rvol_threshold: 6
+    
+  total_factors: 26
+    
+  significance:
+    gap_percentage: 2.0
+    large_gap_percentage: 3.0
+    volume_spike_multiplier: 1.5
+    news_impact_threshold: "MEDIUM"
+    rvol_high_multiplier: 2.0
+    rvol_extreme_multiplier: 3.0
+    confluence_high_score: 7
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "logs/always_on_trader.log"
+  
+  rotation:
+    max_bytes: 10485760
+    backup_count: 5
+    
+  log_all_analyses: false
+  log_api_requests: false
+  log_signal_scores: true
+  log_volume_analysis: true
+  log_key_levels: true
+  log_rr_filtering: true
+
+# Error Handling
+error_handling:
+  max_retries: 3
+  retry_delay: 5
+  
+  on_api_error: "skip_symbol"
+  on_network_error: "retry"
+  
+  alert_on_errors: true
+  error_alert_cooldown: 3600
+
+# Cache Configuration
+cache:
+  enabled: true
+  ttl: 30
+  max_size: 1000
+
+# Testing/Development
+development:
+  dry_run: false
+  test_mode: false
+  test_symbols: ["SPY", "QQQ"]
+  verbose_output: false
+  test_volume_analysis: false
+  test_key_levels: false
+
+# Backup/Persistence
+persistence:
+  save_alerts: true
+  alerts_file: "data/alerts_history.json"
+  save_analyses: false
+  
+  max_alert_history: 1000
+  alert_retention_days: 30
+  save_metrics: true
+  metrics_directory: "data/metrics"
+
+# ========================================
+# 🚀 SYSTEM SUMMARY
+# ========================================
+# Features Active:
+# ✅ Trading Signals (26 factors, Phase 1)
+# ✅ Market Impact Monitor (macro, M&A, analyst, spillover)
+# ✅ OpenAI News Monitor (AI-specific news)
+# ✅ Volume Analysis (RVOL, spikes, dry-ups)
+# ✅ Key Level Detection (confluence scoring)
+# ✅ Earnings Monitoring (weekly + realtime)
+# ✅ Signal Metrics Tracking (win rate, performance)
+# ✅ Multi-Channel Discord Routing
+# ========================================

@@ -1,0 +1,173 @@
+{
+  "global_influencers": [
+    {
+      "username": "GaryBlack00",
+      "name": "Gary Black",
+      "influence_score": 95,
+      "category": "TSLA Analyst"
+    },
+    {
+      "username": "jimcramer",
+      "name": "Jim Cramer",
+      "influence_score": 90,
+      "category": "Financial Advisor"
+    },
+    {
+      "username": "chamath",
+      "name": "Chamath Palihapitiya",
+      "influence_score": 92,
+      "category": "Venture Capitalist"
+    },
+    {
+      "username": "ARKInvest",
+      "name": "ARK Invest",
+      "influence_score": 93,
+      "category": "Asset Manager"
+    },
+    {
+      "username": "DeItaone",
+      "name": "Deltaone",
+      "influence_score": 88,
+      "category": "News Aggregator"
+    },
+    {
+      "username": "Fxhedgers",
+      "name": "FX Hedge",
+      "influence_score": 87,
+      "category": "Market News"
+    }
+  ],
+  "ticker_specific": {
+    "NVDA": [
+      {
+        "username": "nvidia",
+        "name": "NVIDIA",
+        "influence_score": 100,
+        "category": "Official"
+      },
+      {
+        "username": "JensenHuang",
+        "name": "Jensen Huang",
+        "influence_score": 98,
+        "category": "CEO"
+      }
+    ],
+    "TSLA": [
+      {
+        "username": "Tesla",
+        "name": "Tesla",
+        "influence_score": 100,
+        "category": "Official"
+      },
+      {
+        "username": "elonmusk",
+        "name": "Elon Musk",
+        "influence_score": 100,
+        "category": "CEO"
+      },
+      {
+        "username": "GaryBlack00",
+        "name": "Gary Black",
+        "influence_score": 95,
+        "category": "Analyst"
+      },
+      {
+        "username": "SawyerMerritt",
+        "name": "Sawyer Merritt",
+        "influence_score": 85,
+        "category": "Analyst"
+      }
+    ],
+    "PLTR": [
+      {
+        "username": "PalantirTech",
+        "name": "Palantir",
+        "influence_score": 100,
+        "category": "Official"
+      },
+      {
+        "username": "alexkapr",
+        "name": "Alex Karp",
+        "influence_score": 98,
+        "category": "CEO"
+      }
+    ],
+    "AAPL": [
+      {
+        "username": "Apple",
+        "name": "Apple",
+        "influence_score": 100,
+        "category": "Official"
+      },
+      {
+        "username": "tim_cook",
+        "name": "Tim Cook",
+        "influence_score": 98,
+        "category": "CEO"
+      }
+    ],
+    "COIN": [
+      {
+        "username": "coinbase",
+        "name": "Coinbase",
+        "influence_score": 100,
+        "category": "Official"
+      },
+      {
+        "username": "brian_armstrong",
+        "name": "Brian Armstrong",
+        "influence_score": 98,
+        "category": "CEO"
+      }
+    ],
+    "AMD": [
+      {
+        "username": "AMD",
+        "name": "AMD",
+        "influence_score": 100,
+        "category": "Official"
+      },
+      {
+        "username": "LisaSu",
+        "name": "Lisa Su",
+        "influence_score": 98,
+        "category": "CEO"
+      }
+    ],
+    "SPY": [
+      {
+        "username": "SPYdergram",
+        "name": "SPYdergram",
+        "influence_score": 85,
+        "category": "Market Analysis"
+      }
+    ],
+    "QQQ": [
+      {
+        "username": "NASDAQ",
+        "name": "Nasdaq",
+        "influence_score": 90,
+        "category": "Official"
+      }
+    ]
+  },
+  "keywords": {
+    "positive": [
+      "bullish", "buy", "long", "calls", "moon", "rocket",
+      "breakout", "ATH", "beat", "upgrade", "partnership",
+      "acquisition", "earnings beat", "guidance raised",
+      "strong quarter", "exceeds expectations", "revolutionary",
+      "game changer", "huge news", "massive", "incredible"
+    ],
+    "negative": [
+      "bearish", "sell", "short", "puts", "crash", "dump",
+      "breakdown", "miss", "downgrade", "lawsuit", "investigation",
+      "recall", "disappointing", "weak", "concern", "risk",
+      "overvalued", "bubble", "failure", "disaster", "warning"
+    ],
+    "urgent": [
+      "breaking", "alert", "just in", "now", "announced",
+      "confirmed", "urgent", "important", "major", "developing"
+    ]
+  }
+}
