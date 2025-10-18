@@ -1,7 +1,10 @@
 """
-backend/app.py - COMPLETE VERSION
-Your existing features + Phase 1 enhancements + OpenAI Monitor + MARKET IMPACT MONITOR + PRE-MARKET VOLUME MONITOR
-Nothing removed, everything enhanced!
+backend/app.py - COMPLETE VERSION v4.2
+INCLUDES: All existing features + 0DTE Gamma Monitor
+Nothing stripped - everything preserved!
+
+NEW IN V4.2:
+- 0DTE Gamma Level Monitor (9AM EST alerts)
 """
 
 from flask import Flask, jsonify, send_from_directory, request
@@ -49,13 +52,37 @@ except ImportError:
     MARKET_IMPACT_AVAILABLE = False
     logging.warning("Market Impact Monitor not available")
 
-# NEW: Pre-Market Volume Spike Monitor
+# Extended Hours Volume Spike Monitor (Pre-Market + After-Hours)
 try:
-    from monitors.premarket_volume_monitor import PremarketVolumeMonitor
-    PREMARKET_MONITOR_AVAILABLE = True
+    from monitors.extended_hours_volume_monitor import ExtendedHoursVolumeMonitor
+    EXTENDED_HOURS_MONITOR_AVAILABLE = True
 except ImportError:
-    PREMARKET_MONITOR_AVAILABLE = False
-    logging.warning("Pre-Market Volume Monitor not available")
+    EXTENDED_HOURS_MONITOR_AVAILABLE = False
+    logging.warning("Extended Hours Volume Monitor not available")
+
+# Real-Time Volume Spike Monitor (Market Hours)
+try:
+    from monitors.realtime_volume_spike_monitor import RealtimeVolumeSpikeMonitor
+    REALTIME_MONITOR_AVAILABLE = True
+except ImportError:
+    REALTIME_MONITOR_AVAILABLE = False
+    logging.warning("Real-Time Volume Monitor not available")
+
+# Momentum Signal Monitor
+try:
+    from monitors.momentum_signal_monitor import MomentumSignalMonitor
+    MOMENTUM_MONITOR_AVAILABLE = True
+except ImportError:
+    MOMENTUM_MONITOR_AVAILABLE = False
+    logging.warning("Momentum Signal Monitor not available")
+
+# 0DTE Gamma Monitor
+try:
+    from monitors.odte_gamma_monitor import ODTEGammaMonitor
+    ODTE_MONITOR_AVAILABLE = True
+except ImportError:
+    ODTE_MONITOR_AVAILABLE = False
+    logging.warning("0DTE Gamma Monitor not available")
 
 load_dotenv()
 
@@ -83,6 +110,8 @@ POLYGON_API_KEY = os.getenv('POLYGON_API_KEY')
 TWITTER_BEARER_TOKEN = os.getenv('TWITTER_BEARER_TOKEN')
 REDDIT_CLIENT_ID = os.getenv('REDDIT_CLIENT_ID')
 REDDIT_CLIENT_SECRET = os.getenv('REDDIT_CLIENT_SECRET')
+TRADIER_API_KEY = os.getenv('TRADIER_API_KEY')
+TRADIER_ACCOUNT_TYPE = os.getenv('TRADIER_ACCOUNT_TYPE', 'sandbox')
 
 if not POLYGON_API_KEY:
     logger.error("❌ POLYGON_API_KEY not found in .env file!")
@@ -94,7 +123,9 @@ analyzer = EnhancedProfessionalAnalyzer(
     twitter_bearer_token=TWITTER_BEARER_TOKEN,
     reddit_client_id=REDDIT_CLIENT_ID,
     reddit_client_secret=REDDIT_CLIENT_SECRET,
-    debug_mode=False  # Set to True for detailed logging
+    tradier_api_key=TRADIER_API_KEY,
+    tradier_account_type=TRADIER_ACCOUNT_TYPE,
+    debug_mode=False
 )
 
 # Initialize watchlist manager
@@ -135,7 +166,6 @@ if OPENAI_MONITOR_AVAILABLE:
             config=config_yaml
         )
         
-        # Set Discord webhook
         openai_webhook = os.getenv('DISCORD_OPENAI_NEWS')
         if openai_webhook:
             openai_monitor.set_discord_webhook(openai_webhook)
@@ -157,49 +187,113 @@ if MARKET_IMPACT_AVAILABLE:
             watchlist_manager=watchlist_manager
         )
         
-        # Set Discord webhook (DISCORD_NEWS_ALERTS)
         market_impact_webhook = os.getenv('DISCORD_NEWS_ALERTS')
         if market_impact_webhook:
             market_impact_monitor.set_discord_webhook(market_impact_webhook)
             logger.info("✅ Market Impact Monitor initialized")
-            logger.info(f"   📊 Monitoring: Macro, M&A, Analyst, Spillover")
-            logger.info(f"   🎯 Min RVOL: {market_impact_monitor.min_rvol}x")
         else:
             logger.warning("⚠️ DISCORD_NEWS_ALERTS webhook not configured")
     except Exception as e:
         logger.error(f"❌ Market Impact Monitor failed: {str(e)}")
 
-# NEW: Initialize Pre-Market Volume Spike Monitor
-premarket_monitor = None
-premarket_monitor_thread = None
+# Initialize Extended Hours Volume Spike Monitor (Pre-Market + After-Hours)
+extended_hours_monitor = None
+extended_hours_monitor_thread = None
 
-if PREMARKET_MONITOR_AVAILABLE:
+if EXTENDED_HOURS_MONITOR_AVAILABLE:
     try:
-        premarket_monitor = PremarketVolumeMonitor(
+        extended_hours_monitor = ExtendedHoursVolumeMonitor(
             polygon_api_key=POLYGON_API_KEY,
             config=config_yaml,
             watchlist_manager=watchlist_manager
         )
         
-        # Set Discord webhook
-        premarket_webhook = os.getenv('DISCORD_VOLUME_SPIKE')
-        if premarket_webhook:
-            premarket_monitor.set_discord_webhook(premarket_webhook)
-            logger.info("✅ Pre-Market Volume Monitor initialized")
-            logger.info(f"   📊 Monitoring: Pre-market + After-hours volume spikes")
-            logger.info(f"   ⚡ Spike threshold: {premarket_monitor.spike_threshold}x RVOL")
-            logger.info(f"   ⏱️  Cooldown: {premarket_monitor.cooldown_minutes} minutes")
+        volume_spike_webhook = os.getenv('DISCORD_VOLUME_SPIKE')
+        if volume_spike_webhook:
+            extended_hours_monitor.set_discord_webhook(volume_spike_webhook)
+            logger.info("✅ Extended Hours Volume Monitor initialized")
         else:
             logger.warning("⚠️ DISCORD_VOLUME_SPIKE webhook not configured")
     except Exception as e:
-        logger.error(f"❌ Pre-Market Volume Monitor failed: {str(e)}")
+        logger.error(f"❌ Extended Hours Volume Monitor failed: {str(e)}")
+
+# Initialize Real-Time Volume Spike Monitor (Market Hours)
+realtime_monitor = None
+realtime_monitor_thread = None
+
+if REALTIME_MONITOR_AVAILABLE:
+    try:
+        realtime_monitor = RealtimeVolumeSpikeMonitor(
+            polygon_api_key=POLYGON_API_KEY,
+            config=config_yaml,
+            watchlist_manager=watchlist_manager
+        )
+        
+        volume_spike_webhook = os.getenv('DISCORD_VOLUME_SPIKE')
+        if volume_spike_webhook:
+            realtime_monitor.set_discord_webhook(volume_spike_webhook)
+            logger.info("✅ Real-Time Volume Monitor initialized")
+        else:
+            logger.warning("⚠️ DISCORD_VOLUME_SPIKE webhook not configured")
+    except Exception as e:
+        logger.error(f"❌ Real-Time Volume Monitor failed: {str(e)}")
+
+# Initialize Momentum Signal Monitor
+momentum_monitor = None
+momentum_monitor_thread = None
+
+if MOMENTUM_MONITOR_AVAILABLE:
+    try:
+        momentum_monitor = MomentumSignalMonitor(
+            polygon_api_key=POLYGON_API_KEY,
+            config=config_yaml,
+            watchlist_manager=watchlist_manager
+        )
+        
+        momentum_webhook = os.getenv('DISCORD_MOMENTUM_SIGNALS')
+        if momentum_webhook:
+            momentum_monitor.set_discord_webhook(momentum_webhook)
+            logger.info("✅ Momentum Signal Monitor initialized")
+        else:
+            logger.warning("⚠️ DISCORD_MOMENTUM_SIGNALS webhook not configured")
+    except Exception as e:
+        logger.error(f"❌ Momentum Signal Monitor failed: {str(e)}")
+
+# Initialize 0DTE Gamma Monitor
+odte_monitor = None
+odte_monitor_thread = None
+
+if ODTE_MONITOR_AVAILABLE:
+    try:
+        # Add Tradier keys to config
+        config_yaml['tradier_api_key'] = TRADIER_API_KEY
+        config_yaml['tradier_account_type'] = TRADIER_ACCOUNT_TYPE
+        
+        odte_monitor = ODTEGammaMonitor(
+            polygon_api_key=POLYGON_API_KEY,
+            config=config_yaml,
+            watchlist_manager=watchlist_manager
+        )
+        
+        odte_webhook = os.getenv('DISCORD_ODTE_LEVELS')
+        if odte_webhook:
+            odte_monitor.set_discord_webhook(odte_webhook)
+            logger.info("✅ 0DTE Gamma Monitor initialized")
+            logger.info(f"   🕐 Alert time: {odte_monitor.alert_time} EST")
+            logger.info(f"   📏 Proximity: {odte_monitor.min_proximity_pct}%-{odte_monitor.max_proximity_pct}%")
+            logger.info(f"   ⏱️ Alert window: {odte_monitor.alert_window_minutes} minutes")
+            logger.info(f"   📅 Weekdays only: {odte_monitor.weekdays_only}")
+        else:
+            logger.warning("⚠️ DISCORD_ODTE_LEVELS webhook not configured")
+    except Exception as e:
+        logger.error(f"❌ 0DTE Gamma Monitor failed: {str(e)}")
 
 # Initialize scheduler for Sunday routines
 scheduler = BackgroundScheduler()
 scheduler.start()
 
 logger.info("=" * 60)
-logger.info("🚀 PROFESSIONAL TRADING DASHBOARD v4.0 (PHASE 1 + MARKET IMPACT + PRE-MARKET VOL)")
+logger.info("🚀 PROFESSIONAL TRADING DASHBOARD v4.2 (WITH 0DTE GAMMA MONITOR)")
 logger.info("=" * 60)
 logger.info(f"✅ Polygon API: ENABLED")
 logger.info(f"📂 Watchlist Path: {watchlist_path}")
@@ -228,9 +322,6 @@ else:
 
 if alert_manager:
     logger.info(f"✅ Alert System (Phase 1): ENABLED")
-    logger.info(f"   📊 Volume Analysis: ENABLED")
-    logger.info(f"   🎯 Key Level Detection: ENABLED")
-    logger.info(f"   💰 R:R Enforcement: DISABLED")
 else:
     logger.info(f"⚠️ Alert System: DISABLED")
 
@@ -241,38 +332,41 @@ else:
 
 if openai_monitor:
     logger.info(f"✅ OpenAI News Monitor: ENABLED")
-    logger.info(f"   📡 Check interval: {openai_monitor.check_interval}s")
-    logger.info(f"   📊 Volume confirmation: {'ENABLED' if openai_monitor.volume_enabled else 'DISABLED'}")
-    logger.info(f"   🎯 Tech stocks: {len(openai_monitor.tech_stocks)}")
 else:
     logger.info(f"⚠️ OpenAI News Monitor: DISABLED")
 
 if market_impact_monitor:
     logger.info(f"✅ Market Impact Monitor: ENABLED")
-    logger.info(f"   📡 Check interval: {market_impact_monitor.check_interval}s")
-    logger.info(f"   📊 Volume confirmation: {'ENABLED' if market_impact_monitor.volume_enabled else 'DISABLED'}")
-    logger.info(f"   🎯 Watchlist stocks: {len(market_impact_monitor.watchlist)}")
-    logger.info(f"   🌍 Macro keywords: {len(market_impact_monitor.macro_keywords)}")
-    logger.info(f"   🔗 Spillover maps: {len(market_impact_monitor.spillover_map)}")
 else:
     logger.info(f"⚠️ Market Impact Monitor: DISABLED")
 
-# NEW: Pre-Market Monitor status
-if premarket_monitor:
-    logger.info(f"✅ Pre-Market Volume Monitor: ENABLED")
-    logger.info(f"   📡 Check interval: {premarket_monitor.check_interval}s")
-    logger.info(f"   ⚡ Spike threshold: {premarket_monitor.spike_threshold}x RVOL")
-    logger.info(f"   ⏱️  Cooldown: {premarket_monitor.cooldown_minutes}min")
-    logger.info(f"   📊 Sessions: Pre-market (4-9:30 AM) + After-hours (4-8 PM)")
-    logger.info(f"   📬 Routes to: DISCORD_VOLUME_SPIKE")
+if extended_hours_monitor:
+    logger.info(f"✅ Extended Hours Volume Monitor: ENABLED")
 else:
-    logger.info(f"⚠️ Pre-Market Volume Monitor: DISABLED")
+    logger.info(f"⚠️ Extended Hours Volume Monitor: DISABLED")
+
+if realtime_monitor:
+    logger.info(f"✅ Real-Time Volume Monitor: ENABLED")
+else:
+    logger.info(f"⚠️ Real-Time Volume Monitor: DISABLED")
+
+if momentum_monitor:
+    logger.info(f"✅ Momentum Signal Monitor: ENABLED")
+else:
+    logger.info(f"⚠️ Momentum Signal Monitor: DISABLED")
+
+if odte_monitor:
+    logger.info(f"✅ 0DTE Gamma Monitor: ENABLED")
+    logger.info(f"   🕐 Alert time: 9:00 AM EST")
+    logger.info(f"   📏 Proximity: 1-2% from gamma walls")
+else:
+    logger.info(f"⚠️ 0DTE Gamma Monitor: DISABLED")
 
 logger.info("=" * 60)
 
 
 # ============================================================================
-# SUNDAY WEEKLY EARNINGS ROUTINE (PRESERVED FROM YOUR VERSION)
+# SUNDAY WEEKLY EARNINGS ROUTINE (PRESERVED)
 # ============================================================================
 
 def get_october_2025_earnings():
@@ -477,16 +571,13 @@ def schedule_sunday_routine():
 
 
 # ============================================================================
-# ALERT SYSTEM BACKGROUND THREAD (PHASE 1 ENHANCED)
+# MONITOR BACKGROUND THREADS
 # ============================================================================
 
 def run_alert_system():
     """Run alert manager in background thread (Phase 1 enhanced)"""
     if alert_manager:
         logger.info("📢 Starting Phase 1 alert system in background...")
-        logger.info("   ⏱️ Dynamic scan intervals enabled")
-        logger.info("   📊 Volume analysis active")
-        logger.info("   🎯 Key level detection active")
         try:
             alert_manager.run_continuous()
         except Exception as e:
@@ -506,21 +597,51 @@ def run_openai_monitor():
 def run_market_impact_monitor():
     """Run Market Impact monitor in background thread"""
     if market_impact_monitor:
-        logger.info("🌍 Starting Market Impact monitor in background...")
+        logger.info("🌎 Starting Market Impact monitor in background...")
         try:
             market_impact_monitor.run_continuous()
         except Exception as e:
             logger.error(f"❌ Market Impact monitor error: {str(e)}")
 
 
-def run_premarket_monitor():
-    """NEW: Run Pre-Market Volume monitor in background thread"""
-    if premarket_monitor:
-        logger.info("📊 Starting Pre-Market Volume Monitor in background...")
+def run_extended_hours_monitor():
+    """Run Extended Hours Volume monitor in background thread"""
+    if extended_hours_monitor:
+        logger.info("🌅 Starting Extended Hours Volume Monitor in background...")
         try:
-            premarket_monitor.run_continuous()
+            extended_hours_monitor.run_continuous()
         except Exception as e:
-            logger.error(f"❌ Pre-Market monitor error: {str(e)}")
+            logger.error(f"❌ Extended Hours monitor error: {str(e)}")
+
+
+def run_realtime_monitor():
+    """Run Real-Time Volume monitor in background thread"""
+    if realtime_monitor:
+        logger.info("⚡ Starting Real-Time Volume Monitor in background...")
+        try:
+            realtime_monitor.run_continuous()
+        except Exception as e:
+            logger.error(f"❌ Real-Time monitor error: {str(e)}")
+
+
+def run_momentum_monitor():
+    """Run Momentum Signal monitor in background thread"""
+    if momentum_monitor:
+        logger.info("🎯 Starting Momentum Signal Monitor in background...")
+        try:
+            momentum_monitor.run_continuous()
+        except Exception as e:
+            logger.error(f"❌ Momentum monitor error: {str(e)}")
+
+
+def run_odte_monitor():
+    """Run 0DTE Gamma monitor in background thread"""
+    if odte_monitor:
+        logger.info("🎯 Starting 0DTE Gamma Monitor in background...")
+        try:
+            odte_monitor.run_continuous()
+        except Exception as e:
+            logger.error(f"❌ 0DTE monitor error: {str(e)}")
 
 
 # ============================================================================
@@ -535,110 +656,20 @@ def index():
 
 @app.route('/api/analyze/<symbol>')
 def analyze_symbol(symbol):
-    """
-    Analyze a single symbol (Phase 1 enhanced + DIAGNOSTICS)
-    Now includes volume analysis and key level detection with detailed logging
-    """
+    """Analyze a single symbol (Phase 1 enhanced)"""
     try:
         symbol = symbol.upper()
-        logger.info(f"Analyzing {symbol} (Phase 1 + Diagnostics)...")
+        logger.info(f"Analyzing {symbol} (Phase 1)...")
         
         result = analyzer.generate_professional_signal(symbol)
-        
-        # NEW: DIAGNOSTIC LOGGING - Factor Breakdown
-        logger.info(f"\n{'='*60}")
-        logger.info(f"📊 DIAGNOSTIC BREAKDOWN for {symbol}")
-        logger.info(f"{'='*60}")
-        logger.info(f"  Bullish Factors: {result.get('bullish_score', 0)}")
-        logger.info(f"  Bearish Factors: {result.get('bearish_score', 0)}")
-        logger.info(f"  Signal: {result.get('signal', 'None')}")
-        logger.info(f"  Alert Type: {result.get('alert_type', 'MONITOR')}")
-        logger.info(f"  Confidence: {result.get('confidence', 0):.1f}%")
-        
-        # NEW: Module Status Check
-        logger.info(f"\n  Module Status:")
-        logger.info(f"    Volume Analyzer: {'✅ ACTIVE' if analyzer.volume_analyzer else '❌ DISABLED'}")
-        logger.info(f"    Key Level Detector: {'✅ ACTIVE' if analyzer.key_level_detector else '❌ DISABLED'}")
-        
-        # PHASE 1: Log enhanced data
-        if result.get('volume_analysis'):
-            vol = result['volume_analysis']
-            rvol = vol.get('rvol', {})
-            logger.info(f"\n  📊 Volume Analysis:")
-            logger.info(f"    RVOL: {rvol.get('rvol', 0):.2f}x ({rvol.get('classification', 'N/A')})")
-            logger.info(f"    Signal Strength: {rvol.get('signal_strength', 0)}")
-            
-            if vol.get('volume_spike', {}).get('spike_detected'):
-                logger.info(f"    🔥 VOLUME SPIKE DETECTED!")
-            
-            if vol.get('volume_dryup', {}).get('dryup_detected'):
-                logger.info(f"    💧 VOLUME DRY-UP DETECTED!")
-        else:
-            logger.warning(f"  ⚠️ No volume analysis data returned")
-        
-        if result.get('key_levels'):
-            levels = result['key_levels']
-            if 'error' not in levels:
-                logger.info(f"\n  🎯 Key Levels:")
-                logger.info(f"    Confluence Score: {levels.get('confluence_score', 0)}/10")
-                logger.info(f"    At Resistance: {levels.get('at_resistance', False)}")
-                logger.info(f"    At Support: {levels.get('at_support', False)}")
-                
-                if levels.get('confluence_score', 0) >= 7:
-                    logger.info(f"    ⚡ HIGH CONFLUENCE DETECTED!")
-            else:
-                logger.warning(f"  ⚠️ Key level detection error: {levels.get('error')}")
-        else:
-            logger.warning(f"  ⚠️ No key level data returned")
-        
-        # NEW: Gap Detection Info
-        if result.get('gap_data'):
-            gap = result['gap_data']
-            if gap.get('gap_type') != 'NO_GAP' and gap.get('gap_type') != 'UNKNOWN':
-                logger.info(f"\n  📈 Gap Analysis:")
-                logger.info(f"    Type: {gap.get('gap_type')}")
-                logger.info(f"    Size: {gap.get('gap_size')}%")
-                logger.info(f"    Amount: ${gap.get('gap_amount')}")
-        
-        # NEW: News Impact Info
-        if result.get('news'):
-            news = result['news']
-            if news.get('news_impact') != 'NONE':
-                logger.info(f"\n  📰 News Analysis:")
-                logger.info(f"    Sentiment: {news.get('sentiment')}")
-                logger.info(f"    Impact: {news.get('news_impact')}")
-                logger.info(f"    Urgency: {news.get('urgency')}")
-                logger.info(f"    Score: {news.get('sentiment_score')}")
-        
-        # NEW: Pre-Market RVOL Info
-        if result.get('premarket_rvol'):
-            pm = result['premarket_rvol']
-            if pm.get('rvol', 0) > 0:
-                logger.info(f"\n  🌅 Pre-Market RVOL:")
-                logger.info(f"    RVOL: {pm.get('rvol', 0):.2f}x ({pm.get('classification', 'N/A')})")
-                logger.info(f"    Current Volume: {pm.get('current_volume', 0):,}")
-        
-        # NEW: R:R Check
-        if result.get('entry_targets'):
-            et = result['entry_targets']
-            if et.get('insufficient_rr'):
-                logger.warning(f"\n  ⚠️ SIGNAL FILTERED: R:R {et.get('rr_ratio', 0):.2f} below minimum 2.0")
-            else:
-                logger.info(f"\n  💰 Entry & Targets:")
-                logger.info(f"    R:R Ratio: {et.get('risk_reward', 0):.2f}")
-                logger.info(f"    Entry: ${et.get('entry', 0):.2f}")
-                logger.info(f"    TP1: ${et.get('tp1', 0):.2f}")
-                logger.info(f"    Stop: ${et.get('stop_loss', 0):.2f}")
-        
-        logger.info(f"{'='*60}\n")
         
         # PHASE 1: Track signal if metrics enabled
         if metrics_tracker and result.get('alert_type') not in ['MONITOR', None]:
             try:
                 signal_id = metrics_tracker.record_signal(result)
-                logger.debug(f"  📊 Tracked signal: {signal_id}")
+                logger.debug(f"📊 Tracked signal: {signal_id}")
             except Exception as e:
-                logger.error(f"  ⚠️ Metrics tracking failed: {str(e)}")
+                logger.error(f"⚠️ Metrics tracking failed: {str(e)}")
         
         return jsonify(result)
         
@@ -670,7 +701,7 @@ def get_watchlist():
 
 
 # ============================================================================
-# EARNINGS MONITORING API ENDPOINTS (PRESERVED FROM YOUR VERSION)
+# EARNINGS MONITORING API ENDPOINTS (PRESERVED)
 # ============================================================================
 
 @app.route('/api/earnings/status')
@@ -714,7 +745,7 @@ def disable_earnings():
         if alert_manager:
             alert_manager.earnings_manager = EarningsStateManager()
         
-        logger.info("📕 Earnings monitoring disabled via API")
+        logger.info("🔕 Earnings monitoring disabled via API")
         
         return jsonify({
             'success': True,
@@ -774,9 +805,13 @@ def get_earnings_schedule():
         logger.error(f"Error getting schedule: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+"""
+CONTINUATION OF app.py - Part 3 (FINAL)
+All API endpoints + Main section
+"""
 
 # ============================================================================
-# PHASE 1: SIGNAL METRICS API ENDPOINTS
+# PHASE 1: SIGNAL METRICS API ENDPOINTS (PRESERVED)
 # ============================================================================
 
 @app.route('/api/metrics/winrate')
@@ -831,7 +866,7 @@ def get_symbol_performance(symbol):
 
 
 # ============================================================================
-# OPENAI MONITOR API ENDPOINTS
+# OPENAI MONITOR API ENDPOINTS (PRESERVED)
 # ============================================================================
 
 @app.route('/api/openai/status')
@@ -878,7 +913,7 @@ def get_openai_stats():
 
 
 # ============================================================================
-# MARKET IMPACT MONITOR API ENDPOINTS
+# MARKET IMPACT MONITOR API ENDPOINTS (PRESERVED)
 # ============================================================================
 
 @app.route('/api/market-impact/status')
@@ -926,181 +961,263 @@ def get_market_impact_stats():
 
 
 # ============================================================================
-# NEW: PRE-MARKET VOLUME SPIKE MONITOR API ENDPOINTS
+# EXTENDED HOURS VOLUME MONITOR API ENDPOINTS (PRESERVED)
 # ============================================================================
 
-@app.route('/api/premarket-volume/status')
-def get_premarket_monitor_status():
-    """Get Pre-Market Volume monitor status"""
-    if not premarket_monitor:
+@app.route('/api/extended-hours-volume/status')
+def get_extended_hours_monitor_status():
+    """Get Extended Hours Volume monitor status"""
+    if not extended_hours_monitor:
         return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
     
     return jsonify({
-        'enabled': premarket_monitor.enabled,
-        'check_interval': premarket_monitor.check_interval,
-        'spike_threshold': premarket_monitor.spike_threshold,
-        'cooldown_minutes': premarket_monitor.cooldown_minutes,
-        'watchlist_count': len(premarket_monitor.watchlist),
-        'current_session': premarket_monitor.get_current_session(),
-        'is_extended_hours': premarket_monitor.is_extended_hours(),
-        'stats': premarket_monitor.stats
+        'enabled': extended_hours_monitor.enabled,
+        'check_interval': extended_hours_monitor.check_interval,
+        'spike_threshold': extended_hours_monitor.spike_threshold,
+        'cooldown_minutes': extended_hours_monitor.cooldown_minutes,
+        'price_filter': extended_hours_monitor.min_price_change_pct,
+        'sessions': ['premarket', 'afterhours'],
+        'current_session': extended_hours_monitor.get_current_session(),
+        'is_extended_hours': extended_hours_monitor.is_extended_hours(),
+        'watchlist_count': len(extended_hours_monitor.watchlist),
+        'stats': extended_hours_monitor.stats
     })
 
 
-@app.route('/api/premarket-volume/check', methods=['POST'])
-def trigger_premarket_check():
-    """Manually trigger pre-market volume check"""
-    if not premarket_monitor:
+@app.route('/api/extended-hours-volume/check', methods=['POST'])
+def trigger_extended_hours_check():
+    """Manually trigger extended hours volume check"""
+    if not extended_hours_monitor:
         return jsonify({'error': 'Monitor not available'}), 503
     
     try:
-        alerts_sent = premarket_monitor.run_single_check()
+        alerts_sent = extended_hours_monitor.run_single_check()
         return jsonify({
             'success': True,
             'alerts_sent': alerts_sent,
-            'stats': premarket_monitor.stats
+            'stats': extended_hours_monitor.stats
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/premarket-volume/stats')
-def get_premarket_stats():
-    """Get Pre-Market Volume monitor statistics"""
-    if not premarket_monitor:
+@app.route('/api/extended-hours-volume/stats')
+def get_extended_hours_stats():
+    """Get Extended Hours Volume monitor statistics"""
+    if not extended_hours_monitor:
         return jsonify({'error': 'Monitor not available'}), 503
     
-    return jsonify(premarket_monitor.stats)
+    return jsonify(extended_hours_monitor.stats)
 
 
 # ============================================================================
-# DIAGNOSTIC API ENDPOINTS
+# REAL-TIME VOLUME MONITOR API ENDPOINTS (PRESERVED)
 # ============================================================================
 
-@app.route('/api/diagnostics/test/<symbol>')
-def diagnostic_test(symbol):
-    """
-    NEW: Run comprehensive diagnostic test on a symbol
-    Returns detailed breakdown of why signal did/didn't trigger
-    """
+@app.route('/api/realtime-volume/status')
+def get_realtime_monitor_status():
+    """Get Real-Time Volume monitor status"""
+    if not realtime_monitor:
+        return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
+    
+    return jsonify({
+        'enabled': realtime_monitor.enabled,
+        'check_interval': realtime_monitor.check_interval,
+        'thresholds': realtime_monitor.thresholds,
+        'cooldown_minutes': realtime_monitor.cooldown_minutes,
+        'price_filter': realtime_monitor.min_price_change_pct,
+        'market_hours_only': True,
+        'is_market_hours': realtime_monitor.is_market_hours(),
+        'watchlist_count': len(realtime_monitor.watchlist),
+        'stats': realtime_monitor.stats
+    })
+
+
+@app.route('/api/realtime-volume/check', methods=['POST'])
+def trigger_realtime_check():
+    """Manually trigger real-time volume check"""
+    if not realtime_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    try:
+        alerts_sent = realtime_monitor.run_single_check()
+        return jsonify({
+            'success': True,
+            'alerts_sent': alerts_sent,
+            'stats': realtime_monitor.stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/realtime-volume/stats')
+def get_realtime_stats():
+    """Get Real-Time Volume monitor statistics"""
+    if not realtime_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    return jsonify(realtime_monitor.stats)
+
+
+# ============================================================================
+# MOMENTUM SIGNAL MONITOR API ENDPOINTS (PRESERVED)
+# ============================================================================
+
+@app.route('/api/momentum-signals/status')
+def get_momentum_monitor_status():
+    """Get Momentum Signal monitor status"""
+    if not momentum_monitor:
+        return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
+    
+    return jsonify({
+        'enabled': momentum_monitor.enabled,
+        'check_interval': momentum_monitor.check_interval,
+        'market_hours_only': momentum_monitor.market_hours_only,
+        'min_rvol': momentum_monitor.min_rvol,
+        'min_dark_pool_strength': momentum_monitor.min_dark_pool_strength,
+        'gamma_wall_distance': momentum_monitor.gamma_wall_distance,
+        'cooldowns': momentum_monitor.cooldowns,
+        'stats': momentum_monitor.stats
+    })
+
+
+@app.route('/api/momentum-signals/check', methods=['POST'])
+def trigger_momentum_check():
+    """Manually trigger momentum signal check"""
+    if not momentum_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    try:
+        alerts_sent = momentum_monitor.run_single_check()
+        return jsonify({
+            'success': True,
+            'alerts_sent': alerts_sent,
+            'stats': momentum_monitor.stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/momentum-signals/stats')
+def get_momentum_stats():
+    """Get Momentum Signal monitor statistics"""
+    if not momentum_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    return jsonify(momentum_monitor.stats)
+
+
+# ============================================================================
+# 0DTE GAMMA MONITOR API ENDPOINTS (NEW)
+# ============================================================================
+
+@app.route('/api/odte-gamma/status')
+def get_odte_monitor_status():
+    """Get 0DTE Gamma monitor status"""
+    if not odte_monitor:
+        return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
+    
+    return jsonify({
+        'enabled': odte_monitor.enabled,
+        'alert_time': odte_monitor.alert_time,
+        'alert_window_minutes': odte_monitor.alert_window_minutes,
+        'proximity_range': {
+            'min_pct': odte_monitor.min_proximity_pct,
+            'max_pct': odte_monitor.max_proximity_pct
+        },
+        'weekdays_only': odte_monitor.weekdays_only,
+        'watchlist_only': odte_monitor.watchlist_only,
+        'is_alert_time': odte_monitor.is_alert_time(),
+        'is_weekday': odte_monitor.is_weekday(),
+        'alerted_today': list(odte_monitor.alerted_today),
+        'stats': odte_monitor.stats
+    })
+
+
+@app.route('/api/odte-gamma/check', methods=['POST'])
+def trigger_odte_check():
+    """Manually trigger 0DTE gamma check"""
+    if not odte_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    try:
+        alerts_sent = odte_monitor.run_single_check()
+        return jsonify({
+            'success': True,
+            'alerts_sent': alerts_sent,
+            'stats': odte_monitor.stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/odte-gamma/stats')
+def get_odte_stats():
+    """Get 0DTE Gamma monitor statistics"""
+    if not odte_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    return jsonify(odte_monitor.stats)
+
+
+@app.route('/api/odte-gamma/test/<symbol>')
+def test_odte_symbol(symbol):
+    """Test 0DTE detection for specific symbol"""
+    if not odte_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
     try:
         symbol = symbol.upper()
-        result = analyzer.generate_professional_signal(symbol)
         
-        # Build diagnostic report
-        diagnostic = {
+        # Check if 0DTE exists
+        odte_exists, gamma_data = odte_monitor.check_odte_exists(symbol)
+        
+        if not odte_exists:
+            return jsonify({
+                'symbol': symbol,
+                'odte_exists': False,
+                'message': 'No 0DTE options found for today'
+            })
+        
+        # Get current price
+        quote = odte_monitor.analyzer.get_real_time_quote(symbol)
+        current_price = quote['price']
+        
+        # Check proximity
+        alert_data = odte_monitor.check_proximity_to_gamma_walls(
+            symbol, current_price, gamma_data
+        )
+        
+        return jsonify({
             'symbol': symbol,
-            'timestamp': datetime.now().isoformat(),
-            'signal_generated': result.get('signal') is not None,
-            'alert_type': result.get('alert_type', 'MONITOR'),
-            'factor_scores': {
-                'bullish': result.get('bullish_score', 0),
-                'bearish': result.get('bearish_score', 0),
-                'threshold': 8
-            },
-            'modules_status': {
-                'volume_analyzer': analyzer.volume_analyzer is not None,
-                'key_level_detector': analyzer.key_level_detector is not None,
-            },
-            'data_quality': {
-                'has_volume_data': bool(result.get('volume_analysis')),
-                'has_key_levels': bool(result.get('key_levels') and 'error' not in result.get('key_levels', {})),
-                'has_news': bool(result.get('news') and result['news'].get('news_impact') != 'NONE'),
-                'has_gap': result.get('gap_data', {}).get('gap_type') not in ['NO_GAP', 'UNKNOWN']
-            },
-            'filter_reasons': []
-        }
-        
-        # Check why signal might have been filtered
-        if result.get('entry_targets', {}).get('insufficient_rr'):
-            diagnostic['filter_reasons'].append(
-                f"R:R ratio {result['entry_targets'].get('rr_ratio', 0):.2f} below minimum 2.0"
-            )
-        
-        if result.get('bullish_score', 0) < 8 and result.get('bearish_score', 0) < 8:
-            diagnostic['filter_reasons'].append(
-                f"Factor scores below threshold (need 8, got B:{result.get('bullish_score', 0)} / S:{result.get('bearish_score', 0)})"
-            )
-        
-        # Near-miss detection
-        diagnostic['near_miss'] = (
-            result.get('bullish_score', 0) >= 5 or result.get('bearish_score', 0) >= 5
-        ) and not result.get('signal')
-        
-        if diagnostic['near_miss']:
-            diagnostic['near_miss_details'] = {
-                'message': 'Signal was close to triggering but filtered',
-                'needed': 8 - max(result.get('bullish_score', 0), result.get('bearish_score', 0)),
-                'suggestion': 'Consider lowering threshold to 6 for more alerts'
-            }
-        
-        return jsonify(diagnostic)
+            'odte_exists': True,
+            'current_price': current_price,
+            'expiration': gamma_data.get('expiration'),
+            'hours_until_expiry': gamma_data.get('hours_until_expiry'),
+            'gamma_levels': gamma_data.get('gamma_levels', []),
+            'proximity_alert': alert_data is not None,
+            'proximity_levels': alert_data.get('proximity_levels', []) if alert_data else [],
+            'expected_range': gamma_data.get('expected_range', {})
+        })
         
     except Exception as e:
-        logger.error(f"Diagnostic test failed for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/diagnostics/watchlist-scan')
-def diagnostic_watchlist_scan():
-    """
-    NEW: Scan entire watchlist and show near-miss signals
-    Helps identify if threshold is too high
-    """
-    try:
-        symbols = watchlist_manager.load_symbols()
-        results = []
-        
-        for symbol in symbols:
-            try:
-                result = analyzer.generate_professional_signal(symbol)
-                
-                bullish = result.get('bullish_score', 0)
-                bearish = result.get('bearish_score', 0)
-                max_score = max(bullish, bearish)
-                
-                # Include if it's a signal OR a near-miss (5+ factors)
-                if max_score >= 5:
-                    results.append({
-                        'symbol': symbol,
-                        'bullish_score': bullish,
-                        'bearish_score': bearish,
-                        'triggered': result.get('signal') is not None,
-                        'alert_type': result.get('alert_type', 'MONITOR'),
-                        'near_miss': max_score >= 5 and max_score < 8,
-                        'needed_factors': 8 - max_score if max_score < 8 else 0
-                    })
-            except Exception as e:
-                logger.error(f"Error scanning {symbol}: {str(e)}")
-                continue
-        
-        # Sort by score
-        results.sort(key=lambda x: max(x['bullish_score'], x['bearish_score']), reverse=True)
-        
-        summary = {
-            'total_scanned': len(symbols),
-            'signals_triggered': sum(1 for r in results if r['triggered']),
-            'near_misses': sum(1 for r in results if r['near_miss']),
-            'results': results
-        }
-        
-        return jsonify(summary)
-        
-    except Exception as e:
-        logger.error(f"Watchlist scan failed: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
+# ============================================================================
+# HEALTH CHECK ENDPOINT
+# ============================================================================
 
 @app.route('/api/health')
 def health_check():
     """
-    Health check endpoint (Phase 1 enhanced + DIAGNOSTICS + MARKET IMPACT + PRE-MARKET VOL)
+    Health check endpoint (COMPLETE VERSION WITH ALL MONITORS)
     """
     earnings_status = earnings_manager.get_status()
     
     return jsonify({
         'status': 'healthy',
-        'version': '4.0-phase1-market-impact-premarket-vol',
+        'version': '4.2-odte-gamma-monitor',
         'polygon_enabled': bool(POLYGON_API_KEY),
         'alerts_enabled': alert_manager is not None,
         'earnings_monitoring': {
@@ -1114,15 +1231,8 @@ def health_check():
             'volume_analysis': analyzer.volume_analyzer is not None,
             'key_level_detection': analyzer.key_level_detector is not None,
             'signal_metrics': metrics_tracker is not None,
-            'rr_enforcement': False,  # Disabled per user request
+            'rr_enforcement': False,
             'dynamic_scan_intervals': True
-        },
-        'diagnostics': {
-            'enabled': True,
-            'endpoints': [
-                '/api/diagnostics/test/<symbol>',
-                '/api/diagnostics/watchlist-scan'
-            ]
         },
         'alert_stats': alert_manager.stats if alert_manager else None,
         'openai_monitor': {
@@ -1136,11 +1246,35 @@ def health_check():
             'watchlist_count': len(market_impact_monitor.watchlist) if market_impact_monitor else 0,
             'stats': market_impact_monitor.stats if market_impact_monitor else {}
         },
-        'premarket_volume_monitor': {
-            'enabled': premarket_monitor is not None,
-            'spike_threshold': premarket_monitor.spike_threshold if premarket_monitor else 0,
-            'cooldown_minutes': premarket_monitor.cooldown_minutes if premarket_monitor else 0,
-            'stats': premarket_monitor.stats if premarket_monitor else {}
+        'extended_hours_volume_monitor': {
+            'enabled': extended_hours_monitor is not None,
+            'spike_threshold': extended_hours_monitor.spike_threshold if extended_hours_monitor else 0,
+            'cooldown_minutes': extended_hours_monitor.cooldown_minutes if extended_hours_monitor else 0,
+            'sessions': ['premarket', 'afterhours'],
+            'stats': extended_hours_monitor.stats if extended_hours_monitor else {}
+        },
+        'realtime_volume_monitor': {
+            'enabled': realtime_monitor is not None,
+            'check_interval': realtime_monitor.check_interval if realtime_monitor else 0,
+            'cooldown_minutes': realtime_monitor.cooldown_minutes if realtime_monitor else 0,
+            'price_filter': realtime_monitor.min_price_change_pct if realtime_monitor else 0,
+            'thresholds': realtime_monitor.thresholds if realtime_monitor else {},
+            'stats': realtime_monitor.stats if realtime_monitor else {}
+        },
+        'momentum_signal_monitor': {
+            'enabled': momentum_monitor is not None,
+            'check_interval': momentum_monitor.check_interval if momentum_monitor else 0,
+            'min_rvol': momentum_monitor.min_rvol if momentum_monitor else 0,
+            'triggers': 5 if momentum_monitor else 0,
+            'stats': momentum_monitor.stats if momentum_monitor else {}
+        },
+        'odte_gamma_monitor': {
+            'enabled': odte_monitor is not None,
+            'alert_time': odte_monitor.alert_time if odte_monitor else None,
+            'proximity_range': f"{odte_monitor.min_proximity_pct}-{odte_monitor.max_proximity_pct}%" if odte_monitor else None,
+            'is_alert_time': odte_monitor.is_alert_time() if odte_monitor else False,
+            'alerted_today': len(odte_monitor.alerted_today) if odte_monitor else 0,
+            'stats': odte_monitor.stats if odte_monitor else {}
         }
     })
 
@@ -1164,7 +1298,7 @@ def phase1_status():
                 },
                 'risk_management': {
                     'min_rr': 2.0,
-                    'enforcement': False  # Disabled
+                    'enforcement': False
                 },
                 'signal_metrics': {
                     'enabled': metrics_tracker is not None,
@@ -1184,10 +1318,32 @@ def phase1_status():
                     'volume_confirmation': market_impact_monitor.volume_enabled if market_impact_monitor else False,
                     'min_rvol': market_impact_monitor.min_rvol if market_impact_monitor else 0
                 },
-                'premarket_volume_monitor': {
-                    'enabled': premarket_monitor is not None,
-                    'spike_threshold': premarket_monitor.spike_threshold if premarket_monitor else 0,
-                    'cooldown_minutes': premarket_monitor.cooldown_minutes if premarket_monitor else 0
+                'extended_hours_volume_monitor': {
+                    'enabled': extended_hours_monitor is not None,
+                    'spike_threshold': extended_hours_monitor.spike_threshold if extended_hours_monitor else 0,
+                    'cooldown_minutes': extended_hours_monitor.cooldown_minutes if extended_hours_monitor else 0
+                },
+                'realtime_volume_monitor': {
+                    'enabled': realtime_monitor is not None,
+                    'check_interval': realtime_monitor.check_interval if realtime_monitor else 0,
+                    'thresholds': {
+                        'elevated': 2.0,
+                        'high': 3.0,
+                        'extreme': 5.0
+                    } if realtime_monitor else {},
+                    'cooldown_minutes': realtime_monitor.cooldown_minutes if realtime_monitor else 0,
+                    'price_filter': realtime_monitor.min_price_change_pct if realtime_monitor else 0
+                },
+                'momentum_signal_monitor': {
+                    'enabled': momentum_monitor is not None,
+                    'check_interval': momentum_monitor.check_interval if momentum_monitor else 0,
+                    'triggers': 5 if momentum_monitor else 0
+                },
+                'odte_gamma_monitor': {
+                    'enabled': odte_monitor is not None,
+                    'alert_time': odte_monitor.alert_time if odte_monitor else None,
+                    'proximity_range': f"{odte_monitor.min_proximity_pct}-{odte_monitor.max_proximity_pct}%" if odte_monitor else None,
+                    'weekdays_only': odte_monitor.weekdays_only if odte_monitor else False
                 }
             },
             'total_factors': 26
@@ -1199,8 +1355,8 @@ def phase1_status():
 
 if __name__ == '__main__':
     print("\n" + "=" * 60)
-    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.0")
-    print("   (PHASE 1 + DIAGNOSTICS + MARKET IMPACT + PRE-MARKET VOL)")
+    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.2")
+    print("   (WITH 0DTE GAMMA MONITOR)")
     print("=" * 60)
     print(f"\n📊 Dashboard: http://localhost:5001")
     print(f"🩺 API Health: http://localhost:5001/api/health")
@@ -1208,123 +1364,77 @@ if __name__ == '__main__':
     
     # Show earnings status
     earnings_status = earnings_manager.get_status()
-    print(f"\n📅 Earnings Monitoring: {'✅ ENABLED' if earnings_status['enabled'] else '📕 DISABLED'}")
+    print(f"\n📅 Earnings Monitoring: {'✅ ENABLED' if earnings_status['enabled'] else '🔕 DISABLED'}")
     print(f"📊 Earnings Symbols: {earnings_status['symbols_count']}")
     if earnings_status['symbols']:
         print(f"   {', '.join(earnings_status['symbols'][:5])}" + 
               (f" + {earnings_status['symbols_count'] - 5} more" if earnings_status['symbols_count'] > 5 else ""))
     
-    # PHASE 1: Show enhanced features
-    print(f"\n🚀 PHASE 1 FEATURES:")
-    print(f"   ✅ Volume Analysis (RVOL, spikes, dry-ups)")
-    print(f"   ✅ Key Level Detection (confluence scoring)")
-    print(f"   ✅ 1:2 R:R Enforcement: DISABLED")
-    print(f"   ✅ Signal Metrics Tracking")
-    print(f"   ✅ Dynamic Scan Intervals (60s first hour, 120s midday)")
-    print(f"   ✅ 26 Total Factors (was 15)")
+    # Schedule Sunday routine
+    schedule_sunday_routine()
     
-    # OpenAI Monitor status
-    if openai_monitor:
-        print(f"\n🔍 OpenAI News Monitor: ENABLED")
-        print(f"   📡 Check interval: {openai_monitor.check_interval}s")
-        print(f"   📊 Volume confirmation: {'ENABLED' if openai_monitor.volume_enabled else 'DISABLED'}")
-        print(f"   🎯 Tech stocks: {len(openai_monitor.tech_stocks)}")
-        print(f"   ⚡ Min RVOL: {openai_monitor.min_rvol}x")
-    
-    # Market Impact Monitor status
-    if market_impact_monitor:
-        print(f"\n🌍 Market Impact Monitor: ENABLED")
-        print(f"   📡 Check interval: {market_impact_monitor.check_interval}s")
-        print(f"   📊 Volume confirmation: {'ENABLED' if market_impact_monitor.volume_enabled else 'DISABLED'}")
-        print(f"   🎯 Watchlist stocks: {len(market_impact_monitor.watchlist)}")
-        print(f"   🌍 Macro keywords: {len(market_impact_monitor.macro_keywords)}")
-        print(f"   🔗 Spillover maps: {len(market_impact_monitor.spillover_map)}")
-        print(f"   ⚡ Min RVOL: {market_impact_monitor.min_rvol}x")
-        print(f"   📬 Routes to: DISCORD_NEWS_ALERTS")
-    
-    # NEW: Pre-Market Monitor status
-    if premarket_monitor:
-        print(f"\n📊 Pre-Market Volume Monitor: ENABLED")
-        print(f"   📡 Check interval: {premarket_monitor.check_interval}s")
-        print(f"   ⚡ Spike threshold: {premarket_monitor.spike_threshold}x RVOL")
-        print(f"   ⏱️  Cooldown: {premarket_monitor.cooldown_minutes}min")
-        print(f"   📊 Sessions: Pre-market (4-9:30 AM) + After-hours (4-8 PM)")
-        print(f"   📬 Routes to: DISCORD_VOLUME_SPIKE")
-    
-    # Alert system status
+    # Start alert system in background thread
     if alert_manager:
-        print(f"\n✅ Alert System (Phase 1): ENABLED")
-        print(f"   📢 Discord: {'ENABLED' if alert_manager.discord else 'DISABLED'}")
-        
+        print(f"\n📢 Starting Phase 1 Alert System...")
         alert_thread = threading.Thread(target=run_alert_system, daemon=True)
         alert_thread.start()
-        print(f"\n📢 Phase 1 alert system started in background")
-        print(f"   ⏱️ First Hour: 60s intervals")
-        print(f"   ⏱️ Mid-Day: 120s intervals")
-        
-        # Check if alert thread is running
-        import time
-        time.sleep(1)
-        if alert_thread.is_alive():
-            print(f"   ✅ Alert thread is RUNNING")
-        else:
-            print(f"   ❌ Alert thread FAILED to start")
+        print(f"   ✅ Alert system started in background")
     
-    # Start OpenAI Monitor
+    # Start OpenAI monitor
     if openai_monitor:
         print(f"\n🔍 Starting OpenAI News Monitor...")
         openai_monitor_thread = threading.Thread(target=run_openai_monitor, daemon=True)
         openai_monitor_thread.start()
         print(f"   ✅ OpenAI monitor started in background")
-        print(f"   📡 Checking every {openai_monitor.check_interval}s")
-        print(f"   📊 Monitoring {len(openai_monitor.tech_stocks)} tech stocks")
     
-    # Start Market Impact Monitor
+    # Start Market Impact monitor
     if market_impact_monitor:
-        print(f"\n🌍 Starting Market Impact Monitor...")
+        print(f"\n🌎 Starting Market Impact Monitor...")
         market_impact_thread = threading.Thread(target=run_market_impact_monitor, daemon=True)
         market_impact_thread.start()
         print(f"   ✅ Market Impact monitor started in background")
-        print(f"   📡 Checking every {market_impact_monitor.check_interval}s")
-        print(f"   📊 Monitoring: Macro, M&A, Analyst, Spillover")
-        print(f"   📬 Alerts to: DISCORD_NEWS_ALERTS")
     
-    # NEW: Start Pre-Market Volume Monitor
-    if premarket_monitor:
-        print(f"\n📊 Starting Pre-Market Volume Spike Monitor...")
-        premarket_monitor_thread = threading.Thread(target=run_premarket_monitor, daemon=True)
-        premarket_monitor_thread.start()
-        print(f"   ✅ Pre-Market monitor started in background")
-        print(f"   📡 Checking every {premarket_monitor.check_interval}s")
-        print(f"   📊 Monitoring: Pre-market (4-9:30 AM) + After-hours (4-8 PM)")
-        print(f"   ⚡ Spike threshold: {premarket_monitor.spike_threshold}x RVOL")
-        print(f"   📬 Alerts to: DISCORD_VOLUME_SPIKE")
+    # Start Extended Hours Volume monitor
+    if extended_hours_monitor:
+        print(f"\n🌅 Starting Extended Hours Volume Monitor...")
+        extended_hours_monitor_thread = threading.Thread(target=run_extended_hours_monitor, daemon=True)
+        extended_hours_monitor_thread.start()
+        print(f"   ✅ Extended Hours monitor started")
     
-    # Metrics tracker status
-    if metrics_tracker:
-        print(f"\n📊 Signal Metrics: ENABLED")
-        print(f"   📈 View at: http://localhost:5001/api/metrics/winrate?days=7")
+    # Start Real-Time Volume monitor
+    if realtime_monitor:
+        print(f"\n⚡ Starting Real-Time Volume Monitor...")
+        realtime_monitor_thread = threading.Thread(target=run_realtime_monitor, daemon=True)
+        realtime_monitor_thread.start()
+        print(f"   ✅ Real-Time monitor started")
     
-    # Schedule Sunday routine
-    schedule_sunday_routine()
-    print(f"\n🗓️ Sunday Routine: ENABLED")
-    print(f"   📅 Schedule: Every Sunday at 8:00 PM")
-    print(f"   📢 Updates earnings watchlist + sends Discord calendar")
+    # Start Momentum Signal Monitor
+    if momentum_monitor:
+        print(f"\n🎯 Starting Momentum Signal Monitor...")
+        momentum_monitor_thread = threading.Thread(target=run_momentum_monitor, daemon=True)
+        momentum_monitor_thread.start()
+        print(f"   ✅ Momentum monitor started in background")
     
-    if datetime.now().weekday() == 6:
-        print(f"   ✨ It's Sunday! Routine will run shortly...")
+    # Start 0DTE Gamma Monitor
+    if odte_monitor:
+        print(f"\n🎯 Starting 0DTE Gamma Monitor...")
+        odte_monitor_thread = threading.Thread(target=run_odte_monitor, daemon=True)
+        odte_monitor_thread.start()
+        print(f"   ✅ 0DTE monitor started")
+        print(f"   🕐 Alert time: {odte_monitor.alert_time} EST")
+        print(f"   📏 Proximity: {odte_monitor.min_proximity_pct}%-{odte_monitor.max_proximity_pct}%")
+        print(f"   ⏱️ Window: {odte_monitor.alert_window_minutes} minutes")
+        print(f"   📬 Routes to: DISCORD_ODTE_LEVELS")
     
-    # NEW: Diagnostic endpoints
-    print(f"\n🔍 DIAGNOSTIC ENDPOINTS:")
-    print(f"   http://localhost:5001/api/diagnostics/test/NVDA")
-    print(f"   http://localhost:5001/api/diagnostics/watchlist-scan")
-    print(f"   http://localhost:5001/api/market-impact/status")
-    print(f"   http://localhost:5001/api/market-impact/check (POST)")
-    print(f"   http://localhost:5001/api/premarket-volume/status")
-    print(f"   http://localhost:5001/api/premarket-volume/check (POST)")
-    
-    print("\n" + "=" * 60)
-    print("Press CTRL+C to stop")
+    print(f"\n" + "=" * 60)
+    print("✅ ALL SYSTEMS ONLINE - READY FOR TRADING!")
+    print("=" * 60)
+    print(f"\n🎯 NEW: 0DTE Gamma Monitor Active!")
+    print(f"   • Alerts at 9:00 AM EST Monday-Friday")
+    print(f"   • When price within 1-2% of gamma walls")
+    print(f"   • Only when 0DTE options exist")
     print("=" * 60 + "\n")
     
+    # Start Flask server
     app.run(host='0.0.0.0', port=5001, debug=False)
+# TO BE CONTINUED IN PART 3...

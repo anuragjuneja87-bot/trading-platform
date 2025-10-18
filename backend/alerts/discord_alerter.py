@@ -1,7 +1,9 @@
 """
 backend/alerts/discord_alerter.py
-Enhanced Discord Alerter - PHASE 1 UPDATE + MARKET IMPACT ALERTS
-Now includes volume and key level data in alerts + market impact routing
+Enhanced Discord Alerter - WITH VOLUME SPIKE ALERTS + 0DTE SUPPORT
+Adds new method: send_volume_spike_alert()
+Uses DISCORD_VOLUME_SPIKE webhook
+Supports DISCORD_ODTE_LEVELS webhook
 """
 
 import requests
@@ -24,17 +26,21 @@ class DiscordAlerter:
                 'news': self._expand_env_var(config.get('webhook_news')),
                 'earnings_weekly': self._expand_env_var(config.get('webhook_earnings_weekly')),
                 'earnings_realtime': self._expand_env_var(config.get('webhook_earnings_realtime')),
-                'market_impact': self._expand_env_var(config.get('webhook_market_impact'))  # NEW
+                'market_impact': self._expand_env_var(config.get('webhook_market_impact')),
+                'volume_spike': self._expand_env_var(config.get('webhook_volume_spike')),
+                'odte_levels': self._expand_env_var(config.get('webhook_odte_levels'))
             }
             
             if webhook_url:
-                for channel in ['trading', 'news', 'earnings_weekly', 'earnings_realtime', 'market_impact']:
+                for channel in ['trading', 'news', 'earnings_weekly', 'earnings_realtime', 
+                               'market_impact', 'volume_spike', 'odte_levels']:
                     if not self.webhooks.get(channel):
                         self.webhooks[channel] = webhook_url
             
             if not webhook_url and 'webhook_url' in config:
                 fallback_webhook = self._expand_env_var(config.get('webhook_url'))
-                for channel in ['trading', 'news', 'earnings_weekly', 'earnings_realtime', 'market_impact']:
+                for channel in ['trading', 'news', 'earnings_weekly', 'earnings_realtime', 
+                               'market_impact', 'volume_spike', 'odte_levels']:
                     if not self.webhooks.get(channel):
                         self.webhooks[channel] = fallback_webhook
         else:
@@ -43,7 +49,9 @@ class DiscordAlerter:
                 'news': webhook_url,
                 'earnings_weekly': webhook_url,
                 'earnings_realtime': webhook_url,
-                'market_impact': webhook_url
+                'market_impact': webhook_url,
+                'volume_spike': webhook_url,
+                'odte_levels': webhook_url
             }
         
         active_channels = []
@@ -84,6 +92,145 @@ class DiscordAlerter:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"❌ Discord webhook failed for {channel}: {str(e)}")
             return False
+    
+    def send_volume_spike_alert(self, symbol: str, volume_data: Dict, session: str = 'REGULAR') -> bool:
+        """
+        Send volume spike alert
+        
+        Args:
+            symbol: Stock symbol
+            volume_data: Volume analysis data (from calculate_intraday_spike or calculate_premarket_rvol)
+            session: 'REGULAR' or 'PREMARKET'
+        
+        Returns:
+            True if sent successfully
+        """
+        try:
+            spike_ratio = volume_data.get('spike_ratio') or volume_data.get('rvol', 0)
+            classification = volume_data.get('classification', 'UNKNOWN')
+            direction = volume_data.get('direction', 'UNKNOWN')
+            price_change = volume_data.get('price_change_pct', 0)
+            alert_urgency = volume_data.get('alert_urgency', 'MEDIUM')
+            
+            # Determine emoji and color
+            if classification == 'EXTREME':
+                emoji = '🔥'
+                color = 0xff0000  # Red
+            elif classification == 'HIGH':
+                emoji = '📈'
+                color = 0xff6600  # Orange
+            elif classification == 'ELEVATED':
+                emoji = '📊'
+                color = 0xffff00  # Yellow
+            else:
+                emoji = '📉'
+                color = 0x666666  # Gray
+            
+            # Direction emoji
+            if direction == 'BREAKOUT':
+                dir_emoji = '🚀'
+            elif direction == 'BREAKDOWN':
+                dir_emoji = '⬇️'
+            else:
+                dir_emoji = '↔️'
+            
+            # Session display
+            session_display = "PRE-MARKET" if session == 'PREMARKET' else "REGULAR HOURS"
+            
+            # Title
+            title = f'{emoji} {symbol} - VOLUME SPIKE ({session_display})'
+            if direction != 'UNKNOWN' and direction != 'NEUTRAL':
+                title += f' {dir_emoji} {direction}'
+            
+            embed = {
+                'title': title,
+                'description': f'**{classification}** volume detected - {alert_urgency} priority',
+                'color': color,
+                'timestamp': datetime.utcnow().isoformat(),
+                'fields': []
+            }
+            
+            # Spike ratio / RVOL
+            embed['fields'].append({
+                'name': '📊 Volume Metrics',
+                'value': (
+                    f"**Spike Ratio:** {spike_ratio:.2f}x\n"
+                    f"**Classification:** {classification}\n"
+                    f"**Session:** {session_display}"
+                ),
+                'inline': True
+            })
+            
+            # Price movement (if available)
+            if price_change != 0:
+                price_emoji = '📈' if price_change > 0 else '📉'
+                embed['fields'].append({
+                    'name': f'{price_emoji} Price Movement',
+                    'value': (
+                        f"**Change:** {price_change:+.2f}%\n"
+                        f"**Direction:** {direction}"
+                    ),
+                    'inline': True
+                })
+            
+            # Volume details
+            if session == 'PREMARKET':
+                current_vol = volume_data.get('current_5min_volume', 0)
+                avg_vol = volume_data.get('avg_hist_5min_volume', 0)
+                embed['fields'].append({
+                    'name': '📦 Volume Details',
+                    'value': (
+                        f"**Current 5-min:** {self._format_volume(current_vol)}\n"
+                        f"**Historical Avg:** {self._format_volume(avg_vol)}"
+                    ),
+                    'inline': True
+                })
+            else:
+                current_bar = volume_data.get('current_bar_volume', 0)
+                avg_bars = volume_data.get('avg_previous_volume', 0)
+                embed['fields'].append({
+                    'name': '📦 Volume Details',
+                    'value': (
+                        f"**Current Bar:** {self._format_volume(current_bar)}\n"
+                        f"**Avg (10 bars):** {self._format_volume(avg_bars)}"
+                    ),
+                    'inline': True
+                })
+            
+            # Action based on urgency
+            if alert_urgency == 'CRITICAL' or classification == 'EXTREME':
+                action = "🚨 **IMMEDIATE ACTION REQUIRED**\n✅ Check Bookmap NOW\n✅ Review for entry/exit\n✅ Check news catalyst"
+            elif alert_urgency == 'HIGH' or classification == 'HIGH':
+                action = "⚠️ **HIGH PRIORITY**\n✅ Monitor in Bookmap\n✅ Prepare for entry\n✅ Check for news"
+            else:
+                action = "👀 **WATCH CLOSELY**\n✅ Add to watchlist\n✅ Monitor for continuation"
+            
+            embed['fields'].append({
+                'name': '🎯 Action Items',
+                'value': action,
+                'inline': False
+            })
+            
+            # Footer
+            embed['footer'] = {
+                'text': f'Volume Spike Monitor • {datetime.now().strftime("%H:%M:%S ET")}'
+            }
+            
+            payload = {'embeds': [embed]}
+            return self._send_webhook('volume_spike', payload)
+            
+        except Exception as e:
+            self.logger.error(f"Error sending volume spike alert: {str(e)}")
+            return False
+    
+    def _format_volume(self, volume: int) -> str:
+        """Format volume for display"""
+        if volume >= 1_000_000:
+            return f"{volume / 1_000_000:.1f}M"
+        elif volume >= 1_000:
+            return f"{volume / 1_000:.1f}K"
+        else:
+            return str(volume)
     
     def send_trading_signal(self, analysis: Dict) -> bool:
         """
@@ -327,7 +474,7 @@ class DiscordAlerter:
     
     def send_market_impact_alert(self, alert_data: Dict) -> bool:
         """
-        NEW: Send market impact alert (macro, M&A, analyst, spillover)
+        Send market impact alert (macro, M&A, analyst, spillover)
         Routes to: market_impact channel (DISCORD_NEWS_ALERTS)
         """
         try:
@@ -354,7 +501,7 @@ class DiscordAlerter:
             
             # Event type emojis
             type_emoji = {
-                'MACRO': '🌍',
+                'MACRO': '🌎',
                 'M&A': '🤝',
                 'ANALYST': '📊',
                 'EARNINGS': '💰',

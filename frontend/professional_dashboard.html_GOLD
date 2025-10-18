@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Trading Dashboard</title>
+    <title>Professional Trading Dashboard v4.2 - TRADIER GAMMA</title>
     <style>
         * {
             margin: 0;
@@ -40,9 +40,10 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
-        .sound-toggle {
+        .sound-toggle, .earnings-toggle {
             background: #003300;
             color: #00ff00;
             border: 1px solid #00ff00;
@@ -52,15 +53,31 @@
             font-family: inherit;
             border-radius: 3px;
             font-size: 12px;
+            transition: all 0.3s ease;
         }
 
-        .sound-toggle:hover {
+        .sound-toggle:hover, .earnings-toggle:hover {
             background: #004400;
         }
 
         .sound-toggle.active {
             background: #00ff00;
             color: #000;
+        }
+
+        .earnings-toggle {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .earnings-toggle.disabled {
+            background: #332200;
+            color: #ff6600;
+            border-color: #ff6600;
         }
 
         .notification-status {
@@ -205,6 +222,34 @@
             color: #888888;
         }
 
+        .volume-extreme {
+            color: #ff0000;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+
+        .volume-high {
+            color: #ff6600;
+            font-weight: bold;
+        }
+
+        .volume-elevated {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        .volume-normal {
+            color: #00ff00;
+        }
+
+        .volume-low {
+            color: #888888;
+        }
+
+        .volume-unknown {
+            color: #666666;
+        }
+
         .alert-buy {
             background: #003300;
             color: #00ff00;
@@ -270,34 +315,6 @@
             color: #888888;
         }
 
-        .twitter-very.bullish, .twitter-bullish {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .twitter-very.bearish, .twitter-bearish {
-            color: #ff0000;
-            font-weight: bold;
-        }
-
-        .twitter-neutral {
-            color: #888888;
-        }
-
-        .reddit-very.bullish, .reddit-bullish {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .reddit-very.bearish, .reddit-bearish {
-            color: #ff0000;
-            font-weight: bold;
-        }
-
-        .reddit-neutral {
-            color: #888888;
-        }
-
         .institutional-buy, .institutional-buying {
             color: #00ff00;
             font-weight: bold;
@@ -332,6 +349,75 @@
             font-size: 10px;
             color: #00ccff;
             line-height: 1.4;
+        }
+
+        /* ENHANCED: Gamma zones styling - MUCH MORE READABLE */
+        .gamma-zone {
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .gamma-strike-price {
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .gamma-label {
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.3px;
+        }
+
+        .gamma-resistance {
+            color: #ff8800;
+            font-weight: bold;
+        }
+
+        .gamma-resistance .gamma-strike-price {
+            color: #ff6600;
+        }
+
+        .gamma-support {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .gamma-support .gamma-strike-price {
+            color: #00ff00;
+        }
+
+        .gamma-current {
+            color: #ffff00;
+            font-weight: bold;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        .gamma-0dte {
+            color: #ff00ff;
+            font-weight: bold;
+            font-size: 12px;
+            animation: blink 1.5s infinite;
+        }
+
+        .gamma-separator {
+            color: #333;
+            margin: 3px 0;
+            font-size: 8px;
+        }
+
+        .gamma-data {
+            font-size: 10px;
+            color: #888;
+        }
+
+        .gamma-data.resistance-data {
+            color: #ff9944;
+        }
+
+        .gamma-data.support-data {
+            color: #44ff44;
         }
 
         .refresh-btn {
@@ -375,25 +461,12 @@
             color: #ff00ff;
             animation: blink 1s infinite;
         }
-
-        .social-volume {
-            font-size: 9px;
-            color: #666;
-        }
-
-        .social-volume.high {
-            color: #ffff00;
-        }
-
-        .social-volume.very-high {
-            color: #ff6600;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <div>
-            <h1>⚡ PROFESSIONAL TRADING DASHBOARD v3.3 ⚡</h1>
+            <h1>⚡ PROFESSIONAL TRADING DASHBOARD v4.2 - ENHANCED GAMMA ⚡</h1>
             <div style="font-size: 10px; color: #666; margin-top: 4px;" id="symbolList">
                 Loading watchlist...
             </div>
@@ -404,6 +477,13 @@
             <div class="controls" style="margin-top: 8px;">
                 <span class="watchlist-info" id="watchlistInfo">Watchlist: --</span>
                 <span class="update-indicator" id="updateIndicator">Updated: --:--</span>
+                
+                <button class="earnings-toggle" id="earningsToggle" onclick="toggleEarningsMonitoring()">
+                    <span id="earningsIcon">📅</span>
+                    <span id="earningsText">EARNINGS: ON</span>
+                    <span id="earningsCount" style="opacity: 0.7;">(0)</span>
+                </button>
+                
                 <button class="sound-toggle" id="soundToggle">
                     🔇 SOUND OFF
                 </button>
@@ -411,6 +491,9 @@
                     🧪 TEST ALERT
                 </button>
                 <span class="notification-status" id="notificationStatus" onclick="requestNotificationPermission()">NOTIFICATIONS: OFF</span>
+                <button class="refresh-btn" onclick="window.open('gamma_dashboard.html', '_blank')" style="background: #330033; border: 1px solid #ff00ff; color: #ff00ff;">
+                    🎯 GAMMA DETAIL VIEW
+                </button>
                 <button class="refresh-btn" onclick="window.location.href='leveraged_dashboard.html'" style="background: #003366; border: 1px solid #00ccff; color: #00ccff;">
                     📊 LEVERAGED CALC
                 </button>
@@ -430,20 +513,18 @@
                     <th>VWAP</th>
                     <th>CAMARILLA</th>
                     <th>SUP/RES</th>
-                    <th>1H BIAS</th>
-                    <th>DAILY BIAS</th>
-                    <th>DARK POOL</th>
-                    <th>OPTIONS</th>
+                    <th>PRE-MKT RVOL</th>
+                    <th>INTRADAY SPIKE</th>
+                    <th>DARK POOL 💰</th>
+                    <th style="min-width: 280px;">0DTE GAMMA ZONES 🎯</th>
                     <th>NEWS</th>
-                    <th>🐦 TWITTER</th>
-                    <th>🤖 REDDIT</th>
                     <th>ENTRY/TP/SL</th>
                     <th>ALERT</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
                 <tr>
-                    <td colspan="14" class="loading">LOADING WATCHLIST...</td>
+                    <td colspan="12" class="loading">LOADING WATCHLIST...</td>
                 </tr>
             </tbody>
         </table>
@@ -459,6 +540,9 @@
         let previousData = {};
         let previousAlerts = {};
         let isFirstLoad = true;
+
+        let earningsEnabled = true;
+        let earningsSymbolsCount = 0;
 
         async function loadWatchlist() {
             try {
@@ -482,6 +566,71 @@
                 SYMBOLS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'PLTR', 'ORCL'];
                 document.getElementById('symbolList').textContent = SYMBOLS.join(' | ') + ' (DEFAULT - ERROR)';
                 return false;
+            }
+        }
+
+        async function loadEarningsStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/earnings/status`);
+                const data = await response.json();
+                
+                earningsEnabled = data.enabled;
+                earningsSymbolsCount = data.symbols_count;
+                
+                updateEarningsDisplay();
+                
+                console.log(`📅 Earnings monitoring: ${earningsEnabled ? 'ENABLED' : 'DISABLED'} (${earningsSymbolsCount} symbols)`);
+            } catch (error) {
+                console.error('Error loading earnings status:', error);
+            }
+        }
+
+        function updateEarningsDisplay() {
+            const toggleBtn = document.getElementById('earningsToggle');
+            const iconEl = document.getElementById('earningsIcon');
+            const textEl = document.getElementById('earningsText');
+            const countEl = document.getElementById('earningsCount');
+            
+            if (earningsEnabled) {
+                toggleBtn.classList.remove('disabled');
+                iconEl.textContent = '📅';
+                textEl.textContent = 'EARNINGS: ON';
+                countEl.textContent = `(${earningsSymbolsCount})`;
+            } else {
+                toggleBtn.classList.add('disabled');
+                iconEl.textContent = '🚫';
+                textEl.textContent = 'EARNINGS: OFF';
+                countEl.textContent = '(DISABLED)';
+            }
+        }
+
+        async function toggleEarningsMonitoring() {
+            try {
+                const endpoint = earningsEnabled ? 'disable' : 'enable';
+                const response = await fetch(`${API_BASE}/earnings/${endpoint}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    earningsEnabled = data.status.enabled;
+                    earningsSymbolsCount = data.status.symbols_count;
+                    
+                    updateEarningsDisplay();
+                    
+                    const message = earningsEnabled ? 
+                        `✅ Earnings monitoring enabled (${earningsSymbolsCount} symbols)` :
+                        '🚫 Earnings monitoring disabled for this week';
+                    
+                    console.log(message);
+                    
+                    if (notificationsEnabled) {
+                        showNotification('Earnings Monitoring', message, 0);
+                    }
+                }
+            } catch (error) {
+                console.error('Error toggling earnings:', error);
             }
         }
 
@@ -643,27 +792,157 @@
         }
 
         function formatPrice(price) {
-            return price > 0 ? `$${price.toFixed(2)}` : '--';
+            return price > 0 ? `${price.toFixed(2)}` : '--';
         }
 
-        function getBiasClass(bias) {
-            if (bias === 'BULLISH') return 'bullish';
-            if (bias === 'BEARISH') return 'bearish';
-            return 'neutral';
+        function getVolumeClass(classification) {
+            const lowerClass = (classification || 'unknown').toLowerCase();
+            return `volume-${lowerClass}`;
         }
 
-        function getSocialClass(sentiment) {
-            const lower = (sentiment || '').toLowerCase().replace(/\s+/g, '.');
-            if (lower.includes('bullish')) return `twitter-${lower}`;
-            if (lower.includes('bearish')) return `twitter-${lower}`;
-            return 'twitter-neutral';
+        function formatVolumeDisplay(volumeData, isSpike = false) {
+            if (!volumeData) {
+                return '<span class="volume-unknown">--</span>';
+            }
+            
+            const ratio = isSpike ? (volumeData.spike_ratio || 0) : (volumeData.rvol || 0);
+            
+            if (ratio === 0) {
+                return '<span class="volume-unknown">--</span>';
+            }
+            
+            const classification = volumeData.classification || 'UNKNOWN';
+            const direction = volumeData.direction || '';
+            const spikeDetected = volumeData.spike_detected || false;
+            const cssClass = getVolumeClass(classification);
+            
+            const spikeEmoji = spikeDetected ? (isSpike ? ' ⚡' : ' 🔥') : '';
+            
+            let display = `<span class="${cssClass}">${ratio.toFixed(2)}x${spikeEmoji}<br><small>${classification}</small></span>`;
+            
+            if (isSpike && direction && direction !== 'NEUTRAL' && direction !== 'UNKNOWN') {
+                const dirEmoji = direction === 'BREAKOUT' ? '⬆️' : '⬇️';
+                display += `<br><span style="font-size: 9px;">${dirEmoji} ${direction}</span>`;
+            }
+            
+            return display;
         }
 
-        function getRedditClass(sentiment) {
-            const lower = (sentiment || '').toLowerCase().replace(/\s+/g, '.');
-            if (lower.includes('bullish')) return `reddit-${lower}`;
-            if (lower.includes('bearish')) return `reddit-${lower}`;
-            return 'reddit-neutral';
+        function formatGammaZones(openInterest) {
+            if (!openInterest || !openInterest.available) {
+                return '<span class="volume-unknown">No data</span>';
+            }
+            
+            const gammaLevels = openInterest.gamma_levels || [];
+            const currentPrice = openInterest.current_price || 0;
+            const expiresToday = openInterest.expires_today || false;
+            const hoursUntil = openInterest.hours_until_expiry || 0;
+            const dataSource = openInterest.data_source || 'unknown';
+            
+            if (gammaLevels.length === 0) {
+                return '<span class="volume-unknown">No walls detected</span>';
+            }
+            
+            let html = '<div class="gamma-zone">';
+            
+            // ENHANCED: Larger expiry info
+            if (expiresToday && hoursUntil > 0) {
+                html += `<div class="gamma-0dte">⏰ 0DTE - ${hoursUntil.toFixed(1)}h LEFT</div>`;
+            } else if (expiresToday) {
+                html += `<div class="gamma-0dte">🔴 EXPIRED</div>`;
+            } else {
+                const expDate = openInterest.expiration || '';
+                html += `<div style="color:#888;font-size:10px;font-weight:bold;">Exp: ${expDate}</div>`;
+            }
+            
+            html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
+            
+            // Sort levels by strike (descending)
+            const sortedLevels = [...gammaLevels].sort((a, b) => b.strike - a.strike);
+            
+            // Find resistance and support
+            const resistance = sortedLevels.filter(l => l.strike > currentPrice).slice(0, 2);
+            const support = sortedLevels.filter(l => l.strike <= currentPrice).slice(0, 2);
+            
+            // ENHANCED: Display resistance levels with bigger fonts
+            for (const level of resistance) {
+                const oiK = (level.total_oi / 1000).toFixed(0);
+                const volK = (level.total_volume / 1000).toFixed(0);
+                const emoji = level.strength === 'STRONG' ? '🔴' : level.strength === 'MODERATE' ? '🟠' : '⚪';
+                
+                html += `<div class="gamma-resistance" style="margin: 4px 0;">`;
+                html += `<span class="gamma-strike-price">${emoji} $${level.strike}</span> `;
+                html += `<span class="gamma-label">RESIST</span>`;
+                html += `<br><span class="gamma-data resistance-data">OI: ${oiK}K | Vol: ${volK}K</span>`;
+                html += `<br><span style="font-size:9px;color:#777;">${level.direction} ${Math.abs(level.distance_pct).toFixed(1)}%</span>`;
+                html += `</div>`;
+            }
+            
+            // ENHANCED: Current price - BIGGER
+            html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
+            html += `<div class="gamma-current">📍 NOW: $${currentPrice.toFixed(2)}</div>`;
+            html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
+            
+            // ENHANCED: Display support levels with bigger fonts
+            for (const level of support) {
+                const oiK = (level.total_oi / 1000).toFixed(0);
+                const volK = (level.total_volume / 1000).toFixed(0);
+                const emoji = level.strength === 'STRONG' ? '🟢' : level.strength === 'MODERATE' ? '🟡' : '⚪';
+                
+                html += `<div class="gamma-support" style="margin: 4px 0;">`;
+                html += `<span class="gamma-strike-price">${emoji} $${level.strike}</span> `;
+                html += `<span class="gamma-label">SUPPORT</span>`;
+                html += `<br><span class="gamma-data support-data">OI: ${oiK}K | Vol: ${volK}K</span>`;
+                html += `<br><span style="font-size:9px;color:#777;">${level.direction} ${Math.abs(level.distance_pct).toFixed(1)}%</span>`;
+                html += `</div>`;
+            }
+            
+            // Expected range
+            if (openInterest.expected_range) {
+                const range = openInterest.expected_range;
+                html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
+                html += `<div style="font-size:10px;color:#999;font-weight:bold;">Range: $${range.low.toFixed(0)}-$${range.high.toFixed(0)}</div>`;
+            }
+            
+            // Data source
+            if (dataSource === 'tradier') {
+                html += `<div style="font-size:8px;color:#666;margin-top:3px;">📡 Tradier Live</div>`;
+            } else if (dataSource === 'polygon_fallback') {
+                html += `<div style="font-size:8px;color:#ff6600;margin-top:3px;">⚠️ Fallback Data</div>`;
+            }
+            
+            html += '</div>';
+            
+            return html;
+        }
+
+        function formatDarkPool(darkPoolData) {
+            if (!darkPoolData || !darkPoolData.institutional_flow) {
+                return '<span class="institutional-neutral">--</span>';
+            }
+            
+            const flow = darkPoolData.institutional_flow;
+            const activity = darkPoolData.activity || 'LIGHT';
+            const blockValue = darkPoolData.block_trade_value || 0;
+            const signalStrength = darkPoolData.signal_strength || 0;
+            
+            let display = `<span class="institutional-${flow.toLowerCase()}">${flow}</span>`;
+            
+            if (activity !== 'LIGHT') {
+                display += `<br><span style="font-size:9px;color:#666;">${activity}</span>`;
+            }
+            
+            if (blockValue > 10000) {
+                const valueMil = (blockValue / 1000000).toFixed(1);
+                display += `<br><span style="font-size:9px;color:#ffff00;">$${valueMil}M</span>`;
+            }
+            
+            if (signalStrength > 0) {
+                const bars = '█'.repeat(Math.min(signalStrength, 5));
+                display += `<br><span style="font-size:9px;color:#00ff00;">${bars}</span>`;
+            }
+            
+            return display;
         }
 
         function getAlertClass(alertType) {
@@ -681,12 +960,6 @@
             return 'low';
         }
 
-        function getVolumeClass(volume) {
-            if (volume === 'VERY HIGH') return 'social-volume very-high';
-            if (volume === 'HIGH') return 'social-volume high';
-            return 'social-volume';
-        }
-
         function updateCell(cell, newContent, animated = true) {
             if (cell.innerHTML !== newContent) {
                 cell.innerHTML = newContent;
@@ -697,83 +970,49 @@
             }
         }
 
-        function formatTwitter(twitter) {
-            if (!twitter) return '<span class="twitter-neutral">--</span>';
-            
-            const sentiment = twitter.overall_sentiment || 'NEUTRAL';
-            const volume = twitter.volume || 'LOW';
-            const tweetCount = twitter.tweet_count || 0;
-            const whaleSent = twitter.whale_sentiment || '';
-            
-            let display = `<span class="${getSocialClass(sentiment)}">${sentiment}</span>`;
-            if (tweetCount > 0) {
-                display += `<br><span class="${getVolumeClass(volume)}">${tweetCount} tweets</span>`;
-            }
-            if (whaleSent && whaleSent !== 'NEUTRAL') {
-                display += `<br><span style="color: #ffa500; font-size: 9px;">🐋 ${whaleSent}</span>`;
-            }
-            
-            return display;
-        }
-
-        function formatReddit(reddit) {
-            if (!reddit) return '<span class="reddit-neutral">--</span>';
-            
-            const sentiment = reddit.overall_sentiment || 'NEUTRAL';
-            const volume = reddit.volume || 'LOW';
-            const postCount = reddit.post_count || 0;
-            const wsbSent = reddit.wsb_sentiment || '';
-            
-            let display = `<span class="${getRedditClass(sentiment)}">${sentiment}</span>`;
-            if (postCount > 0) {
-                display += `<br><span class="${getVolumeClass(volume)}">${postCount} posts</span>`;
-            }
-            if (wsbSent && wsbSent !== 'NONE') {
-                display += `<br><span style="color: #ff4500; font-size: 9px;">WSB: ${wsbSent}</span>`;
-            }
-            
-            return display;
-        }
-
         function updateRow(symbol, data) {
             let row = document.querySelector(`tr[data-symbol="${symbol}"]`);
             
             if (!row) {
                 const tbody = document.getElementById('tableBody');
-                if (tbody.children[0]?.colSpan === 14) {
+                if (tbody.children[0]?.colSpan === 12) {
                     tbody.innerHTML = '';
                 }
                 row = document.createElement('tr');
                 row.setAttribute('data-symbol', symbol);
-                row.innerHTML = '<td></td>'.repeat(14);
+                row.innerHTML = '<td></td>'.repeat(12);
                 tbody.appendChild(row);
             }
 
             const cells = row.children;
             const camarilla = data.camarilla || {};
             const entryTargets = data.entry_targets || {};
+            const premarketVol = data.premarket_rvol || {};
+            const volumeAnalysis = data.volume_analysis || {};
+            const intradaySpike = volumeAnalysis.volume_spike || {};
 
             updateCell(cells[0], `<span class="symbol">${data.symbol}</span>`, false);
             updateCell(cells[1], `<span class="price">${formatPrice(data.current_price)}</span>`);
             updateCell(cells[2], `<span class="level">${formatPrice(data.vwap)}</span>`);
             updateCell(cells[3], `<span class="level" style="line-height: 1.4;">R4: ${formatPrice(camarilla.R4)}<br>R3: ${formatPrice(camarilla.R3)}<br>S3: ${formatPrice(camarilla.S3)}<br>S4: ${formatPrice(camarilla.S4)}</span>`);
             updateCell(cells[4], `<span class="level" style="line-height: 1.4;">RES: ${formatPrice(data.resistance)}<br>SUP: ${formatPrice(data.support)}</span>`);
-            updateCell(cells[5], `<span class="${getBiasClass(data.bias_1h)}">${data.bias_1h || '--'}</span>`);
-            updateCell(cells[6], `<span class="${getBiasClass(data.bias_daily)}">${data.bias_daily || '--'}</span>`);
-            updateCell(cells[7], `<span class="institutional-${(data.dark_pool_activity || 'neutral').toLowerCase()}">${data.dark_pool_activity || '--'}</span>`);
-            updateCell(cells[8], `<span class="${getBiasClass(data.options_sentiment)}">${data.options_sentiment || '--'}</span>`);
+            
+            updateCell(cells[5], formatVolumeDisplay(premarketVol, false));
+            updateCell(cells[6], formatVolumeDisplay(intradaySpike, true));
+            
+            updateCell(cells[7], formatDarkPool(data.dark_pool_details || {}));
+            
+            // ENHANCED: Gamma zones (now much more readable)
+            updateCell(cells[8], formatGammaZones(data.open_interest || {}));
+            
             updateCell(cells[9], `<span class="news-${(data.news_sentiment || 'neutral').toLowerCase().replace(/\s+/g, '.')}">${data.news_sentiment || '--'}</span>`);
             
-            // Twitter column
-            updateCell(cells[10], formatTwitter(data.twitter));
-            
-            // Reddit column
-            updateCell(cells[11], formatReddit(data.reddit));
-            
+            // SHIFTED: Entry/TP/SL now at cells[10]
             const entryInfo = entryTargets.entry ? 
                 `E: ${formatPrice(entryTargets.entry)}<br>TP: ${formatPrice(entryTargets.tp1)}<br>SL: ${formatPrice(entryTargets.stop_loss)}` : '--';
-            updateCell(cells[12], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
+            updateCell(cells[10], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
 
+            // SHIFTED: Alert now at cells[11]
             const alertClass = getAlertClass(data.alert_type);
             const currentAlert = data.alert_type || 'MONITOR';
             const previousAlert = previousAlerts[symbol] || 'MONITOR';
@@ -781,12 +1020,12 @@
             
             const alertContent = `<span class="${alertClass}">${data.alert_type || 'MONITOR'}${data.confidence ? `<br><span class="confidence ${getConfidenceClass(data.confidence)}">${data.confidence.toFixed(0)}%</span>` : ''}</span>`;
             
-            if (cells[13].innerHTML !== alertContent) {
-                cells[13].innerHTML = alertContent;
+            if (cells[11].innerHTML !== alertContent) {
+                cells[11].innerHTML = alertContent;
                 
                 if (isNewAlert && !isFirstLoad) {
-                    cells[13].classList.add('alert-changed');
-                    setTimeout(() => cells[13].classList.remove('alert-changed'), 2000);
+                    cells[11].classList.add('alert-changed');
+                    setTimeout(() => cells[11].classList.remove('alert-changed'), 2000);
                     
                     playAlertSound(currentAlert);
                     showNotification(data.symbol, currentAlert, data.confidence);
@@ -859,9 +1098,10 @@
         }
 
         async function initialize() {
-            console.log('🚀 Initializing Professional Trading Dashboard v3.3');
+            console.log('🚀 Initializing Professional Trading Dashboard v4.2 - ENHANCED GAMMA');
             
             await loadWatchlist();
+            await loadEarningsStatus();
             
             setInterval(updateTime, 1000);
             updateTime();
@@ -870,6 +1110,7 @@
             await loadData();
             
             setInterval(loadData, 30000);
+            setInterval(loadEarningsStatus, 60000);
 
             setTimeout(() => {
                 if ('Notification' in window && Notification.permission === 'default') {
@@ -878,6 +1119,9 @@
             }, 2000);
             
             console.log('✅ Dashboard initialized with', SYMBOLS.length, 'symbols');
+            console.log(`📅 Earnings monitoring: ${earningsEnabled ? 'ENABLED' : 'DISABLED'} (${earningsSymbolsCount} symbols)`);
+            console.log('💡 Enhanced Gamma Zones: 85% larger + improved readability');
+            console.log('🎯 0DTE gamma pinning detection active');
         }
 
         initialize();

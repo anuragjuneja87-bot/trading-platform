@@ -1,6 +1,6 @@
 # ========================================
-# ALWAYS-ON-TRADER Configuration
-# Enhanced with Multi-Channel Discord + News + Earnings + PHASE 1 + MARKET IMPACT
+# ALWAYS-ON-TRADER Configuration v4.1
+# Enhanced with Multi-Channel Discord + News + Earnings + PHASE 1 + MARKET IMPACT + MOMENTUM SIGNALS + 0DTE GAMMA
 # ========================================
 
 # API Keys
@@ -39,9 +39,10 @@ discord:
   webhook_news: ${DISCORD_NEWS_ONLY}
   webhook_earnings_weekly: ${DISCORD_WEEKLY_EARNINGS}
   webhook_earnings_realtime: ${DISCORD_REALTIME_EARNINGS}
-  
-  # NEW: Market impact alerts (uses DISCORD_NEWS_ALERTS)
   webhook_market_impact: ${DISCORD_NEWS_ALERTS}
+  webhook_volume_spike: ${DISCORD_VOLUME_SPIKE}
+  webhook_momentum_signals: ${DISCORD_MOMENTUM_SIGNALS}
+  webhook_odte_levels: ${DISCORD_ODTE_LEVELS}
   
   # Legacy single webhook (for backward compatibility)
   webhook_url: ${DISCORD_WEBHOOK_URL}
@@ -105,7 +106,7 @@ news_monitoring:
     - "halted"
 
 # ========================================
-# 🚨 NEW: MARKET IMPACT MONITOR
+# 🚨 MARKET IMPACT MONITOR
 # High-impact news alerts (macro, M&A, analyst, spillover)
 # Routes to: DISCORD_NEWS_ALERTS channel
 # ========================================
@@ -121,7 +122,7 @@ market_impact_monitor:
   # Volume Confirmation Settings
   volume_confirmation:
     enabled: true                       # Require volume spike for confirmation
-    min_rvol: 2.0                       # 2.0x RVOL minimum (your requirement)
+    min_rvol: 2.0                       # 2.0x RVOL minimum
     critical_rvol: 3.0                  # 3.0x+ = CRITICAL alert
   
   # Macro Event Keywords (Fed, tariffs, economic data)
@@ -198,7 +199,6 @@ market_impact_monitor:
   min_earnings_surprise_percent: 10     # Only alert on >10% earnings surprise
   
   # 🎯 SPILLOVER MAPPING (NVDA → related stocks)
-  # When NVDA has news, automatically check these stocks for volume spikes
   spillover_map:
     NVDA:
       - NVTS      # AI infrastructure
@@ -333,6 +333,90 @@ openai_monitor:
   log_all_checks: false
   log_filtered_news: true
   log_volume_data: true
+
+# ========================================
+# 📊 PRE-MARKET VOLUME SPIKE MONITOR
+# Routes to: DISCORD_VOLUME_SPIKE
+# ========================================
+premarket_volume_monitor:
+  enabled: true
+  check_interval: 180                   # Check every 3 minutes
+  
+  # Spike detection
+  spike_threshold: 3.0                  # 3.0x RVOL = spike
+  critical_threshold: 5.0               # 5.0x RVOL = critical
+  
+  # Alert settings
+  cooldown_minutes: 30                  # 30 min cooldown per symbol
+  max_alerts_per_session: 5             # Max 5 alerts per symbol per session
+  
+  # Session times (ET)
+  sessions:
+    pre_market:
+      start: "04:00"
+      end: "09:30"
+    after_hours:
+      start: "16:00"
+      end: "20:00"
+  
+  # Filters
+  min_price: 5.0                        # Ignore penny stocks
+  watchlist_only: true                  # Only monitor watchlist
+
+# ========================================
+# 🎯 MOMENTUM SIGNAL MONITOR
+# Combines RVOL + Dark Pool + Gamma Walls
+# Routes to: DISCORD_MOMENTUM_SIGNALS
+# ========================================
+momentum_signal_monitor:
+  enabled: true
+  check_interval: 60                    # Check every 60 seconds
+  market_hours_only: true               # Only alert during 9:30 AM - 4:00 PM ET
+  
+  # Cooldowns (prevent spam)
+  cooldown_minutes:
+    momentum_signal: 15                 # Momentum buy/sell signals
+    gamma_approach: 10                  # Gamma wall approaches
+    dark_pool_flip: 5                   # Dark pool flips (urgent!)
+    extreme_setup: 30                   # Extreme setups (rare)
+  
+  # Thresholds
+  thresholds:
+    min_rvol: 2.5                       # Minimum RVOL for momentum signals
+    extreme_rvol: 4.0                   # RVOL for extreme setups
+    min_dark_pool_strength: 4           # Min signal strength (0-6 scale)
+    min_dark_pool_value: 1000000        # $1M minimum block trade value
+    gamma_wall_distance_pct: 1.0        # Alert if within 1% of wall
+    gamma_wall_urgent_pct: 0.5          # Urgent if within 0.5%
+    min_confluence: 7                   # Min confluence score for key levels
+    extreme_confluence: 8               # Confluence for extreme setups
+  
+  # Filters
+  filters:
+    watchlist_only: true                # Only monitor watchlist symbols
+    min_price: 5.0                      # Ignore penny stocks
+    max_alert_per_symbol_per_day: 5     # Max 5 alerts per symbol per day
+
+# ========================================
+# 🎯 0DTE GAMMA LEVEL MONITOR
+# Alert at 9:00 AM EST when price near gamma walls
+# Routes to: DISCORD_ODTE_LEVELS
+# ========================================
+odte_gamma_monitor:
+  enabled: true
+  
+  # Alert timing
+  alert_time: "09:00"                   # 9:00 AM EST sharp
+  alert_window_minutes: 5               # 5-minute alert window (9:00-9:05 AM)
+  
+  # Proximity thresholds (1-2%)
+  min_proximity_pct: 1.0                # Minimum 1% away from gamma wall
+  max_proximity_pct: 2.0                # Maximum 2% away from gamma wall
+  
+  # Filters
+  weekdays_only: true                   # Only alert Monday-Friday
+  watchlist_only: true                  # Only monitor watchlist symbols
+  require_odte: true                    # Only alert if 0DTE options exist
 
 # ========================================
 # 🚀 PHASE 1: VOLUME ANALYSIS
@@ -549,15 +633,19 @@ persistence:
   metrics_directory: "data/metrics"
 
 # ========================================
-# 🚀 SYSTEM SUMMARY
+# 🚀 SYSTEM SUMMARY v4.1
 # ========================================
 # Features Active:
 # ✅ Trading Signals (26 factors, Phase 1)
 # ✅ Market Impact Monitor (macro, M&A, analyst, spillover)
 # ✅ OpenAI News Monitor (AI-specific news)
+# ✅ Pre-Market Volume Monitor (extended hours spikes)
+# ✅ Momentum Signal Monitor (RVOL + Dark Pool + Gamma)
+# ✅ 0DTE Gamma Monitor (9AM gamma wall alerts)
 # ✅ Volume Analysis (RVOL, spikes, dry-ups)
 # ✅ Key Level Detection (confluence scoring)
 # ✅ Earnings Monitoring (weekly + realtime)
 # ✅ Signal Metrics Tracking (win rate, performance)
 # ✅ Multi-Channel Discord Routing
+# ✅ Option A: Open Interest + Enhanced Dark Pool
 # ========================================

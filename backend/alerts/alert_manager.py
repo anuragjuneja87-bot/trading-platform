@@ -1,11 +1,11 @@
 """
 backend/alerts/alert_manager.py
-Enhanced Alert Manager - PHASE 1 UPDATE
+Enhanced Alert Manager - PHASE 1 UPDATE + VOLUME SPIKE ALERTS
 - Better scan intervals (60s first hour, 2min mid-day)
 - Signal metrics tracking integration
+- Volume spike detection and alerting (NEW)
 - Enhanced status logging
 """
-
 import sys
 from pathlib import Path
 
@@ -36,7 +36,7 @@ except ImportError:
 
 class AlertManager:
     def __init__(self, config_path: str = None, polygon_api_key: str = None):
-        """Initialize Enhanced Alert Manager - PHASE 1"""
+        """Initialize Enhanced Alert Manager - PHASE 1 + Volume Spikes"""
         self.logger = logging.getLogger(__name__)
         
         if config_path is None:
@@ -81,13 +81,20 @@ class AlertManager:
         self.last_news_check = {}
         self.last_news_reset = datetime.now().date()
         
+        # NEW: Volume spike cooldown tracking
+        self._volume_spike_cooldowns = {}
+        self.volume_spike_config = {
+            'cooldown_minutes': 30,
+            'min_classification': 'ELEVATED'
+        }
+        
         # PHASE 1: Enhanced scan intervals
         self.scan_intervals = {
-            'PREMARKET': 300,  # 5 minutes
-            'FIRST_HOUR': 60,  # 1 minute (9:30-10:30)
-            'MIDDAY': 120,     # 2 minutes (10:30-15:00)
-            'POWER_HOUR': 60,  # 1 minute (15:00-16:00)
-            'AFTERHOURS': 300  # 5 minutes
+            'PREMARKET': 300,
+            'FIRST_HOUR': 60,
+            'MIDDAY': 120,
+            'POWER_HOUR': 60,
+            'AFTERHOURS': 300
         }
         
         self.stats = {
@@ -96,10 +103,12 @@ class AlertManager:
             'symbols_analyzed': 0,
             'errors': 0,
             'news_alerts_sent': 0,
-            'signals_tracked': 0  # PHASE 1
+            'signals_tracked': 0,
+            'volume_spike_alerts': 0
         }
         
-        self.logger.info("Enhanced Alert Manager (Phase 1) initialized")
+        self.logger.info("Enhanced Alert Manager (Phase 1 + Volume Spikes) initialized")
+        self.logger.info(f"  📊 Volume spike alerts: ENABLED (cooldown: {self.volume_spike_config['cooldown_minutes']}min)")
     
     def get_current_market_phase(self) -> str:
         """
@@ -112,24 +121,21 @@ class AlertManager:
         
         current_minutes = et_hour * 60 + et_minute
         
-        # Market phases (ET)
-        if current_minutes < 4 * 60:  # Before 4 AM
+        if current_minutes < 4 * 60:
             return 'AFTERHOURS'
-        elif current_minutes < 9 * 60 + 30:  # 4 AM - 9:30 AM
+        elif current_minutes < 9 * 60 + 30:
             return 'PREMARKET'
-        elif current_minutes < 10 * 60 + 30:  # 9:30 AM - 10:30 AM
+        elif current_minutes < 10 * 60 + 30:
             return 'FIRST_HOUR'
-        elif current_minutes < 15 * 60:  # 10:30 AM - 3:00 PM
+        elif current_minutes < 15 * 60:
             return 'MIDDAY'
-        elif current_minutes < 16 * 60:  # 3:00 PM - 4:00 PM
+        elif current_minutes < 16 * 60:
             return 'POWER_HOUR'
-        else:  # After 4 PM
+        else:
             return 'AFTERHOURS'
     
     def get_scan_interval(self) -> int:
-        """
-        PHASE 1: Get scan interval based on market phase
-        """
+        """PHASE 1: Get scan interval based on market phase"""
         phase = self.get_current_market_phase()
         return self.scan_intervals.get(phase, 300)
     
@@ -146,9 +152,7 @@ class AlertManager:
             return None
     
     def send_alert(self, analysis: Dict):
-        """
-        PHASE 1: Send alert with metrics tracking
-        """
+        """PHASE 1: Send trading signal alert with metrics tracking"""
         symbol = analysis['symbol']
         alert_type = analysis.get('alert_type', 'MONITOR')
         confidence = analysis.get('confidence', 0)
@@ -159,7 +163,6 @@ class AlertManager:
             self.logger.debug(f"{symbol}: Not sending alert - {reason}")
             return
         
-        # PHASE 1: Enhanced logging with volume and level info
         log_parts = [f"📢 {symbol} - {alert_type} ({confidence:.1f}%)"]
         
         volume_analysis = analysis.get('volume_analysis', {})
@@ -176,7 +179,6 @@ class AlertManager:
         
         self.logger.info(" | ".join(log_parts))
         
-        # Send to Discord
         if self.discord:
             try:
                 success = self.discord.send_trading_signal(analysis)
@@ -199,8 +201,89 @@ class AlertManager:
             except Exception as e:
                 self.logger.error(f"Error tracking signal: {str(e)}")
     
+    def check_and_send_volume_spike_alert(self, analysis: Dict):
+        """
+        NEW: Check for volume spikes and send dedicated alerts
+        Separate from trading signals - alerts on pure volume action
+        """
+        symbol = analysis['symbol']
+        volume_analysis = analysis.get('volume_analysis', {})
+        
+        if not volume_analysis or 'error' in volume_analysis:
+            return
+        
+        spike_data = volume_analysis.get('volume_spike', {})
+        
+        if not spike_data.get('spike_detected'):
+            return
+        
+        classification = spike_data.get('classification', 'UNKNOWN')
+        spike_ratio = spike_data.get('spike_ratio', 0)
+        alert_urgency = spike_data.get('alert_urgency', 'NONE')
+        
+        # Check if classification meets minimum threshold
+        min_classification = self.volume_spike_config['min_classification']
+        allowed_classifications = ['ELEVATED', 'HIGH', 'EXTREME']
+        
+        if min_classification == 'HIGH':
+            allowed_classifications = ['HIGH', 'EXTREME']
+        elif min_classification == 'EXTREME':
+            allowed_classifications = ['EXTREME']
+        
+        if classification not in allowed_classifications:
+            self.logger.debug(
+                f"{symbol}: Volume spike {spike_ratio:.2f}x ({classification}) "
+                f"below threshold ({min_classification})"
+            )
+            return
+        
+        # Check cooldown
+        cooldown_key = f"volume_spike_{symbol}"
+        cooldown_minutes = self.volume_spike_config['cooldown_minutes']
+        
+        last_alert = self._volume_spike_cooldowns.get(cooldown_key)
+        if last_alert:
+            elapsed_minutes = (datetime.now() - last_alert).total_seconds() / 60
+            if elapsed_minutes < cooldown_minutes:
+                self.logger.debug(
+                    f"{symbol}: Volume spike cooldown active "
+                    f"({elapsed_minutes:.0f}min ago, need {cooldown_minutes}min)"
+                )
+                return
+        
+        # Send alert
+        if self.discord:
+            try:
+                phase = self.get_current_market_phase()
+                if phase == 'PREMARKET':
+                    session = 'PREMARKET'
+                elif phase == 'AFTERHOURS':
+                    session = 'AFTERHOURS'
+                else:
+                    session = 'REGULAR'
+                
+                success = self.discord.send_volume_spike_alert(
+                    symbol=symbol,
+                    volume_data=spike_data,
+                    session=session
+                )
+                
+                if success:
+                    self.logger.info(
+                        f"🔥 Volume spike alert sent: {symbol} "
+                        f"({spike_ratio:.2f}x - {classification} - {alert_urgency})"
+                    )
+                    self._volume_spike_cooldowns[cooldown_key] = datetime.now()
+                    self.stats['volume_spike_alerts'] += 1
+                    
+            except Exception as e:
+                self.logger.error(f"Volume spike alert failed for {symbol}: {str(e)}")
+                self.stats['errors'] += 1
+        else:
+            self.logger.warning(f"Discord not configured - cannot send volume spike alert for {symbol}")
+    
     def run_scan(self) -> List[Dict]:
-        """Run complete scan"""
+        """Run complete scan with volume spike detection"""
         symbols = self.scheduler.get_watchlist_for_state(
             self.scheduler.get_current_market_state()
         )
@@ -219,9 +302,14 @@ class AlertManager:
             
             if analysis:
                 results.append(analysis)
+                
+                # Send trading signal alert
                 self.send_alert(analysis)
+                
+                # NEW: Check for volume spike alerts
+                self.check_and_send_volume_spike_alert(analysis)
             
-            # News monitoring
+            # Check news if enabled
             if self.news_config.get('enabled'):
                 try:
                     self.check_news_for_symbol(symbol)
@@ -232,16 +320,19 @@ class AlertManager:
         
         self.stats['scans_completed'] += 1
         
-        # PHASE 1: Enhanced scan summary
+        # Enhanced scan summary
         alerts_sent = sum(1 for r in results if r.get('alert_type') != 'MONITOR')
         high_rvol = sum(1 for r in results 
                        if r.get('volume_analysis', {}).get('rvol', {}).get('classification') in ['HIGH', 'EXTREME'])
         high_confluence = sum(1 for r in results
                              if r.get('key_levels', {}).get('confluence_score', 0) >= 7)
+        volume_spikes = sum(1 for r in results
+                           if r.get('volume_analysis', {}).get('volume_spike', {}).get('spike_detected'))
         
         self.logger.info(
             f"Scan complete: {len(results)} analyzed | "
-            f"{alerts_sent} alerts | "
+            f"{alerts_sent} signals | "
+            f"{volume_spikes} volume spikes | "
             f"{high_rvol} high RVOL | "
             f"{high_confluence} high confluence"
         )
@@ -249,12 +340,11 @@ class AlertManager:
         return results
     
     def run_continuous(self):
-        """
-        PHASE 1: Run continuous scanning with dynamic intervals
-        """
-        self.logger.info("Starting continuous scanning mode (Phase 1)...")
+        """PHASE 1: Run continuous scanning with dynamic intervals + volume spike detection"""
+        self.logger.info("Starting continuous scanning mode (Phase 1 + Volume Spikes)...")
         self.logger.info(f"Initial phase: {self.get_current_market_phase()}")
         self.logger.info(f"Signal tracking: {'ENABLED' if self.metrics_tracker else 'DISABLED'}")
+        self.logger.info(f"Volume spike alerts: ENABLED (cooldown: {self.volume_spike_config['cooldown_minutes']}min)")
         
         try:
             while True:
@@ -264,7 +354,6 @@ class AlertManager:
                     continue
                 
                 try:
-                    # PHASE 1: Log current phase
                     phase = self.get_current_market_phase()
                     interval = self.get_scan_interval()
                     
@@ -272,12 +361,12 @@ class AlertManager:
                     results = self.run_scan()
                     scan_duration = time.time() - scan_start
                     
-                    # PHASE 1: Enhanced scan summary
                     alerts_sent = sum(1 for r in results if r.get('alert_type') != 'MONITOR')
                     
                     self.logger.info(
                         f"Scan summary ({scan_duration:.1f}s): "
-                        f"{len(results)} analyzed, {alerts_sent} alerts"
+                        f"{len(results)} analyzed, {alerts_sent} signals, "
+                        f"{self.stats.get('volume_spike_alerts', 0)} total volume spikes"
                     )
                 
                 except Exception as e:
@@ -286,7 +375,6 @@ class AlertManager:
                     self.logger.debug(traceback.format_exc())
                     self.stats['errors'] += 1
                 
-                # PHASE 1: Dynamic interval based on phase
                 interval = self.get_scan_interval()
                 next_scan = datetime.now() + timedelta(seconds=interval)
                 
@@ -300,13 +388,11 @@ class AlertManager:
             self.logger.info("Stopping continuous mode...")
             self.print_stats()
             
-            # PHASE 1: Show metrics summary
             if self.metrics_tracker:
                 print("\n" + self.metrics_tracker.generate_report(days=1))
     
     def check_news_for_symbol(self, symbol: str) -> bool:
         """Check news for a single symbol"""
-        # Reset daily counters
         current_date = datetime.now().date()
         if current_date != self.last_news_reset:
             self.news_alert_counts.clear()
@@ -370,13 +456,25 @@ class AlertManager:
         print(f"Scans Completed: {self.stats['scans_completed']}")
         print(f"Symbols Analyzed: {self.stats['symbols_analyzed']}")
         print(f"Trading Alerts Sent: {self.stats['alerts_sent']}")
+        print(f"Volume Spike Alerts: {self.stats.get('volume_spike_alerts', 0)}")
         print(f"News Alerts Sent: {self.stats['news_alerts_sent']}")
         print(f"Signals Tracked: {self.stats['signals_tracked']}")
         print(f"Errors: {self.stats['errors']}")
-        print("=" * 60 + "\n")
+        print("=" * 60)
+        
+        if self._volume_spike_cooldowns:
+            print("\n📊 Active Volume Spike Cooldowns:")
+            now = datetime.now()
+            for key, last_alert in self._volume_spike_cooldowns.items():
+                symbol = key.replace('volume_spike_', '')
+                elapsed = (now - last_alert).total_seconds() / 60
+                remaining = self.volume_spike_config['cooldown_minutes'] - elapsed
+                if remaining > 0:
+                    print(f"  • {symbol}: {remaining:.0f} minutes remaining")
+        
+        print()
 
 
-# CLI
 def main():
     """Command-line interface"""
     import sys
@@ -410,9 +508,10 @@ def main():
             print("Running single scan...")
             results = manager.run_scan()
             print(f"\n✅ Scan complete: {len(results)} symbols analyzed")
+            manager.print_stats()
         
         elif command == 'run':
-            print("Starting continuous mode (Phase 1)...")
+            print("Starting continuous mode (Phase 1 + Volume Spikes)...")
             print("Press Ctrl+C to stop")
             manager.run_continuous()
         
@@ -420,7 +519,6 @@ def main():
             manager.print_stats()
         
         elif command == 'metrics':
-            # PHASE 1: Show signal metrics
             if manager.metrics_tracker:
                 days = int(sys.argv[2]) if len(sys.argv) > 2 else 7
                 print(manager.metrics_tracker.generate_report(days=days))
