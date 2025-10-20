@@ -1,10 +1,12 @@
 """
 backend/analyzers/enhanced_professional_analyzer.py
-Enhanced Professional Analyzer v4.1 - TRADIER GAMMA INTEGRATION
+Enhanced Professional Analyzer v4.3 - COMPLETE VERSION WITH WALL STRENGTH TRACKING
 NOW INCLUDES:
 - Tradier API for real Open Interest and Volume data
 - 0DTE gamma wall detection with real OI/Volume
 - Premium analysis for put/call imbalance
+- NET GAMMA EXPOSURE (GEX) CALCULATOR
+- WALL STRENGTH TRACKER (NEW!)
 - All existing features preserved (Phase 1 + Option A)
 """
 
@@ -23,6 +25,12 @@ from typing import Dict, List, Optional
 import logging
 from collections import defaultdict
 import pytz
+
+# Import GEX Calculator
+from analyzers.gex_calculator import GEXCalculator
+
+# Import Wall Strength Tracker (NEW!)
+from analyzers.wall_strength_tracker import WallStrengthTracker
 
 # Import new modules
 try:
@@ -46,7 +54,7 @@ class EnhancedProfessionalAnalyzer:
                  tradier_api_key: Optional[str] = None, tradier_account_type: str = 'sandbox',
                  debug_mode: bool = False):
         """
-        Initialize Enhanced Professional Analyzer v4.1 - Tradier Integration
+        Initialize Enhanced Professional Analyzer v4.3 - With Wall Strength Tracking
         
         Args:
             polygon_api_key: Polygon.io API key
@@ -122,6 +130,14 @@ class EnhancedProfessionalAnalyzer:
         
         self.logger.info(f"📊 Signal Thresholds: Base={self.base_signal_threshold}, High Impact={self.high_impact_threshold}")
         self.logger.info(f"💡 Tradier Gamma Walls: {'ENABLED' if tradier_api_key else 'DISABLED (using Polygon fallback)'}")
+        
+        # Initialize GEX Calculator
+        self.gex_calculator = GEXCalculator()
+        self.logger.info("✅ GEX Calculator initialized")
+        
+        # Initialize Wall Strength Tracker (NEW!)
+        self.wall_tracker = WallStrengthTracker()
+        self.logger.info("✅ Wall Strength Tracker initialized")
     
     def _make_request(self, endpoint: str, params: dict = None) -> dict:
         """Make Polygon API request"""
@@ -198,12 +214,13 @@ class EnhancedProfessionalAnalyzer:
     
     def analyze_gamma_walls_tradier(self, symbol: str, current_price: float) -> Dict:
         """
-        NEW: Analyze gamma walls using Tradier API with REAL Open Interest and Volume
+        Analyze gamma walls using Tradier API with REAL Open Interest and Volume
         
         This replaces the Polygon contract counting with actual market data
+        Returns ALL gamma_levels for wall strength tracking
         
         Returns:
-            Complete gamma wall analysis with top 2-3 levels, OI, Volume, and premium data
+            Complete gamma wall analysis with all levels, OI, Volume, and premium data
         """
         try:
             # Get expiration dates
@@ -357,7 +374,7 @@ class EnhancedProfessionalAnalyzer:
             # Sort by gamma exposure (highest first)
             gamma_levels.sort(key=lambda x: x['gamma_exposure'], reverse=True)
             
-            # Get top 3 levels
+            # Get top 3 levels for display, but return ALL for wall tracking
             top_levels = gamma_levels[:3]
             
             # Calculate expected range
@@ -393,7 +410,8 @@ class EnhancedProfessionalAnalyzer:
             if self.debug_mode:
                 self.logger.debug(f"{symbol} Gamma Analysis (Tradier):")
                 self.logger.debug(f"  Expiration: {expiry_date} ({'0DTE' if is_0dte else f'{hours_until_expiry/24:.1f} days'})")
-                self.logger.debug(f"  Top {len(top_levels)} gamma levels identified")
+                self.logger.debug(f"  Total gamma levels found: {len(gamma_levels)}")
+                self.logger.debug(f"  Top 3 gamma levels:")
                 for level in top_levels:
                     self.logger.debug(f"    ${level['strike']}: {level['total_oi']:,} OI, {level['gamma_exposure']:,} gamma exp")
             
@@ -402,7 +420,7 @@ class EnhancedProfessionalAnalyzer:
                 'expires_today': is_0dte,
                 'hours_until_expiry': round(hours_until_expiry, 1),
                 'current_price': current_price,
-                'gamma_levels': top_levels,
+                'gamma_levels': gamma_levels,  # ALL levels for wall tracking
                 'expected_range': {
                     'low': round(expected_low, 2),
                     'high': round(expected_high, 2),
@@ -423,6 +441,94 @@ class EnhancedProfessionalAnalyzer:
             import traceback
             self.logger.debug(traceback.format_exc())
             return {'available': False, 'error': str(e)}
+    
+    def analyze_full_gex(self, symbol: str) -> Dict:
+        """
+        Analyze Net Gamma Exposure (GEX) for symbol
+        Uses Tradier to get ALL options, then calculates net GEX
+        
+        Returns:
+            Complete GEX analysis with net GEX, zero gamma level, regime, etc.
+        """
+        try:
+            # Get current price
+            quote = self.get_real_time_quote(symbol)
+            current_price = quote['price']
+            
+            if current_price == 0:
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'error': 'Invalid price'
+                }
+            
+            # Get expirations
+            expirations = self.get_tradier_expirations(symbol)
+            
+            if not expirations:
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'error': 'No expirations found'
+                }
+            
+            # Find 0DTE or nearest expiration
+            et_tz = pytz.timezone('America/New_York')
+            today = datetime.now(et_tz).date()
+            today_str = today.strftime('%Y-%m-%d')
+            
+            expiry_date = None
+            if today_str in expirations:
+                expiry_date = today_str
+            else:
+                future_expirations = [exp for exp in expirations if exp > today_str]
+                if future_expirations:
+                    expiry_date = sorted(future_expirations)[0]
+            
+            if not expiry_date:
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'error': 'No valid expiration found'
+                }
+            
+            # Get options chain
+            options_chain = self.get_tradier_options_chain(symbol, expiry_date)
+            
+            if not options_chain:
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'error': 'No options chain data'
+                }
+            
+            # Calculate GEX
+            gex_result = self.gex_calculator.calculate_net_gex(
+                symbol, options_chain, current_price
+            )
+            
+            # Add expiration info
+            gex_result['expiration'] = expiry_date
+            gex_result['expires_today'] = (expiry_date == today_str)
+            
+            if self.debug_mode and gex_result.get('available'):
+                self.logger.debug(f"{symbol} GEX Analysis:")
+                net_gex = gex_result['net_gex']
+                self.logger.debug(f"  Net GEX: ${net_gex['total']/1e9:.2f}B ({net_gex['regime']})")
+                if gex_result['zero_gamma']['level']:
+                    self.logger.debug(f"  Zero Gamma: ${gex_result['zero_gamma']['level']:.2f}")
+            
+            return gex_result
+            
+        except Exception as e:
+            self.logger.error(f"GEX analysis failed for {symbol}: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            return {
+                'symbol': symbol,
+                'available': False,
+                'error': str(e)
+            }
     
     def detect_gap(self, symbol: str, current_price: float = None) -> Dict:
         """Detect pre-market gap"""
@@ -734,6 +840,7 @@ class EnhancedProfessionalAnalyzer:
     def analyze_open_interest(self, symbol: str, current_price: float) -> Dict:
         """
         UPDATED: Use Tradier if available, fallback to Polygon contract counting
+        Returns ALL gamma_levels for wall strength tracking
         """
         # Try Tradier first
         if self.tradier_api_key:
@@ -1042,7 +1149,7 @@ class EnhancedProfessionalAnalyzer:
         }
     
     def generate_professional_signal(self, symbol: str) -> Dict:
-        """Generate signal with Tradier gamma walls integration"""
+        """Generate signal with Tradier gamma walls + Wall Strength Tracking integration"""
         try:
             if self.debug_mode:
                 self.logger.debug(f"\n{'='*60}")
@@ -1099,6 +1206,22 @@ class EnhancedProfessionalAnalyzer:
                 except Exception as e:
                     self.logger.error(f"Key level detection failed: {str(e)}")
             
+            # NEW: Wall Strength Tracking
+            wall_strength = {}
+            if open_interest.get('available'):
+                try:
+                    wall_strength = self.wall_tracker.track_wall_strength(
+                        symbol, current_price, open_interest
+                    )
+                    
+                    if self.debug_mode and wall_strength.get('tracking_active'):
+                        self.logger.debug(f"Wall Strength Tracking: {len(wall_strength.get('tracked_walls', []))} walls monitored")
+                        for wall_alert in wall_strength.get('alerts', []):
+                            self.logger.debug(f"  ALERT: {wall_alert['alert_type']} at ${wall_alert['strike']}")
+                            
+                except Exception as e:
+                    self.logger.error(f"Wall strength tracking failed: {str(e)}")
+            
             momentum_shifted = self.detect_momentum_shift(symbol, bias_1h['bias'])
             
             # Signal scoring (preserved from original)
@@ -1110,7 +1233,7 @@ class EnhancedProfessionalAnalyzer:
                 'bearish': []
             }
             
-            # [All existing factor logic preserved - gap, news, bias, etc.]
+            # Gap factors
             if gap_data['gap_type'] == 'GAP_DOWN' and abs(gap_data['gap_size']) > 2:
                 bearish_factors += 4
                 factor_breakdown['bearish'].append(f"Large gap down ({gap_data['gap_size']}%) [+4]")
@@ -1118,6 +1241,7 @@ class EnhancedProfessionalAnalyzer:
                 bullish_factors += 4
                 factor_breakdown['bullish'].append(f"Large gap up ({gap_data['gap_size']}%) [+4]")
             
+            # News factors
             if news['sentiment'] == 'VERY NEGATIVE':
                 bearish_factors += 3
                 factor_breakdown['bearish'].append(f"Very negative news (score: {news['sentiment_score']}) [+3]")
@@ -1131,6 +1255,7 @@ class EnhancedProfessionalAnalyzer:
                 bullish_factors += 2
                 factor_breakdown['bullish'].append(f"Positive news [+2]")
             
+            # Bias factors
             if bias_1h['bias'] == 'BULLISH':
                 bullish_factors += 2
                 factor_breakdown['bullish'].append("1H bullish bias [+2]")
@@ -1174,7 +1299,7 @@ class EnhancedProfessionalAnalyzer:
                 # Check for 0DTE gamma pinning effect
                 if open_interest.get('expires_today') and open_interest.get('hours_until_expiry', 999) < 3:
                     # Extreme gamma pinning in final 3 hours of 0DTE
-                    for level in gamma_levels:
+                    for level in gamma_levels[:3]:
                         if abs(level['distance_pct']) < 1.5:
                             if level['type'] == 'SUPPORT':
                                 bullish_factors += 4
@@ -1184,7 +1309,7 @@ class EnhancedProfessionalAnalyzer:
                                 factor_breakdown['bearish'].append(f"0DTE gamma pin at ${level['strike']} ({level['total_oi']:,} OI) [+4]")
                 else:
                     # Regular gamma wall logic
-                    for level in gamma_levels:
+                    for level in gamma_levels[:5]:
                         if abs(level['distance_pct']) < 2:
                             strength_points = 3 if level['strength'] == 'STRONG' else 2 if level['strength'] == 'MODERATE' else 1
                             if level['type'] == 'SUPPORT':
@@ -1269,6 +1394,7 @@ class EnhancedProfessionalAnalyzer:
                 confidence = min(bearish_factors / 28 * 100, 95)
                 alert_type = 'STRONG SELL' if bearish_factors >= signal_threshold + 4 else 'SELL'
             
+            # Momentum shift override
             if momentum_shifted:
                 alert_type = 'MOMENTUM SHIFT - TAKE PROFIT'
             
@@ -1306,6 +1432,7 @@ class EnhancedProfessionalAnalyzer:
                 'volume_analysis': volume_analysis,
                 'premarket_rvol': premarket_rvol,
                 'key_levels': key_levels,
+                'wall_strength': wall_strength,  # NEW: Wall strength tracking data
                 'entry_targets': entry_targets,
                 'momentum_shifted': momentum_shifted,
                 'bullish_score': bullish_factors,
@@ -1346,53 +1473,66 @@ if __name__ == '__main__':
     )
     
     print("=" * 80)
-    print("TRADIER GAMMA WALL INTEGRATION TEST")
+    print("ENHANCED ANALYZER V4.3 - WITH WALL STRENGTH TRACKING")
     print("=" * 80)
     
+    # Test regular analysis
     result = analyzer.generate_professional_signal('SPY')
     
-    print(f"\n📊 RESULTS:")
+    print(f"\n📊 TRADING SIGNAL:")
     print(f"Symbol: {result['symbol']}")
     print(f"Signal: {result.get('signal', 'None')}")
     print(f"Alert Type: {result.get('alert_type')}")
     print(f"Confidence: {result.get('confidence', 0):.1f}%")
+    print(f"Current Price: ${result.get('current_price', 0):.2f}")
     
-    print(f"\n📈 SCORES:")
-    print(f"Bullish: {result.get('bullish_score', 0)}")
-    print(f"Bearish: {result.get('bearish_score', 0)}")
+    # Display wall strength tracking
+    if result.get('wall_strength') and result['wall_strength'].get('tracking_active'):
+        ws = result['wall_strength']
+        print(f"\n🧱 WALL STRENGTH TRACKING:")
+        print(f"Tracked Walls: {len(ws.get('tracked_walls', []))}")
+        print(f"Active Alerts: {len(ws.get('alerts', []))}")
+        
+        if ws.get('alerts'):
+            print("\n🚨 WALL ALERTS:")
+            for alert in ws['alerts']:
+                print(f"  • {alert['alert_type']} at ${alert['strike']:.2f}")
+                print(f"    {alert['message']}")
+        
+        if ws.get('tracked_walls'):
+            print("\n📈 MONITORED WALLS (Top 5):")
+            for wall in ws['tracked_walls'][:5]:
+                status = wall.get('status', 'UNKNOWN')
+                strike = wall.get('strike', 0)
+                strength = wall.get('current_strength', 'UNKNOWN')
+                wall_type = wall.get('type', 'N/A')
+                print(f"  • ${strike:.2f} ({wall_type}) - {status} - Strength: {strength}")
     
-    # Gamma Wall Analysis
-    if result.get('open_interest') and result['open_interest'].get('available'):
-        oi = result['open_interest']
-        print(f"\n🎯 GAMMA WALLS (Tradier):")
-        print(f"  Data Source: {oi.get('data_source', 'unknown')}")
-        print(f"  Expiration: {oi.get('expiration', 'N/A')}")
-        print(f"  0DTE: {oi.get('expires_today', False)}")
-        print(f"  Hours Until Expiry: {oi.get('hours_until_expiry', 0):.1f}h")
+    # Test GEX analysis
+    print("\n" + "=" * 80)
+    print("NET GEX ANALYSIS TEST")
+    print("=" * 80)
+    
+    gex_result = analyzer.analyze_full_gex('SPY')
+    
+    if gex_result.get('available'):
+        net_gex = gex_result['net_gex']
+        zero_gamma = gex_result['zero_gamma']
         
-        if oi.get('gamma_levels'):
-            print(f"\n  Top Gamma Levels:")
-            for i, level in enumerate(oi['gamma_levels'][:3], 1):
-                print(f"\n  Level {i}: ${level['strike']} ({level['type']})")
-                print(f"    Distance: {level['distance_pct']:.2f}% ({level['direction']})")
-                print(f"    Call OI: {level['call_oi']:,} | Volume: {level['call_volume']:,}")
-                print(f"    Put OI: {level['put_oi']:,} | Volume: {level['put_volume']:,}")
-                print(f"    Total OI: {level['total_oi']:,}")
-                print(f"    Gamma Exposure: {level['gamma_exposure']:,}")
-                print(f"    Strength: {level['strength']}")
+        print(f"\n💰 NET GEX: ${net_gex['total']/1e9:+.2f}B")
+        print(f"   Regime: {net_gex['regime']}")
+        print(f"   Strength: {net_gex['regime_strength']}")
         
-        if oi.get('expected_range'):
-            range_data = oi['expected_range']
-            print(f"\n  Expected Range:")
-            print(f"    Low: ${range_data['low']:.2f}")
-            print(f"    High: ${range_data['high']:.2f}")
-            print(f"    Midpoint: ${range_data['midpoint']:.2f}")
+        if zero_gamma['level']:
+            print(f"\n💥 ZERO GAMMA: ${zero_gamma['level']:.2f}")
+            print(f"   Position: {zero_gamma['position']}")
+            print(f"   Distance: {zero_gamma['distance_pct']:+.2f}%")
         
-        if oi.get('analysis'):
-            analysis = oi['analysis']
-            print(f"\n  Analysis:")
-            print(f"    Pinning Effect: {analysis.get('pinning_effect')}")
-            print(f"    Dominant Wall: ${analysis.get('dominant_wall'):.2f}")
-            print(f"    Recommendation: {analysis.get('recommendation')}")
+        print(f"\n📖 SUMMARY:")
+        print(f"   {gex_result.get('summary', 'N/A')}")
+    else:
+        print(f"\n❌ GEX analysis not available: {gex_result.get('error')}")
     
     print("\n" + "=" * 80)
+    print("✅ ALL TESTS COMPLETE")
+    print("=" * 80)

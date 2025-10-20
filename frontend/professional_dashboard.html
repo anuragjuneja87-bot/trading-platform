@@ -420,6 +420,35 @@
             color: #44ff44;
         }
 
+        /* Wall Strength Badge Styles */
+        .wall-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin: 2px;
+        }
+
+        .wall-building {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        .wall-weakening {
+            background: #330000;
+            color: #ff6600;
+            border: 1px solid #ff6600;
+        }
+
+        .wall-breaking {
+            background: #330000;
+            color: #ff0000;
+            border: 1px solid #ff0000;
+            animation: blink 0.8s infinite;
+        }
+
         .refresh-btn {
             background: #00ff00;
             color: #000;
@@ -828,7 +857,41 @@
             return display;
         }
 
-        function formatGammaZones(openInterest) {
+        function getWallStrengthBadge(wallStrength, strike, type) {
+            if (!wallStrength || !wallStrength.available) {
+                return '';
+            }
+            
+            const changes = wallStrength.walls || [];
+            
+            const change = changes.find(c => Math.abs(c.strike - strike) < 0.01 && c.type === type);
+            
+            if (!change) {
+                return '';
+            }
+            
+            const changePct = change.change_pct;
+            
+            if (change.pattern === 'BUILDING') {
+                if (changePct >= 50) {
+                    return '<span class="wall-badge wall-building">🔥🔥 +' + changePct.toFixed(0) + '%</span>';
+                } else if (changePct >= 25) {
+                    return '<span class="wall-badge wall-building">🔥 +' + changePct.toFixed(0) + '%</span>';
+                }
+            } else if (change.pattern === 'WEAKENING') {
+                if (changePct <= -40) {
+                    return '<span class="wall-badge wall-breaking">🚨 ' + changePct.toFixed(0) + '%</span>';
+                } else if (changePct <= -25) {
+                    return '<span class="wall-badge wall-weakening">⚠️⚠️ ' + changePct.toFixed(0) + '%</span>';
+                } else if (changePct <= -15) {
+                    return '<span class="wall-badge wall-weakening">⚠️ ' + changePct.toFixed(0) + '%</span>';
+                }
+            }
+            
+            return '';
+        }
+
+        function formatGammaZones(openInterest, wallStrength) {
             if (!openInterest || !openInterest.available) {
                 return '<span class="volume-unknown">No data</span>';
             }
@@ -845,7 +908,6 @@
             
             let html = '<div class="gamma-zone">';
             
-            // ENHANCED: Larger expiry info
             if (expiresToday && hoursUntil > 0) {
                 html += `<div class="gamma-0dte">⏰ 0DTE - ${hoursUntil.toFixed(1)}h LEFT</div>`;
             } else if (expiresToday) {
@@ -857,14 +919,11 @@
             
             html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
             
-            // Sort levels by strike (descending)
             const sortedLevels = [...gammaLevels].sort((a, b) => b.strike - a.strike);
             
-            // Find resistance and support
             const resistance = sortedLevels.filter(l => l.strike > currentPrice).slice(0, 2);
             const support = sortedLevels.filter(l => l.strike <= currentPrice).slice(0, 2);
             
-            // ENHANCED: Display resistance levels with bigger fonts
             for (const level of resistance) {
                 const oiK = (level.total_oi / 1000).toFixed(0);
                 const volK = (level.total_volume / 1000).toFixed(0);
@@ -873,17 +932,18 @@
                 html += `<div class="gamma-resistance" style="margin: 4px 0;">`;
                 html += `<span class="gamma-strike-price">${emoji} $${level.strike}</span> `;
                 html += `<span class="gamma-label">RESIST</span>`;
+                
+                html += getWallStrengthBadge(wallStrength, level.strike, 'RESISTANCE');
+                
                 html += `<br><span class="gamma-data resistance-data">OI: ${oiK}K | Vol: ${volK}K</span>`;
                 html += `<br><span style="font-size:9px;color:#777;">${level.direction} ${Math.abs(level.distance_pct).toFixed(1)}%</span>`;
                 html += `</div>`;
             }
             
-            // ENHANCED: Current price - BIGGER
             html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
             html += `<div class="gamma-current">📍 NOW: $${currentPrice.toFixed(2)}</div>`;
             html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
             
-            // ENHANCED: Display support levels with bigger fonts
             for (const level of support) {
                 const oiK = (level.total_oi / 1000).toFixed(0);
                 const volK = (level.total_volume / 1000).toFixed(0);
@@ -892,19 +952,20 @@
                 html += `<div class="gamma-support" style="margin: 4px 0;">`;
                 html += `<span class="gamma-strike-price">${emoji} $${level.strike}</span> `;
                 html += `<span class="gamma-label">SUPPORT</span>`;
+                
+                html += getWallStrengthBadge(wallStrength, level.strike, 'SUPPORT');
+                
                 html += `<br><span class="gamma-data support-data">OI: ${oiK}K | Vol: ${volK}K</span>`;
                 html += `<br><span style="font-size:9px;color:#777;">${level.direction} ${Math.abs(level.distance_pct).toFixed(1)}%</span>`;
                 html += `</div>`;
             }
             
-            // Expected range
             if (openInterest.expected_range) {
                 const range = openInterest.expected_range;
                 html += '<div class="gamma-separator">━━━━━━━━━━━━━</div>';
                 html += `<div style="font-size:10px;color:#999;font-weight:bold;">Range: $${range.low.toFixed(0)}-$${range.high.toFixed(0)}</div>`;
             }
             
-            // Data source
             if (dataSource === 'tradier') {
                 html += `<div style="font-size:8px;color:#666;margin-top:3px;">📡 Tradier Live</div>`;
             } else if (dataSource === 'polygon_fallback') {
@@ -1002,17 +1063,14 @@
             
             updateCell(cells[7], formatDarkPool(data.dark_pool_details || {}));
             
-            // ENHANCED: Gamma zones (now much more readable)
-            updateCell(cells[8], formatGammaZones(data.open_interest || {}));
+            updateCell(cells[8], formatGammaZones(data.open_interest || {}, data.wall_strength || {}));
             
             updateCell(cells[9], `<span class="news-${(data.news_sentiment || 'neutral').toLowerCase().replace(/\s+/g, '.')}">${data.news_sentiment || '--'}</span>`);
             
-            // SHIFTED: Entry/TP/SL now at cells[10]
             const entryInfo = entryTargets.entry ? 
                 `E: ${formatPrice(entryTargets.entry)}<br>TP: ${formatPrice(entryTargets.tp1)}<br>SL: ${formatPrice(entryTargets.stop_loss)}` : '--';
             updateCell(cells[10], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
 
-            // SHIFTED: Alert now at cells[11]
             const alertClass = getAlertClass(data.alert_type);
             const currentAlert = data.alert_type || 'MONITOR';
             const previousAlert = previousAlerts[symbol] || 'MONITOR';
@@ -1122,6 +1180,7 @@
             console.log(`📅 Earnings monitoring: ${earningsEnabled ? 'ENABLED' : 'DISABLED'} (${earningsSymbolsCount} symbols)`);
             console.log('💡 Enhanced Gamma Zones: 85% larger + improved readability');
             console.log('🎯 0DTE gamma pinning detection active');
+            console.log('🧱 Wall strength tracking enabled');
         }
 
         initialize();

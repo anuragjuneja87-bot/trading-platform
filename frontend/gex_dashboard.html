@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Net Gamma Exposure (GEX) Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            background: #000000;
+            color: #00ff00;
+            padding: 15px;
+            font-size: 13px;
+        }
+
+        .header {
+            background: #0a0a0a;
+            padding: 20px;
+            border: 2px solid #00ff00;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #00ff00;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .header-subtitle {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .market-time {
+            font-size: 18px;
+            color: #ffff00;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .update-indicator {
+            font-size: 12px;
+            color: #00ff00;
+            padding: 6px 12px;
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+        }
+
+        .symbol-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .symbol-tab {
+            padding: 10px 20px;
+            background: #0a0a0a;
+            border: 2px solid #333;
+            color: #888;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .symbol-tab:hover {
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+
+        .symbol-tab.active {
+            background: #001a00;
+            border-color: #00ff00;
+            color: #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .gex-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .gex-card {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        .gex-card h2 {
+            font-size: 16px;
+            color: #00ff00;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .gex-value {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .gex-value.positive {
+            color: #00ff00;
+        }
+
+        .gex-value.negative {
+            color: #ff0000;
+        }
+
+        .gex-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .regime-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .regime-mean-reversion {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+        }
+
+        .regime-volatility {
+            background: #330000;
+            color: #ff0000;
+            border: 2px solid #ff0000;
+        }
+
+        .regime-neutral {
+            background: #333300;
+            color: #ffff00;
+            border: 2px solid #ffff00;
+        }
+
+        .zero-gamma-card {
+            background: #0a0a0a;
+            border: 2px solid #ff00ff;
+            padding: 20px;
+            border-radius: 5px;
+            grid-column: 1 / -1;
+        }
+
+        .zero-gamma-card h2 {
+            color: #ff00ff;
+        }
+
+        .zero-gamma-level {
+            font-size: 48px;
+            font-weight: bold;
+            color: #ff00ff;
+            text-shadow: 0 0 15px #ff00ff;
+            margin: 15px 0;
+        }
+
+        .distance-indicator {
+            font-size: 14px;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .distance-indicator.approaching {
+            background: #330000;
+            color: #ff0000;
+            border: 2px solid #ff0000;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.4; }
+        }
+
+        .distance-indicator.safe {
+            background: #001a00;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+        }
+
+        .heatmap-container {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        .heatmap-container h2 {
+            font-size: 16px;
+            color: #00ff00;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .strike-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+
+        .strike-row:hover {
+            background: #1a1a1a;
+        }
+
+        .strike-row.current-price {
+            background: #2a2a00;
+            border: 2px solid #ffff00;
+            padding: 12px 8px;
+            margin: 15px 0;
+        }
+
+        .strike-row.zero-gamma {
+            background: #2a002a;
+            border: 2px solid #ff00ff;
+            padding: 12px 8px;
+            margin: 15px 0;
+        }
+
+        .strike-price {
+            min-width: 80px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .strike-bar {
+            flex-grow: 1;
+            height: 20px;
+            margin: 0 15px;
+            border-radius: 3px;
+            position: relative;
+            background: #1a1a1a;
+        }
+
+        .strike-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s;
+        }
+
+        .resistance-strong { background: linear-gradient(90deg, #660000, #ff0000); }
+        .resistance-moderate { background: linear-gradient(90deg, #663300, #ff6600); }
+        .resistance-weak { background: linear-gradient(90deg, #665500, #ffaa00); }
+
+        .support-strong { background: linear-gradient(90deg, #00ff00, #006600); }
+        .support-moderate { background: linear-gradient(90deg, #00ff88, #006644); }
+        .support-weak { background: linear-gradient(90deg, #00ffaa, #006655); }
+
+        .gex-amount {
+            min-width: 120px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            font-size: 18px;
+            color: #ffff00;
+        }
+
+        .explanation {
+            background: #0a0a0a;
+            border: 2px solid #666;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 11px;
+            color: #888;
+            line-height: 1.6;
+        }
+
+        .explanation h3 {
+            color: #00ff00;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .explanation ul {
+            margin-left: 20px;
+        }
+
+        .explanation li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>⚡ NET GAMMA EXPOSURE (GEX) CALCULATOR ⚡</h1>
+            <div class="header-subtitle">Real-time dealer positioning analysis - Zero gamma flip points - Mean reversion vs volatility regimes</div>
+        </div>
+        <div style="text-align: right;">
+            <div class="market-time" id="marketTime">--:--:-- ET</div>
+            <span class="update-indicator" id="updateIndicator">Loading...</span>
+        </div>
+    </div>
+
+    <div class="symbol-tabs" id="symbolTabs">
+        <!-- Tabs will be dynamically loaded -->
+    </div>
+
+    <div id="gexContent" class="loading">
+        Loading GEX data...
+    </div>
+
+    <div class="explanation">
+        <h3>📚 What is Net Gamma Exposure (GEX)?</h3>
+        <ul>
+            <li><strong>Positive GEX (Green):</strong> Dealers are SHORT calls → Mean reversion mode → Price gets pushed BACK to key levels</li>
+            <li><strong>Negative GEX (Red):</strong> Dealers are LONG puts → Volatility mode → Price moves AMPLIFIED (breakouts more likely)</li>
+            <li><strong>Zero Gamma Level:</strong> Critical flip point where regime changes → Extreme volatility when price crosses this level</li>
+            <li><strong>Above Zero Gamma:</strong> Expect rangebound, choppy price action with strong resistance/support</li>
+            <li><strong>Below Zero Gamma:</strong> Expect explosive moves, momentum-driven breakouts/breakdowns</li>
+        </ul>
+    </div>
+
+    <script>
+        let SYMBOLS = [];
+        let currentSymbol = null;
+        let gexData = {};
+        const API_BASE = 'http://localhost:5001/api';
+
+        async function loadWatchlist() {
+            try {
+                const response = await fetch(`${API_BASE}/watchlist`);
+                const data = await response.json();
+                
+                if (data.symbols && data.symbols.length > 0) {
+                    SYMBOLS = data.symbols;
+                    console.log(`✅ Loaded ${SYMBOLS.length} symbols`);
+                    createSymbolTabs();
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error loading watchlist:', error);
+            }
+            
+            SYMBOLS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL'];
+            createSymbolTabs();
+            return false;
+        }
+
+        function createSymbolTabs() {
+            const container = document.getElementById('symbolTabs');
+            container.innerHTML = '';
+            
+            SYMBOLS.forEach((symbol, index) => {
+                const tab = document.createElement('div');
+                tab.className = 'symbol-tab';
+                if (index === 0) {
+                    tab.classList.add('active');
+                    currentSymbol = symbol;
+                }
+                tab.textContent = symbol;
+                tab.onclick = () => selectSymbol(symbol);
+                container.appendChild(tab);
+            });
+            
+            if (currentSymbol) {
+                loadGexData(currentSymbol);
+            }
+        }
+
+        function selectSymbol(symbol) {
+            currentSymbol = symbol;
+            
+            document.querySelectorAll('.symbol-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.textContent === symbol) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            if (gexData[symbol]) {
+                renderGexData(gexData[symbol]);
+            } else {
+                loadGexData(symbol);
+            }
+        }
+
+        async function loadGexData(symbol) {
+            try {
+                document.getElementById('gexContent').innerHTML = '<div class="loading">Loading GEX data for ' + symbol + '...</div>';
+                
+                const response = await fetch(`${API_BASE}/gex/${symbol}`);
+                const data = await response.json();
+                
+                gexData[symbol] = data;
+                renderGexData(data);
+                
+            } catch (error) {
+                console.error('Error loading GEX data:', error);
+                document.getElementById('gexContent').innerHTML = '<div class="loading" style="color: #ff0000;">Error loading GEX data</div>';
+            }
+        }
+
+        function renderGexData(data) {
+            if (!data.available) {
+                document.getElementById('gexContent').innerHTML = '<div class="loading" style="color: #888;">No GEX data available for ' + data.symbol + '</div>';
+                return;
+            }
+
+            const net_gex = data.net_gex;
+            const zero_gamma = data.zero_gamma;
+            const current_price = data.current_price;
+
+            const gexBillions = net_gex.total / 1_000_000_000;
+            const isPositive = net_gex.total > 0;
+
+            // Determine regime class
+            let regimeClass = 'regime-neutral';
+            let regimeText = net_gex.regime;
+            
+            if (regimeText.includes('MEAN_REVERSION')) {
+                regimeClass = 'regime-mean-reversion';
+            } else if (regimeText.includes('VOLATILITY')) {
+                regimeClass = 'regime-volatility';
+            }
+
+            let html = '<div class="gex-container">';
+
+            // Net GEX Card
+            html += `
+                <div class="gex-card">
+                    <h2>📊 Net Gamma Exposure</h2>
+                    <div class="gex-value ${isPositive ? 'positive' : 'negative'}">
+                        ${isPositive ? '+' : ''}$${Math.abs(gexBillions).toFixed(2)}B
+                    </div>
+                    <div class="gex-label">Total: $${(net_gex.total / 1_000_000_000).toFixed(2)}B</div>
+                    <div class="gex-label">Calls: $${(net_gex.call_gex / 1_000_000_000).toFixed(2)}B</div>
+                    <div class="gex-label">Puts: $${(net_gex.put_gex / 1_000_000_000).toFixed(2)}B</div>
+                    <div class="regime-badge ${regimeClass}">
+                        ${regimeText.replace(/_/g, ' ')}
+                    </div>
+                </div>
+            `;
+
+            // Current Price Card
+            html += `
+                <div class="gex-card">
+                    <h2>💰 Current Price</h2>
+                    <div class="gex-value" style="color: #ffff00;">
+                        $${current_price.toFixed(2)}
+                    </div>
+                    <div class="gex-label">Max Pain: $${data.max_pain ? data.max_pain.toFixed(2) : 'N/A'}</div>
+                    <div class="gex-label">Expected Range: $${data.expected_range.low} - $${data.expected_range.high}</div>
+                    <div class="gex-label">Range Width: ${data.expected_range.width_pct}%</div>
+                </div>
+            `;
+
+            html += '</div>';
+
+            // Zero Gamma Card
+            const approaching = zero_gamma.approaching;
+            const distanceClass = approaching ? 'approaching' : 'safe';
+            const distanceText = approaching ? '⚠️ APPROACHING ZERO GAMMA' : `${zero_gamma.position} zero gamma`;
+
+            html += `
+                <div class="zero-gamma-card">
+                    <h2>💥 Zero Gamma Level (Critical Flip Point)</h2>
+                    <div class="zero-gamma-level">
+                        $${zero_gamma.level ? zero_gamma.level.toFixed(2) : 'N/A'}
+                    </div>
+                    <div class="gex-label">Current price ${zero_gamma.position} zero gamma by ${Math.abs(zero_gamma.distance_pct).toFixed(2)}%</div>
+                    <div class="distance-indicator ${distanceClass}">
+                        ${distanceText}
+                    </div>
+                </div>
+            `;
+
+            // Heatmap
+            html += '<div class="heatmap-container">';
+            html += '<h2>📈 GEX Heatmap by Strike</h2>';
+            html += renderHeatmap(data.strikes, current_price, zero_gamma.level, net_gex.total);
+            html += '</div>';
+
+            document.getElementById('gexContent').innerHTML = html;
+        }
+
+        function renderHeatmap(strikes, current_price, zero_gamma_level, max_gex) {
+            if (!strikes || strikes.length === 0) {
+                return '<div class="loading">No strike data available</div>';
+            }
+
+            // Filter strikes within ±10%
+            const filtered = strikes.filter(s => Math.abs(s.distance_pct) <= 10);
+            
+            // Sort by strike price (descending)
+            filtered.sort((a, b) => b.strike - a.strike);
+
+            const maxAbsGex = Math.max(...filtered.map(s => Math.abs(s.net_gex)));
+
+            let html = '';
+
+            filtered.forEach(strike => {
+                const isCurrentPrice = Math.abs(strike.strike - current_price) < 0.5;
+                const isZeroGamma = zero_gamma_level && Math.abs(strike.strike - zero_gamma_level) < 0.5;
+
+                let rowClass = 'strike-row';
+                if (isCurrentPrice) rowClass += ' current-price';
+                if (isZeroGamma) rowClass += ' zero-gamma';
+
+                const gex = strike.net_gex;
+                const gexMagnitude = Math.abs(gex);
+                const barWidth = (gexMagnitude / maxAbsGex) * 100;
+
+                let barClass = '';
+                let strikeColor = '';
+                let emoji = '';
+
+                if (gex > 0) {
+                    // Resistance
+                    strikeColor = 'color: #ff0000;';
+                    emoji = '⬆️';
+                    if (gexMagnitude > maxAbsGex * 0.7) {
+                        barClass = 'resistance-strong';
+                    } else if (gexMagnitude > maxAbsGex * 0.4) {
+                        barClass = 'resistance-moderate';
+                    } else {
+                        barClass = 'resistance-weak';
+                    }
+                } else {
+                    // Support
+                    strikeColor = 'color: #00ff00;';
+                    emoji = '⬇️';
+                    if (gexMagnitude > maxAbsGex * 0.7) {
+                        barClass = 'support-strong';
+                    } else if (gexMagnitude > maxAbsGex * 0.4) {
+                        barClass = 'support-moderate';
+                    } else {
+                        barClass = 'support-weak';
+                    }
+                }
+
+                let label = '';
+                if (isCurrentPrice) {
+                    label = '💛 CURRENT PRICE';
+                    strikeColor = 'color: #ffff00;';
+                } else if (isZeroGamma) {
+                    label = '💥 ZERO GAMMA';
+                    strikeColor = 'color: #ff00ff;';
+                } else {
+                    label = `$${strike.strike.toFixed(2)} ${emoji}`;
+                }
+
+                const gexDisplay = formatGex(gex);
+
+                html += `
+                    <div class="${rowClass}">
+                        <div class="strike-price" style="${strikeColor}">${label}</div>
+                        <div class="strike-bar">
+                            <div class="strike-bar-fill ${barClass}" style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="gex-amount" style="${strikeColor}">${gexDisplay}</div>
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        function formatGex(gex) {
+            const sign = gex >= 0 ? '+' : '';
+            const absGex = Math.abs(gex);
+            
+            if (absGex >= 1_000_000_000) {
+                return `${sign}$${(gex / 1_000_000_000).toFixed(2)}B`;
+            } else if (absGex >= 1_000_000) {
+                return `${sign}$${(gex / 1_000_000).toFixed(0)}M`;
+            } else {
+                return `${sign}$${(gex / 1_000).toFixed(0)}K`;
+            }
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const timeStr = et.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('marketTime').textContent = timeStr + ' ET';
+        }
+
+        async function refreshAllData() {
+            const indicator = document.getElementById('updateIndicator');
+            indicator.textContent = 'Updating...';
+            
+            for (const symbol of SYMBOLS) {
+                try {
+                    const response = await fetch(`${API_BASE}/gex/${symbol}`);
+                    const data = await response.json();
+                    gexData[symbol] = data;
+                } catch (error) {
+                    console.error(`Error updating ${symbol}:`, error);
+                }
+            }
+            
+            if (currentSymbol && gexData[currentSymbol]) {
+                renderGexData(gexData[currentSymbol]);
+            }
+            
+            const now = new Date();
+            indicator.textContent = `Last update: ${now.toLocaleTimeString('en-US', { hour12: false })}`;
+        }
+
+        async function initialize() {
+            console.log('🚀 Initializing GEX Dashboard');
+            
+            await loadWatchlist();
+            
+            setInterval(updateTime, 1000);
+            updateTime();
+            
+            // Auto-refresh every 60 seconds
+            setInterval(refreshAllData, 60000);
+            
+            console.log('✅ GEX dashboard initialized');
+        }
+
+        initialize();
+    </script>
+</body>
+</html>

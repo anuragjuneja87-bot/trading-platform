@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gamma Levels Detail View - 0DTE Zones</title>
+    <title>Gamma Levels Detail View - 0DTE Zones + Wall Strength</title>
     <style>
         * {
             margin: 0;
@@ -38,43 +38,6 @@
             text-shadow: 0 0 10px #ff00ff;
         }
 
-        .header-right {
-            text-align: right;
-        }
-
-        .market-time {
-            font-size: 18px;
-            color: #ffff00;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-
-        .update-indicator {
-            font-size: 12px;
-            color: #00ff00;
-            padding: 6px 12px;
-            border: 1px solid #00ff00;
-            border-radius: 3px;
-            display: inline-block;
-        }
-
-        .update-indicator.updating {
-            color: #ffff00;
-            border-color: #ffff00;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .watchlist-info {
-            font-size: 11px;
-            color: #888;
-            margin-top: 8px;
-        }
-
         .table-container {
             overflow-x: auto;
             border: 2px solid #ff00ff;
@@ -85,7 +48,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1400px;
+            min-width: 1600px;
         }
 
         th {
@@ -123,15 +86,6 @@
             background: #1a1a1a;
         }
 
-        tr.zero-dte {
-            animation: blinkRow 2s infinite;
-        }
-
-        @keyframes blinkRow {
-            0%, 100% { background: #0a0a0a; }
-            50% { background: #2a2a00; }
-        }
-
         .symbol {
             font-weight: bold;
             font-size: 18px;
@@ -143,11 +97,6 @@
             font-weight: bold;
             font-size: 16px;
             color: #ffff00;
-        }
-
-        .expiration {
-            font-size: 11px;
-            color: #888;
         }
 
         .zero-dte-status {
@@ -168,7 +117,7 @@
         }
 
         .strike-price {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: bold;
             margin-bottom: 4px;
             letter-spacing: 0.5px;
@@ -196,62 +145,43 @@
             margin-bottom: 3px;
         }
 
-        .resistance-1 .oi-volume {
-            color: #ff9999;
+        /* NEW: Wall Strength Styles */
+        .wall-strength-cell {
+            min-width: 200px;
+            line-height: 1.5;
+            text-align: left;
         }
 
-        .resistance-2 .oi-volume {
-            color: #ffbb88;
-        }
-
-        .support-1 .oi-volume {
-            color: #99ff99;
-        }
-
-        .support-2 .oi-volume {
-            color: #99ffbb;
-        }
-
-        .distance {
-            font-size: 10px;
-            color: #666;
-            font-style: italic;
-        }
-
-        .strength-strong {
-            text-shadow: 0 0 8px currentColor;
-            font-weight: bold;
-        }
-
-        .expected-range {
-            font-size: 13px;
-            color: #00ccff;
-            font-weight: bold;
-        }
-
-        .data-source {
-            font-size: 10px;
-            padding: 3px 8px;
-            border-radius: 3px;
-            display: inline-block;
-        }
-
-        .source-tradier {
-            background: #003300;
+        .wall-building {
             color: #00ff00;
-            border: 1px solid #00ff00;
+            font-weight: bold;
         }
 
-        .source-fallback {
-            background: #332200;
-            color: #ff9900;
-            border: 1px solid #ff9900;
+        .wall-weakening {
+            color: #ff6600;
+            font-weight: bold;
         }
 
-        .no-data {
-            color: #666;
-            font-style: italic;
-            font-size: 12px;
+        .wall-stable {
+            color: #666666;
+        }
+
+        .timeline-entry {
+            font-size: 10px;
+            margin: 2px 0;
+            padding: 2px 4px;
+            background: #1a1a1a;
+            border-radius: 2px;
+        }
+
+        .timeline-entry.building {
+            background: #002200;
+            color: #00ff00;
+        }
+
+        .timeline-entry.weakening {
+            background: #220000;
+            color: #ff6600;
         }
 
         .loading {
@@ -260,22 +190,17 @@
             font-size: 18px;
             color: #ffff00;
         }
-
-        .emoji {
-            font-size: 14px;
-            margin-right: 3px;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <div>
-            <h1>⚡ GAMMA LEVELS DETAIL VIEW - 0DTE ZONES ⚡</h1>
-            <div class="watchlist-info" id="symbolList">Loading watchlist...</div>
+            <h1>⚡ GAMMA LEVELS + WALL STRENGTH TRACKER ⚡</h1>
+            <div style="font-size: 10px; color: #666; margin-top: 4px;" id="symbolList">Loading watchlist...</div>
         </div>
-        <div class="header-right">
-            <div class="market-time" id="marketTime">--:--:-- ET</div>
-            <span class="update-indicator" id="updateIndicator">Auto-refresh: 30s</span>
+        <div style="text-align: right;">
+            <div class="market-time" style="font-size: 18px; color: #ffff00; font-weight: bold; margin-bottom: 8px;" id="marketTime">--:--:-- ET</div>
+            <span style="font-size: 12px; color: #00ff00; padding: 6px 12px; border: 1px solid #00ff00; border-radius: 3px;" id="updateIndicator">Auto-refresh: 30s</span>
         </div>
     </div>
 
@@ -287,11 +212,11 @@
                     <th>CURRENT<br>PRICE</th>
                     <th>EXPIRATION</th>
                     <th>0DTE<br>STATUS</th>
-                    <th style="background: #330000;">RESISTANCE 1<br><small style="opacity:0.7;">Closest Above</small></th>
-                    <th style="background: #331100;">RESISTANCE 2<br><small style="opacity:0.7;">Second Above</small></th>
-                    <th style="background: #003300;">SUPPORT 1<br><small style="opacity:0.7;">Closest Below</small></th>
-                    <th style="background: #003311;">SUPPORT 2<br><small style="opacity:0.7;">Second Below</small></th>
-                    <th>EXPECTED<br>RANGE</th>
+                    <th style="background: #330000;">RESISTANCE 1</th>
+                    <th style="background: #331100;">RESISTANCE 2</th>
+                    <th style="background: #003300;">SUPPORT 1</th>
+                    <th style="background: #003311;">SUPPORT 2</th>
+                    <th style="background: #002244;">WALL STRENGTH<br><small style="opacity:0.7;">OI Changes</small></th>
                     <th>DATA<br>SOURCE</th>
                 </tr>
             </thead>
@@ -315,7 +240,6 @@
                 if (data.symbols && data.symbols.length > 0) {
                     SYMBOLS = data.symbols;
                     document.getElementById('symbolList').textContent = `Tracking ${SYMBOLS.length} symbols: ${SYMBOLS.join(', ')}`;
-                    console.log(`✅ Loaded ${SYMBOLS.length} symbols from watchlist`);
                     return true;
                 } else {
                     SYMBOLS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'PLTR', 'ORCL'];
@@ -323,7 +247,7 @@
                     return false;
                 }
             } catch (error) {
-                console.error('❌ Error loading watchlist:', error);
+                console.error('Error loading watchlist:', error);
                 SYMBOLS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'PLTR', 'ORCL'];
                 return false;
             }
@@ -342,25 +266,75 @@
 
         function formatGammaLevel(level) {
             if (!level) {
-                return '<div class="no-data">No wall detected</div>';
+                return '<div style="color: #666;">No wall detected</div>';
             }
 
             const oiK = (level.total_oi / 1000).toFixed(1);
             const volK = (level.total_volume / 1000).toFixed(1);
-            const emoji = level.strength === 'STRONG' ? '●' : level.strength === 'MODERATE' ? '◐' : '○';
-            const strengthClass = level.strength === 'STRONG' ? 'strength-strong' : '';
+            const emoji = level.strength === 'STRONG' ? '◆' : level.strength === 'MODERATE' ? '◇' : '○';
 
             return `
-                <div class="strike-price ${strengthClass}">
-                    <span class="emoji">${emoji}</span>${formatPrice(level.strike)}
+                <div class="strike-price">
+                    <span style="font-size: 14px;">${emoji}</span> ${formatPrice(level.strike)}
                 </div>
                 <div class="oi-volume">
                     OI: ${oiK}K | Vol: ${volK}K
                 </div>
-                <div class="distance">
+                <div style="font-size: 9px; color: #777;">
                     ${level.direction} ${Math.abs(level.distance_pct).toFixed(1)}%
                 </div>
             `;
+        }
+
+        function formatWallStrength(wallStrength) {
+            if (!wallStrength || !wallStrength.available) {
+                return '<div style="color: #666; font-size: 11px;">No tracking data</div>';
+            }
+
+            const changes = wallStrength.walls || [];
+            
+            if (changes.length === 0) {
+                return '<div style="color: #666; font-size: 11px;">No changes detected</div>';
+            }
+
+            // Show top 3 most significant changes
+            const significantChanges = changes
+                .filter(c => c.pattern !== 'STABLE')
+                .sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct))
+                .slice(0, 3);
+
+            if (significantChanges.length === 0) {
+                return '<div style="color: #666; font-size: 11px;">All walls stable</div>';
+            }
+
+            let html = '';
+            
+            for (const change of significantChanges) {
+                const isBuilding = change.pattern === 'BUILDING';
+                const className = isBuilding ? 'wall-building' : 'wall-weakening';
+                const emoji = isBuilding ? '🔥' : '⚠️';
+                
+                html += `
+                    <div class="${className}" style="margin-bottom: 8px; padding: 4px; background: ${isBuilding ? '#001100' : '#110000'}; border-radius: 3px;">
+                        <div style="font-size: 12px; font-weight: bold;">
+                            ${emoji} $${change.strike.toFixed(2)} ${change.type}
+                        </div>
+                        <div style="font-size: 11px; opacity: 0.9;">
+                            ${change.change_pct > 0 ? '+' : ''}${change.change_pct.toFixed(1)}% from baseline
+                        </div>
+                        <div style="font-size: 10px; opacity: 0.7; margin-top: 2px;">
+                            ${change.current_oi.toLocaleString()} OI (was ${change.baseline_oi.toLocaleString()})
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Show baseline time
+            if (wallStrength.baseline_time) {
+                html += `<div style="font-size: 9px; color: #666; margin-top: 4px;">Baseline: ${wallStrength.baseline_time}</div>`;
+            }
+
+            return html;
         }
 
         function createRow(data) {
@@ -371,7 +345,7 @@
                     <tr>
                         <td><div class="symbol">${data.symbol}</div></td>
                         <td><div class="price">${formatPrice(data.current_price)}</div></td>
-                        <td colspan="8" class="no-data">No gamma data available</td>
+                        <td colspan="8" style="color: #666;">No gamma data available</td>
                     </tr>
                 `;
             }
@@ -390,33 +364,30 @@
             const sup2 = support[1] || null;
 
             // 0DTE status
-            let zeroDTEStatus = '<div class="no-data">--</div>';
-            let rowClass = '';
+            let zeroDTEStatus = '<div style="color: #666;">--</div>';
             
             if (oi.expires_today && oi.hours_until_expiry > 0) {
                 zeroDTEStatus = `<div class="zero-dte-status">⏰ ${oi.hours_until_expiry.toFixed(1)}h LEFT</div>`;
-                rowClass = 'zero-dte';
             } else if (oi.expires_today) {
                 zeroDTEStatus = '<div class="zero-dte-status">🔴 EXPIRED</div>';
             }
 
             // Expiration
             const expiration = oi.expiration || '--';
-            const expDisplay = `<div class="expiration">${expiration}</div>`;
-
-            // Expected range
-            const rangeDisplay = oi.expected_range ? 
-                `<div class="expected-range">${formatPrice(oi.expected_range.low)}<br>to<br>${formatPrice(oi.expected_range.high)}</div>` :
-                '<div class="no-data">--</div>';
+            const expDisplay = `<div style="font-size: 11px;">${expiration}</div>`;
 
             // Data source
             const source = oi.data_source || 'unknown';
-            const sourceClass = source === 'tradier' ? 'source-tradier' : 'source-fallback';
+            const sourceClass = source === 'tradier' ? 'color: #00ff00;' : 'color: #ff6600;';
             const sourceText = source === 'tradier' ? '📡 Tradier' : '⚠️ Fallback';
-            const sourceDisplay = `<div class="data-source ${sourceClass}">${sourceText}</div>`;
+            const sourceDisplay = `<div style="${sourceClass} font-size: 11px; font-weight: bold;">${sourceText}</div>`;
+
+            // Wall Strength
+            const wallStrength = data.wall_strength || {};
+            const wallStrengthDisplay = formatWallStrength(wallStrength);
 
             return `
-                <tr class="${rowClass}">
+                <tr>
                     <td><div class="symbol">${data.symbol}</div></td>
                     <td><div class="price">${formatPrice(currentPrice)}</div></td>
                     <td>${expDisplay}</td>
@@ -425,7 +396,7 @@
                     <td class="gamma-cell resistance-2">${formatGammaLevel(res2)}</td>
                     <td class="gamma-cell support-1">${formatGammaLevel(sup1)}</td>
                     <td class="gamma-cell support-2">${formatGammaLevel(sup2)}</td>
-                    <td>${rangeDisplay}</td>
+                    <td class="wall-strength-cell">${wallStrengthDisplay}</td>
                     <td>${sourceDisplay}</td>
                 </tr>
             `;
@@ -439,7 +410,6 @@
 
             const indicator = document.getElementById('updateIndicator');
             indicator.textContent = 'Updating...';
-            indicator.classList.add('updating');
 
             try {
                 const promises = SYMBOLS.map(symbol => 
@@ -459,17 +429,15 @@
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
                 indicator.textContent = `Last update: ${timeStr}`;
-                indicator.classList.remove('updating');
 
             } catch (error) {
                 console.error('Error loading data:', error);
                 indicator.textContent = 'Update failed';
-                indicator.classList.remove('updating');
             }
         }
 
         async function initialize() {
-            console.log('🚀 Initializing Gamma Levels Detail View');
+            console.log('🚀 Initializing Gamma Levels + Wall Strength View');
             
             await loadWatchlist();
             
@@ -481,7 +449,7 @@
             // Auto-refresh every 30 seconds
             setInterval(loadData, 30000);
             
-            console.log('✅ Gamma detail view initialized with', SYMBOLS.length, 'symbols');
+            console.log('✅ Gamma + Wall Strength view initialized');
         }
 
         initialize();
