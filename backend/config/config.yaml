@@ -347,7 +347,7 @@ premarket_volume_monitor:
   critical_threshold: 5.0               # 5.0x RVOL = critical
   
   # Alert settings
-  cooldown_minutes: 30                  # 30 min cooldown per symbol
+  cooldown_minutes: 10                # 30 min cooldown per symbol
   max_alerts_per_session: 5             # Max 5 alerts per symbol per session
   
   # Session times (ET)

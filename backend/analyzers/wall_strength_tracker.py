@@ -5,6 +5,8 @@ Real-Time Gamma Wall Strength Tracker
 Tracks OI/Volume changes at gamma walls every 5 minutes
 Detects building vs weakening patterns
 Generates alerts for institutional positioning momentum
+
+DAY TRADER OPTIMIZED - Sensitive thresholds for intraday wall movement
 """
 
 import json
@@ -18,49 +20,36 @@ import pytz
 
 class WallStrengthTracker:
     def __init__(self, storage_path: str = 'backend/data/wall_history/'):
-        """
-        Initialize Wall Strength Tracker
-        
-        Args:
-            storage_path: Directory to store wall history JSON files
-        """
+        """Initialize Wall Strength Tracker"""
         self.logger = logging.getLogger(__name__)
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
         
         # In-memory storage
-        self.snapshots = defaultdict(list)  # {symbol: [snapshot1, snapshot2, ...]}
-        self.baseline = {}  # {symbol: baseline_snapshot}
-        self.alerts_generated = defaultdict(list)  # {symbol: [alert1, alert2, ...]}
+        self.snapshots = defaultdict(list)
+        self.baseline = {}
+        self.alerts_generated = defaultdict(list)
         
-        # Alert thresholds
+        # DAY TRADER THRESHOLDS - Optimized for intraday wall movement
         self.building_thresholds = {
-            'moderate': 25,   # +25% → 🔥
-            'strong': 50,     # +50% → 🔥🔥
-            'very_strong': 75 # +75% → 🔥🔥🔥
+            'moderate': 10,   # +10% → 🔥 (was 25% - TOO HIGH)
+            'strong': 20,     # +20% → 🔥🔥 (was 50% - TOO HIGH)
+            'very_strong': 35 # +35% → 🔥🔥🔥 (was 75% - TOO HIGH)
         }
         
         self.weakening_thresholds = {
-            'slight': 15,     # -15% → ⚠️
-            'moderate': 25,   # -25% → ⚠️⚠️
-            'breaking': 40    # -40% → 🚨
+            'slight': 8,      # -8% → ⚠️ (was 15% - TOO HIGH)
+            'moderate': 15,   # -15% → ⚠️⚠️ (was 25% - TOO HIGH)
+            'breaking': 25    # -25% → 🚨 (was 40% - TOO HIGH)
         }
         
-        self.logger.info("✅ Wall Strength Tracker initialized")
+        self.logger.info("✅ Wall Strength Tracker initialized (DAY TRADER MODE)")
         self.logger.info(f"   📁 Storage: {self.storage_path}")
+        self.logger.info(f"   🔥 Building thresholds: {self.building_thresholds['moderate']}% / {self.building_thresholds['strong']}% / {self.building_thresholds['very_strong']}%")
+        self.logger.info(f"   ⚠️ Weakening thresholds: {self.weakening_thresholds['slight']}% / {self.weakening_thresholds['moderate']}% / {self.weakening_thresholds['breaking']}%")
     
     def capture_snapshot(self, symbol: str, current_price: float, gamma_data: Dict) -> Dict:
-        """
-        Capture current gamma wall snapshot
-        
-        Args:
-            symbol: Stock symbol
-            current_price: Current price
-            gamma_data: Gamma analysis data from analyzer
-        
-        Returns:
-            Snapshot dict
-        """
+        """Capture current gamma wall snapshot"""
         try:
             gamma_levels = gamma_data.get('gamma_levels', [])
             
@@ -109,16 +98,7 @@ class WallStrengthTracker:
             return None
     
     def calculate_changes(self, symbol: str, current_snapshot: Dict) -> List[Dict]:
-        """
-        Calculate changes from baseline for all walls
-        
-        Args:
-            symbol: Stock symbol
-            current_snapshot: Current snapshot
-        
-        Returns:
-            List of wall changes with % change from baseline
-        """
+        """Calculate changes from baseline for all walls"""
         if symbol not in self.baseline:
             return []
         
@@ -166,12 +146,7 @@ class WallStrengthTracker:
         return changes
     
     def _detect_pattern(self, change_pct: float) -> str:
-        """
-        Detect pattern from % change
-        
-        Returns:
-            'BUILDING', 'WEAKENING', or 'STABLE'
-        """
+        """Detect pattern from % change"""
         if change_pct >= self.building_thresholds['moderate']:
             return 'BUILDING'
         elif change_pct <= -self.weakening_thresholds['slight']:
@@ -180,12 +155,7 @@ class WallStrengthTracker:
             return 'STABLE'
     
     def _build_timeline(self, symbol: str, strike: float) -> List[Dict]:
-        """
-        Build timeline of OI changes for specific strike
-        
-        Returns:
-            List of {time, oi, change_pct} dicts
-        """
+        """Build timeline of OI changes for specific strike"""
         if symbol not in self.snapshots:
             return []
         
@@ -212,37 +182,24 @@ class WallStrengthTracker:
         return timeline
     
     def generate_alerts(self, symbol: str, changes: List[Dict]) -> List[Dict]:
-        """
-        Generate alerts for significant wall changes
-        
-        Args:
-            symbol: Stock symbol
-            changes: List of wall changes
-        
-        Returns:
-            List of alert dicts
-        """
+        """Generate alerts for significant wall changes"""
         alerts = []
         
         for change in changes:
             change_pct = change['change_pct']
             pattern = change['pattern']
             
-            # Skip stable walls
-            if pattern == 'STABLE':
-                continue
-            
-            # Building alerts
+            # Building alerts (LOWERED THRESHOLDS FOR DAY TRADING)
             if pattern == 'BUILDING':
                 if change_pct >= self.building_thresholds['very_strong']:
                     urgency = 'VERY_STRONG'
-                    emoji = '🔥🔥🔥🔥'
+                    emoji = '🔥🔥🔥'
                 elif change_pct >= self.building_thresholds['strong']:
                     urgency = 'STRONG'
-                    emoji = '🔥🔥🔥'
+                    emoji = '🔥🔥'
                 elif change_pct >= self.building_thresholds['moderate']:
                     urgency = 'MODERATE'
-                    emoji = '🔥🔥'
+                    emoji = '🔥'
                 else:
                     continue
                 
@@ -254,7 +211,7 @@ class WallStrengthTracker:
                     'change_pct': change['change_pct'],
                     'urgency': urgency,
                     'emoji': emoji,
-                    'message': f"{emoji} ${change['strike']} {change['type']} STRENGTHENING",
+                    'message': f"{emoji} ${change['strike']} {change['type']} BUILDING",
                     'timeline': change['timeline'],
                     'distance_pct': change['distance_pct'],
                     'timestamp': datetime.now().isoformat()
@@ -262,7 +219,7 @@ class WallStrengthTracker:
                 
                 alerts.append(alert)
             
-            # Weakening alerts
+            # Weakening alerts (LOWERED THRESHOLDS FOR DAY TRADING)
             elif pattern == 'WEAKENING':
                 if abs(change_pct) >= self.weakening_thresholds['breaking']:
                     urgency = 'BREAKING'
@@ -299,17 +256,7 @@ class WallStrengthTracker:
         return alerts
     
     def track_wall_strength(self, symbol: str, current_price: float, gamma_data: Dict) -> Dict:
-        """
-        Main tracking method - captures snapshot and returns changes
-        
-        Args:
-            symbol: Stock symbol
-            current_price: Current price
-            gamma_data: Gamma analysis data
-        
-        Returns:
-            Wall strength analysis dict
-        """
+        """Main tracking method - captures snapshot and returns changes"""
         try:
             # Capture current snapshot
             snapshot = self.capture_snapshot(symbol, current_price, gamma_data)
@@ -351,12 +298,7 @@ class WallStrengthTracker:
             }
     
     def get_wall_strength_summary(self, symbol: str) -> Dict:
-        """
-        Get summary of wall strength for symbol
-        
-        Returns:
-            Summary dict with current status
-        """
+        """Get summary of wall strength for symbol"""
         if symbol not in self.snapshots or not self.snapshots[symbol]:
             return {
                 'available': False,
@@ -365,7 +307,7 @@ class WallStrengthTracker:
         
         latest_snapshot = self.snapshots[symbol][-1]
         changes = self.calculate_changes(symbol, latest_snapshot)
-        recent_alerts = self.alerts_generated.get(symbol, [])[-5:]  # Last 5 alerts
+        recent_alerts = self.alerts_generated.get(symbol, [])[-5:]
         
         return {
             'available': True,
@@ -377,25 +319,11 @@ class WallStrengthTracker:
         }
     
     def get_recent_alerts(self, symbol: str, limit: int = 10) -> List[Dict]:
-        """
-        Get recent alerts for symbol
-        
-        Args:
-            symbol: Stock symbol
-            limit: Maximum number of alerts to return
-        
-        Returns:
-            List of recent alerts
-        """
+        """Get recent alerts for symbol"""
         return self.alerts_generated.get(symbol, [])[-limit:]
     
     def save_to_disk(self, symbol: str):
-        """
-        Save snapshots to disk as JSON
-        
-        Args:
-            symbol: Stock symbol
-        """
+        """Save snapshots to disk as JSON"""
         try:
             file_path = self.storage_path / f"{symbol}_{datetime.now().strftime('%Y%m%d')}.json"
             
@@ -416,12 +344,7 @@ class WallStrengthTracker:
             self.logger.error(f"Error saving wall history for {symbol}: {str(e)}")
     
     def load_from_disk(self, symbol: str):
-        """
-        Load snapshots from disk
-        
-        Args:
-            symbol: Stock symbol
-        """
+        """Load snapshots from disk"""
         try:
             file_path = self.storage_path / f"{symbol}_{datetime.now().strftime('%Y%m%d')}.json"
             
@@ -446,12 +369,7 @@ class WallStrengthTracker:
             self.logger.error(f"Error loading wall history for {symbol}: {str(e)}")
     
     def reset_daily(self, symbol: str = None):
-        """
-        Reset tracking for new day
-        
-        Args:
-            symbol: Specific symbol to reset, or None for all
-        """
+        """Reset tracking for new day"""
         if symbol:
             # Save before reset
             self.save_to_disk(symbol)

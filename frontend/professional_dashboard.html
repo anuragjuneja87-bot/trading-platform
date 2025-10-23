@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Trading Dashboard v4.2 - TRADIER GAMMA</title>
+    <title>Professional Trading Dashboard v4.3 - CLEANED</title>
     <style>
         * {
             margin: 0;
@@ -351,7 +351,6 @@
             line-height: 1.4;
         }
 
-        /* ENHANCED: Gamma zones styling - MUCH MORE READABLE */
         .gamma-zone {
             font-size: 11px;
             line-height: 1.5;
@@ -420,7 +419,38 @@
             color: #44ff44;
         }
 
-        /* Wall Strength Badge Styles */
+        /* === FEATURE 3: Unusual Activity Badge Styles === */
+        .unusual-badge {
+            margin-top: 5px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            line-height: 1.3;
+            display: inline-block;
+        }
+
+        .unusual-extreme {
+            background: #330033;
+            color: #ff00ff;
+            border: 1px solid #ff00ff;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+            animation: pulse 1s infinite;
+        }
+
+        .unusual-high {
+            background: #333300;
+            color: #ffff00;
+            border: 1px solid #ffff00;
+        }
+
+        .unusual-moderate {
+            background: #003333;
+            color: #00ffff;
+            border: 1px solid #00ffff;
+        }
+        /* === END FEATURE 3 CSS === */
+
         .wall-badge {
             display: inline-block;
             padding: 2px 6px;
@@ -495,7 +525,7 @@
 <body>
     <div class="header">
         <div>
-            <h1>⚡ PROFESSIONAL TRADING DASHBOARD v4.2 - ENHANCED GAMMA ⚡</h1>
+            <h1>⚡ PROFESSIONAL TRADING DASHBOARD v4.3 - CLEANED ⚡</h1>
             <div style="font-size: 10px; color: #666; margin-top: 4px;" id="symbolList">
                 Loading watchlist...
             </div>
@@ -523,8 +553,8 @@
                 <button class="refresh-btn" onclick="window.open('gamma_dashboard.html', '_blank')" style="background: #330033; border: 1px solid #ff00ff; color: #ff00ff;">
                     🎯 GAMMA DETAIL VIEW
                 </button>
-                <button class="refresh-btn" onclick="window.location.href='leveraged_dashboard.html'" style="background: #003366; border: 1px solid #00ccff; color: #00ccff;">
-                    📊 LEVERAGED CALC
+                <button class="refresh-btn" onclick="window.open('gex_dashboard.html', '_blank')" style="background: #003300; border: 1px solid #00ff00; color: #00ff00;">
+                    💰 GEX CALCULATOR
                 </button>
                 <button class="refresh-btn" id="refreshBtn">REFRESH NOW</button>
             </div>
@@ -539,8 +569,6 @@
                 <tr>
                     <th>SYMBOL</th>
                     <th>PRICE</th>
-                    <th>VWAP</th>
-                    <th>CAMARILLA</th>
                     <th>SUP/RES</th>
                     <th>PRE-MKT RVOL</th>
                     <th>INTRADAY SPIKE</th>
@@ -553,7 +581,7 @@
             </thead>
             <tbody id="tableBody">
                 <tr>
-                    <td colspan="12" class="loading">LOADING WATCHLIST...</td>
+                    <td colspan="10" class="loading">LOADING WATCHLIST...</td>
                 </tr>
             </tbody>
         </table>
@@ -650,7 +678,7 @@
                     
                     const message = earningsEnabled ? 
                         `✅ Earnings monitoring enabled (${earningsSymbolsCount} symbols)` :
-                        '🚫 Earnings monitoring disabled for this week';
+                        '🔕 Earnings monitoring disabled for this week';
                     
                     console.log(message);
                     
@@ -719,6 +747,22 @@
                         osc.stop(audioContext.currentTime + 0.08);
                     }, i * 100);
                 }
+            } else if (alertType.includes('UNUSUAL')) {
+                // FEATURE 3: Triple beep for unusual activity
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        const osc = audioContext.createOscillator();
+                        const gain = audioContext.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioContext.destination);
+                        osc.frequency.setValueAtTime(900, audioContext.currentTime);
+                        gain.gain.setValueAtTime(0.35, audioContext.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                        osc.start(audioContext.currentTime);
+                        osc.stop(audioContext.currentTime + 0.1);
+                    }, i * 120);
+                }
+
 
             } else if (!alertType.includes('MONITOR') && !alertType.includes('WAIT')) {
                 oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
@@ -891,6 +935,36 @@
             return '';
         }
 
+        function formatUnusualActivity(unusualData) {
+            // FEATURE 3: Format unusual activity badge
+            if (!unusualData || !unusualData.detected) {
+                return '';
+            }
+            
+            const alerts = unusualData.alerts || [];
+            if (alerts.length === 0) {
+                return '';
+            }
+            
+            // Show only the highest priority alert
+            const topAlert = alerts[0];
+            
+            // Determine badge class
+            let badgeClass = 'unusual-moderate';
+            if (topAlert.urgency === 'EXTREME') {
+                badgeClass = 'unusual-extreme';
+            } else if (topAlert.urgency === 'HIGH') {
+                badgeClass = 'unusual-high';
+            }
+            
+            // Format message
+            const strike = topAlert.strike;
+            const optionType = topAlert.option_type[0]; // C or P
+            const oiChange = topAlert.oi_change_pct;
+            
+            return `<div class="unusual-badge ${badgeClass}">🔥 UNUSUAL<br>${strike}${optionType} ${oiChange > 0 ? '+' : ''}${oiChange.toFixed(0)}% OI</div>`;
+        }
+
         function formatGammaZones(openInterest, wallStrength) {
             if (!openInterest || !openInterest.available) {
                 return '<span class="volume-unknown">No data</span>';
@@ -1036,40 +1110,42 @@
             
             if (!row) {
                 const tbody = document.getElementById('tableBody');
-                if (tbody.children[0]?.colSpan === 12) {
+                if (tbody.children[0]?.colSpan === 10) {
                     tbody.innerHTML = '';
                 }
                 row = document.createElement('tr');
                 row.setAttribute('data-symbol', symbol);
-                row.innerHTML = '<td></td>'.repeat(12);
+                row.innerHTML = '<td></td>'.repeat(10);
                 tbody.appendChild(row);
             }
 
             const cells = row.children;
-            const camarilla = data.camarilla || {};
             const entryTargets = data.entry_targets || {};
             const premarketVol = data.premarket_rvol || {};
             const volumeAnalysis = data.volume_analysis || {};
             const intradaySpike = volumeAnalysis.volume_spike || {};
 
+            // CLEANED: Removed VWAP (cell 2) and Camarilla (cell 3)
+            // New column order: Symbol, Price, Sup/Res, Pre-Mkt RVOL, Intraday Spike, Dark Pool, Gamma, News, Entry/TP/SL, Alert
+            
             updateCell(cells[0], `<span class="symbol">${data.symbol}</span>`, false);
             updateCell(cells[1], `<span class="price">${formatPrice(data.current_price)}</span>`);
-            updateCell(cells[2], `<span class="level">${formatPrice(data.vwap)}</span>`);
-            updateCell(cells[3], `<span class="level" style="line-height: 1.4;">R4: ${formatPrice(camarilla.R4)}<br>R3: ${formatPrice(camarilla.R3)}<br>S3: ${formatPrice(camarilla.S3)}<br>S4: ${formatPrice(camarilla.S4)}</span>`);
-            updateCell(cells[4], `<span class="level" style="line-height: 1.4;">RES: ${formatPrice(data.resistance)}<br>SUP: ${formatPrice(data.support)}</span>`);
-            
-            updateCell(cells[5], formatVolumeDisplay(premarketVol, false));
-            updateCell(cells[6], formatVolumeDisplay(intradaySpike, true));
-            
-            updateCell(cells[7], formatDarkPool(data.dark_pool_details || {}));
-            
-            updateCell(cells[8], formatGammaZones(data.open_interest || {}, data.wall_strength || {}));
-            
-            updateCell(cells[9], `<span class="news-${(data.news_sentiment || 'neutral').toLowerCase().replace(/\s+/g, '.')}">${data.news_sentiment || '--'}</span>`);
+            updateCell(cells[2], `<span class="level" style="line-height: 1.4;">RES: ${formatPrice(data.resistance)}<br>SUP: ${formatPrice(data.support)}</span>`);
+            updateCell(cells[3], formatVolumeDisplay(premarketVol, false));
+            updateCell(cells[4], formatVolumeDisplay(intradaySpike, true));
+            updateCell(cells[5], formatDarkPool(data.dark_pool_details || {}));
+            // FEATURE 3: Gamma zones + Unusual Activity
+            let gammaContent = formatGammaZones(data.open_interest || {}, data.wall_strength || {});
+            const unusualContent = formatUnusualActivity(data.unusual_activity || {});
+            if (unusualContent) {
+                gammaContent += unusualContent;
+            }
+            updateCell(cells[6], gammaContent);
+            updateCell(cells[7], `<span class="news-${(data.news_sentiment || 'neutral').toLowerCase().replace(/\s+/g, '.')}">${data.news_sentiment || '--'}</span>`);
             
             const entryInfo = entryTargets.entry ? 
                 `E: ${formatPrice(entryTargets.entry)}<br>TP: ${formatPrice(entryTargets.tp1)}<br>SL: ${formatPrice(entryTargets.stop_loss)}` : '--';
-            updateCell(cells[10], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
+            updateCell(cells[8], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
 
             const alertClass = getAlertClass(data.alert_type);
             const currentAlert = data.alert_type || 'MONITOR';
@@ -1078,12 +1154,12 @@
             
             const alertContent = `<span class="${alertClass}">${data.alert_type || 'MONITOR'}${data.confidence ? `<br><span class="confidence ${getConfidenceClass(data.confidence)}">${data.confidence.toFixed(0)}%</span>` : ''}</span>`;
             
-            if (cells[11].innerHTML !== alertContent) {
-                cells[11].innerHTML = alertContent;
+            if (cells[9].innerHTML !== alertContent) {
+                cells[9].innerHTML = alertContent;
                 
                 if (isNewAlert && !isFirstLoad) {
-                    cells[11].classList.add('alert-changed');
-                    setTimeout(() => cells[11].classList.remove('alert-changed'), 2000);
+                    cells[9].classList.add('alert-changed');
+                    setTimeout(() => cells[9].classList.remove('alert-changed'), 2000);
                     
                     playAlertSound(currentAlert);
                     showNotification(data.symbol, currentAlert, data.confidence);
@@ -1156,7 +1232,7 @@
         }
 
         async function initialize() {
-            console.log('🚀 Initializing Professional Trading Dashboard v4.2 - ENHANCED GAMMA');
+            console.log('🚀 Initializing Professional Trading Dashboard v4.3 - CLEANED');
             
             await loadWatchlist();
             await loadEarningsStatus();
@@ -1178,7 +1254,7 @@
             
             console.log('✅ Dashboard initialized with', SYMBOLS.length, 'symbols');
             console.log(`📅 Earnings monitoring: ${earningsEnabled ? 'ENABLED' : 'DISABLED'} (${earningsSymbolsCount} symbols)`);
-            console.log('💡 Enhanced Gamma Zones: 85% larger + improved readability');
+            console.log('🧹 CLEANED VERSION: Removed VWAP & Camarilla columns');
             console.log('🎯 0DTE gamma pinning detection active');
             console.log('🧱 Wall strength tracking enabled');
         }

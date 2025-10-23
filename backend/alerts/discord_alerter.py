@@ -222,7 +222,156 @@ class DiscordAlerter:
         except Exception as e:
             self.logger.error(f"Error sending volume spike alert: {str(e)}")
             return False
-    
+    def send_unusual_activity_alert(self, symbol: str, alert: Dict) -> bool:
+        """
+        Send unusual options activity alert
+        Routes to: webhook_momentum_signals channel
+        
+        Args:
+            symbol: Stock symbol
+            alert: Alert dict from UnusualActivityDetector
+        
+        Returns:
+            True if sent successfully
+        """
+        try:
+            strike = alert['strike']
+            option_type = alert['option_type']
+            oi_change_pct = alert['oi_change_pct']
+            volume_ratio = alert['volume_ratio']
+            premium_swept = alert['premium_swept']
+            classification = alert['classification']
+            urgency = alert['urgency']
+            score = alert['score']
+            
+            # Determine color and emoji
+            if urgency == 'EXTREME':
+                emoji = '🔥🔥'
+                color = 0xff0000  # Red
+            elif urgency == 'HIGH':
+                emoji = '🔥'
+                color = 0xff6600  # Orange
+            else:
+                emoji = '📊'
+                color = 0xffff00  # Yellow
+            
+            # Title
+            title = f"{emoji} UNUSUAL OPTIONS ACTIVITY - {symbol}"
+            
+            # Description
+            description = f"**{urgency} PRIORITY** • Score: {score:.1f}/10 ⭐"
+            
+            embed = {
+                'title': title,
+                'description': description,
+                'color': color,
+                'timestamp': datetime.utcnow().isoformat(),
+                'fields': []
+            }
+            
+            # Strike info
+            strike_display = f"${strike} {option_type.upper()}"
+            embed['fields'].append({
+                'name': '📍 Strike & Type',
+                'value': (
+                    f"**Strike:** {strike_display}\n"
+                    f"**Classification:** {classification.replace('_', ' ')}\n"
+                    f"**Score:** {score:.1f}/10"
+                ),
+                'inline': True
+            })
+            
+            # OI metrics
+            embed['fields'].append({
+                'name': '📊 Open Interest',
+                'value': (
+                    f"**Current OI:** {alert['oi']:,}\n"
+                    f"**Change:** {alert['oi_change']:+,} ({oi_change_pct:+.1f}%)\n"
+                    f"**Status:** {'INCREASING 📈' if alert['oi_change'] > 0 else 'DECREASING 📉'}"
+                ),
+                'inline': True
+            })
+            
+            # Volume metrics
+            embed['fields'].append({
+                'name': '📦 Volume Activity',
+                'value': (
+                    f"**Current Volume:** {alert['volume']:,}\n"
+                    f"**Average Volume:** {alert['avg_volume']:,.0f}\n"
+                    f"**Ratio:** {volume_ratio:.1f}x {'🔥' if volume_ratio >= 3 else '⚡' if volume_ratio >= 2 else ''}"
+                ),
+                'inline': True
+            })
+            
+            # Premium swept
+            if premium_swept >= 1_000_000:
+                premium_display = f"${premium_swept/1_000_000:.2f}M"
+            elif premium_swept >= 1_000:
+                premium_display = f"${premium_swept/1_000:.0f}K"
+            else:
+                premium_display = f"${premium_swept:.0f}"
+            
+            embed['fields'].append({
+                'name': '💰 Premium Swept',
+                'value': (
+                    f"**Total:** {premium_display} {'💰💰' if premium_swept >= 2_000_000 else '💰' if premium_swept >= 500_000 else ''}\n"
+                    f"**Last Price:** ${alert['last_price']:.2f}\n"
+                    f"**Contracts:** {alert['volume']:,}"
+                ),
+                'inline': True
+            })
+            
+            # Price relationship
+            embed['fields'].append({
+                'name': '📈 Price Relationship',
+                'value': (
+                    f"**Distance:** ${alert['distance_from_price']:+.2f} ({alert['distance_pct']:+.1f}%)\n"
+                    f"**Status:** {'OTM' if abs(alert['distance_pct']) > 2 else 'ATM' if abs(alert['distance_pct']) < 1 else 'Near-Money'}"
+                ),
+                'inline': True
+            })
+            
+            # Action items
+            if urgency == 'EXTREME':
+                action = (
+                    "🚨 **IMMEDIATE ACTION REQUIRED**\n"
+                    "✅ Review position immediately\n"
+                    "✅ Check related strikes\n"
+                    "✅ Monitor for continuation"
+                )
+            elif urgency == 'HIGH':
+                action = (
+                    "⚡ **HIGH PRIORITY**\n"
+                    "✅ Monitor closely\n"
+                    "✅ Watch for follow-through\n"
+                    "✅ Set alerts for movement"
+                )
+            else:
+                action = (
+                    "👀 **WATCH CLOSELY**\n"
+                    "✅ Add to active watchlist\n"
+                    "✅ Monitor for continuation"
+                )
+            
+            embed['fields'].append({
+                'name': '🎯 Action Items',
+                'value': action,
+                'inline': False
+            })
+            
+            # Footer
+            embed['footer'] = {
+                'text': f'Unusual Activity Scanner • {datetime.now().strftime("%H:%M:%S ET")}'
+            }
+            
+            # Send to momentum_signals channel
+            payload = {'embeds': [embed]}
+            return self._send_webhook('momentum_signals', payload)
+            
+        except Exception as e:
+            self.logger.error(f"Error sending unusual activity alert: {str(e)}")
+            return False
+        
     def _format_volume(self, volume: int) -> str:
         """Format volume for display"""
         if volume >= 1_000_000:

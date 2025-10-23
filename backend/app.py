@@ -1,6 +1,6 @@
 """
-backend/app.py - COMPLETE VERSION v4.3 - PART 1 of 2
-WITH WALL STRENGTH TRACKER
+backend/app.py - COMPLETE VERSION v4.4
+WITH WALL STRENGTH TRACKER + UNUSUAL ACTIVITY MONITOR
 
 COMPLETE REPLACEMENT FILE
 Copy this entire file to replace your existing app.py
@@ -93,6 +93,14 @@ try:
 except ImportError:
     WALL_STRENGTH_AVAILABLE = False
     logging.warning("Wall Strength Monitor not available")
+
+# Unusual Activity Monitor (Feature 3)
+try:
+    from monitors.unusual_activity_monitor import UnusualActivityMonitor
+    UNUSUAL_ACTIVITY_AVAILABLE = True
+except ImportError:
+    UNUSUAL_ACTIVITY_AVAILABLE = False
+    logging.warning("Unusual Activity Monitor not available")
 
 load_dotenv()
 
@@ -264,13 +272,30 @@ if WALL_STRENGTH_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Wall Strength Monitor failed: {str(e)}")
 
+# Initialize Unusual Activity Monitor (Feature 3)
+unusual_activity_monitor = None
+if UNUSUAL_ACTIVITY_AVAILABLE:
+    try:
+        unusual_activity_monitor = UnusualActivityMonitor(
+            analyzer=analyzer,
+            detector=analyzer.unusual_activity_detector,
+            config=config_yaml
+        )
+        webhook = os.getenv('DISCORD_UNUSUAL_ACTIVITY')
+        if webhook:
+            unusual_activity_monitor.set_discord_webhook(webhook)
+            logger.info("✅ Unusual Activity Monitor initialized")
+            logger.info(f"   🕐 Check interval: {unusual_activity_monitor.check_interval} seconds")
+    except Exception as e:
+        logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
+
 # Initialize scheduler
 scheduler = BackgroundScheduler()
 scheduler.start()
 
 logger.info("=" * 60)
-logger.info("🚀 PROFESSIONAL TRADING DASHBOARD v4.3")
-logger.info("   (WITH WALL STRENGTH TRACKER)")
+logger.info("🚀 PROFESSIONAL TRADING DASHBOARD v4.4")
+logger.info("   (WITH WALL STRENGTH + UNUSUAL ACTIVITY)")
 logger.info("=" * 60)
 
 # Monitor background thread functions
@@ -291,6 +316,15 @@ def run_wall_strength_monitor():
             wall_strength_monitor.run_continuous(watchlist_manager)
         except Exception as e:
             logger.error(f"❌ Wall Strength monitor error: {str(e)}")
+
+def run_unusual_activity_monitor():
+    """Run Unusual Activity monitor (Feature 3)"""
+    if unusual_activity_monitor:
+        logger.info("🔍 Starting Unusual Activity Monitor...")
+        try:
+            unusual_activity_monitor.run_continuous(watchlist_manager)
+        except Exception as e:
+            logger.error(f"❌ Unusual Activity monitor error: {str(e)}")
 
 # Sunday earnings routine
 def get_october_2025_earnings():
@@ -521,6 +555,96 @@ def trigger_wall_strength_check():
 
 
 # ============================================================================
+# UNUSUAL ACTIVITY API ENDPOINTS (Feature 3)
+# ============================================================================
+
+@app.route('/api/unusual-activity/<symbol>')
+def get_unusual_activity(symbol):
+    """Get unusual activity analysis"""
+    try:
+        symbol = symbol.upper()
+        logger.info(f"🔍 Unusual activity requested for {symbol}")
+        
+        # Get options data and analyze
+        options_data = analyzer.get_options_chain(symbol)
+        if not options_data:
+            return jsonify({
+                'symbol': symbol,
+                'detected': False,
+                'reason': 'No options data available'
+            })
+        
+        quote = analyzer.get_real_time_quote(symbol)
+        current_price = quote.get('price', 0)
+        
+        result = analyzer.unusual_activity_detector.analyze_unusual_activity(
+            symbol,
+            options_data,
+            current_price
+        )
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting unusual activity: {str(e)}")
+        return jsonify({
+            'symbol': symbol,
+            'detected': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/unusual-activity/alerts/<symbol>')
+def get_unusual_activity_alerts(symbol):
+    """Get recent unusual activity alerts"""
+    try:
+        symbol = symbol.upper()
+        limit = int(request.args.get('limit', 10))
+        alerts = analyzer.unusual_activity_detector.get_recent_alerts(symbol, limit=limit)
+        return jsonify({
+            'symbol': symbol,
+            'alerts': alerts,
+            'count': len(alerts)
+        })
+    except Exception as e:
+        return jsonify({'symbol': symbol, 'error': str(e)}), 500
+
+
+@app.route('/api/unusual-activity/status')
+def get_unusual_activity_monitor_status():
+    """Get Unusual Activity monitor status"""
+    if not unusual_activity_monitor:
+        return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
+    
+    return jsonify({
+        'enabled': unusual_activity_monitor.enabled,
+        'check_interval': unusual_activity_monitor.check_interval,
+        'market_hours_only': unusual_activity_monitor.market_hours_only,
+        'cooldown_minutes': unusual_activity_monitor.cooldown_minutes,
+        'is_market_hours': unusual_activity_monitor.is_market_hours(),
+        'stats': unusual_activity_monitor.stats,
+        'detector_stats': analyzer.unusual_activity_detector.get_statistics()
+    })
+
+
+@app.route('/api/unusual-activity/check', methods=['POST'])
+def trigger_unusual_activity_check():
+    """Manually trigger unusual activity check"""
+    if not unusual_activity_monitor:
+        return jsonify({'error': 'Monitor not available'}), 503
+    
+    try:
+        watchlist = watchlist_manager.load_symbols()
+        alerts_sent = unusual_activity_monitor.run_single_check(watchlist)
+        return jsonify({
+            'success': True,
+            'alerts_sent': alerts_sent,
+            'stats': unusual_activity_monitor.stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 
@@ -531,7 +655,7 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '4.3-wall-strength-tracker',
+        'version': '4.4-wall-strength-unusual-activity',
         'polygon_enabled': bool(POLYGON_API_KEY),
         'alerts_enabled': alert_manager is not None,
         'earnings_monitoring': {
@@ -543,6 +667,12 @@ def health_check():
             'check_interval': wall_strength_monitor.check_interval if wall_strength_monitor else 0,
             'stats': wall_strength_monitor.stats if wall_strength_monitor else {},
             'tracker_stats': analyzer.wall_tracker.get_statistics()
+        },
+        'unusual_activity': {
+            'enabled': unusual_activity_monitor is not None,
+            'check_interval': unusual_activity_monitor.check_interval if unusual_activity_monitor else 0,
+            'stats': unusual_activity_monitor.stats if unusual_activity_monitor else {},
+            'detector_stats': analyzer.unusual_activity_detector.get_statistics() if hasattr(analyzer, 'unusual_activity_detector') else {}
         },
         'phase1_features': {
             'volume_analysis': analyzer.volume_analyzer is not None,
@@ -563,8 +693,8 @@ def health_check():
 
 if __name__ == '__main__':
     print("\n" + "=" * 60)
-    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.3")
-    print("   (WITH WALL STRENGTH TRACKER)")
+    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.4")
+    print("   (WITH WALL STRENGTH + UNUSUAL ACTIVITY)")
     print("=" * 60)
     print(f"\n📊 Dashboard: http://localhost:5001")
     print(f"🩺 Health: http://localhost:5001/api/health")
@@ -593,12 +723,24 @@ if __name__ == '__main__':
         print(f"   🕐 Tracks OI/Volume changes every 5 minutes")
         print(f"   📡 Routes to: DISCORD_ODTE_LEVELS")
     
+    # Start Unusual Activity Monitor (Feature 3)
+    if unusual_activity_monitor:
+        print(f"\n🔍 Starting Unusual Activity Monitor...")
+        unusual_activity_thread = threading.Thread(
+            target=run_unusual_activity_monitor,
+            daemon=True
+        )
+        unusual_activity_thread.start()
+        print(f"   ✅ Unusual activity monitor started")
+        print(f"   🕐 Scans every {unusual_activity_monitor.check_interval} seconds")
+        print(f"   📡 Routes to: DISCORD_UNUSUAL_ACTIVITY")
+    
     print(f"\n" + "=" * 60)
     print("✅ ALL SYSTEMS ONLINE - READY FOR TRADING!")
     print("=" * 60)
-    print(f"\n🎯 NEW: Wall Strength Tracker Active!")
-    print(f"   • Tracks OI/Volume changes at gamma walls")
-    print(f"   • Alerts when walls building/weakening")
+    print(f"\n🎯 ACTIVE FEATURES:")
+    print(f"   • Wall Strength Tracker - Monitors gamma walls")
+    print(f"   • Unusual Activity Detector - Smart money tracking")
     print(f"   • 5-minute monitoring during market hours")
     print("=" * 60 + "\n")
     

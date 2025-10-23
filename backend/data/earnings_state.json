@@ -1,6 +1,6 @@
 {
-  "enabled": false,
-  "week_number": 42,
-  "last_updated": "2025-10-14T08:24:00.122218",
-  "disabled_by_user": true
+  "enabled": true,
+  "week_number": 43,
+  "last_updated": "2025-10-20T08:28:19.988522",
+  "disabled_by_user": false
 }

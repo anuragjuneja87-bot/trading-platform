@@ -84,7 +84,7 @@ class AlertManager:
         # NEW: Volume spike cooldown tracking
         self._volume_spike_cooldowns = {}
         self.volume_spike_config = {
-            'cooldown_minutes': 30,
+            'cooldown_minutes': 10,
             'min_classification': 'ELEVATED'
         }
         
@@ -104,7 +104,8 @@ class AlertManager:
             'errors': 0,
             'news_alerts_sent': 0,
             'signals_tracked': 0,
-            'volume_spike_alerts': 0
+            'volume_spike_alerts': 0,
+            'unusual_activity_alerts': 0
         }
         
         self.logger.info("Enhanced Alert Manager (Phase 1 + Volume Spikes) initialized")
@@ -281,7 +282,38 @@ class AlertManager:
                 self.stats['errors'] += 1
         else:
             self.logger.warning(f"Discord not configured - cannot send volume spike alert for {symbol}")
-    
+
+    def check_and_send_unusual_activity_alerts(self, analysis: Dict):
+        """
+        NEW: Check for unusual options activity and send alerts
+        Day trader optimized - 5-minute cooldown for frequent updates
+        
+        Args:
+            analysis: Analysis dict containing unusual_activity data
+        """
+        symbol = analysis['symbol']
+        unusual_activity = analysis.get('unusual_activity', {})
+        
+        if not unusual_activity.get('detected'):
+            return
+        
+        alerts = unusual_activity.get('alerts', [])
+        
+        for alert in alerts:
+            # Send to Discord via unusual activity method
+            if self.discord:
+                try:
+                    success = self.discord.send_unusual_activity_alert(symbol, alert)
+                    if success:
+                        self.stats['unusual_activity_alerts'] = self.stats.get('unusual_activity_alerts', 0) + 1
+                        self.logger.info(
+                            f"✅ Unusual activity alert sent: {symbol} "
+                            f"${alert['strike']}{alert['option_type'][0].upper()} "
+                            f"Score: {alert['score']:.1f}/10"
+                        )
+                except Exception as e:
+                    self.logger.error(f"Error sending unusual activity alert: {str(e)}")
+
     def run_scan(self) -> List[Dict]:
         """Run complete scan with volume spike detection"""
         symbols = self.scheduler.get_watchlist_for_state(
@@ -308,6 +340,9 @@ class AlertManager:
                 
                 # NEW: Check for volume spike alerts
                 self.check_and_send_volume_spike_alert(analysis)
+                
+                 # NEW: Check for unusual options activity (day trader mode)
+                self.check_and_send_unusual_activity_alerts(analysis)
             
             # Check news if enabled
             if self.news_config.get('enabled'):

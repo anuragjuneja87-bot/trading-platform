@@ -58,6 +58,30 @@
             border-radius: 3px;
         }
 
+        .debug-panel {
+            background: #1a1a00;
+            border: 2px solid #ffff00;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            font-size: 11px;
+            color: #ffff00;
+        }
+
+        .debug-panel h3 {
+            margin-bottom: 10px;
+            color: #ffff00;
+        }
+
+        .debug-line {
+            padding: 3px 0;
+            font-family: monospace;
+        }
+
+        .debug-line.success { color: #00ff00; }
+        .debug-line.error { color: #ff0000; }
+        .debug-line.info { color: #00aaff; }
+
         .symbol-tabs {
             display: flex;
             gap: 10px;
@@ -288,6 +312,20 @@
             color: #ffff00;
         }
 
+        .error-box {
+            background: #330000;
+            border: 2px solid #ff0000;
+            padding: 20px;
+            border-radius: 5px;
+            color: #ff0000;
+            margin: 20px 0;
+        }
+
+        .error-box h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
         .explanation {
             background: #0a0a0a;
             border: 2px solid #666;
@@ -326,12 +364,19 @@
         </div>
     </div>
 
+    <div class="debug-panel" id="debugPanel">
+        <h3>🔍 Debug Console</h3>
+        <div id="debugLog">
+            <div class="debug-line info">Initializing GEX Dashboard...</div>
+        </div>
+    </div>
+
     <div class="symbol-tabs" id="symbolTabs">
         <!-- Tabs will be dynamically loaded -->
     </div>
 
     <div id="gexContent" class="loading">
-        Loading GEX data...
+        Connecting to backend...
     </div>
 
     <div class="explanation">
@@ -351,22 +396,78 @@
         let gexData = {};
         const API_BASE = 'http://localhost:5001/api';
 
+        function addDebugLog(message, type = 'info') {
+            const debugLog = document.getElementById('debugLog');
+            const line = document.createElement('div');
+            line.className = `debug-line ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            line.textContent = `[${timestamp}] ${message}`;
+            debugLog.appendChild(line);
+            
+            // Keep only last 10 messages
+            while (debugLog.children.length > 10) {
+                debugLog.removeChild(debugLog.firstChild);
+            }
+            
+            console.log(`[GEX Dashboard] ${message}`);
+        }
+
+        async function testBackendConnection() {
+            try {
+                addDebugLog('Testing backend connection...', 'info');
+                const response = await fetch(`${API_BASE}/health`, { timeout: 5000 });
+                const data = await response.json();
+                
+                if (data.status === 'healthy') {
+                    addDebugLog('✅ Backend connected successfully', 'success');
+                    addDebugLog(`Backend version: ${data.version}`, 'success');
+                    
+                    if (data.phase1_features && data.phase1_features.volume_analysis) {
+                        addDebugLog('✅ Volume analyzer available', 'success');
+                    }
+                    
+                    return true;
+                } else {
+                    addDebugLog('⚠️ Backend responded but status not healthy', 'error');
+                    return false;
+                }
+            } catch (error) {
+                addDebugLog(`❌ Backend connection failed: ${error.message}`, 'error');
+                addDebugLog('Make sure backend is running: python app.py', 'error');
+                
+                document.getElementById('gexContent').innerHTML = `
+                    <div class="error-box">
+                        <h3>❌ Backend Connection Error</h3>
+                        <p>Cannot connect to backend at ${API_BASE}</p>
+                        <p><strong>Solution:</strong> Make sure the backend server is running:</p>
+                        <pre style="background: #1a1a1a; padding: 10px; margin-top: 10px;">cd backend
+python app.py</pre>
+                        <p style="margin-top: 10px;">Expected output: "Dashboard: http://localhost:5001"</p>
+                    </div>
+                `;
+                
+                return false;
+            }
+        }
+
         async function loadWatchlist() {
             try {
+                addDebugLog('Loading watchlist...', 'info');
                 const response = await fetch(`${API_BASE}/watchlist`);
                 const data = await response.json();
                 
                 if (data.symbols && data.symbols.length > 0) {
                     SYMBOLS = data.symbols;
-                    console.log(`✅ Loaded ${SYMBOLS.length} symbols`);
+                    addDebugLog(`✅ Loaded ${SYMBOLS.length} symbols from watchlist`, 'success');
                     createSymbolTabs();
                     return true;
                 }
             } catch (error) {
-                console.error('Error loading watchlist:', error);
+                addDebugLog(`⚠️ Watchlist load failed: ${error.message}`, 'error');
             }
             
             SYMBOLS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL'];
+            addDebugLog(`Using default symbols: ${SYMBOLS.join(', ')}`, 'info');
             createSymbolTabs();
             return false;
         }
@@ -411,23 +512,52 @@
 
         async function loadGexData(symbol) {
             try {
-                document.getElementById('gexContent').innerHTML = '<div class="loading">Loading GEX data for ' + symbol + '...</div>';
+                addDebugLog(`Requesting GEX data for ${symbol}...`, 'info');
+                document.getElementById('gexContent').innerHTML = `<div class="loading">Loading GEX data for ${symbol}...</div>`;
                 
                 const response = await fetch(`${API_BASE}/gex/${symbol}`);
                 const data = await response.json();
                 
-                gexData[symbol] = data;
-                renderGexData(data);
+                if (data.available) {
+                    addDebugLog(`✅ GEX data loaded for ${symbol}`, 'success');
+                    gexData[symbol] = data;
+                    renderGexData(data);
+                } else {
+                    const errorMsg = data.error || 'No data available';
+                    addDebugLog(`❌ GEX not available for ${symbol}: ${errorMsg}`, 'error');
+                    
+                    document.getElementById('gexContent').innerHTML = `
+                        <div class="error-box">
+                            <h3>⚠️ GEX Data Not Available for ${symbol}</h3>
+                            <p><strong>Reason:</strong> ${errorMsg}</p>
+                            <p><strong>Possible causes:</strong></p>
+                            <ul style="margin-left: 20px; margin-top: 10px;">
+                                <li>Tradier API not configured or expired</li>
+                                <li>No options expirations available today</li>
+                                <li>Options chain data not available</li>
+                                <li>Symbol may not have options</li>
+                            </ul>
+                            <p style="margin-top: 10px;"><strong>Check backend logs for details</strong></p>
+                        </div>
+                    `;
+                }
                 
             } catch (error) {
-                console.error('Error loading GEX data:', error);
-                document.getElementById('gexContent').innerHTML = '<div class="loading" style="color: #ff0000;">Error loading GEX data</div>';
+                addDebugLog(`❌ Error loading GEX for ${symbol}: ${error.message}`, 'error');
+                
+                document.getElementById('gexContent').innerHTML = `
+                    <div class="error-box">
+                        <h3>❌ Error Loading GEX Data</h3>
+                        <p>${error.message}</p>
+                        <p>Check browser console and backend logs for details</p>
+                    </div>
+                `;
             }
         }
 
         function renderGexData(data) {
             if (!data.available) {
-                document.getElementById('gexContent').innerHTML = '<div class="loading" style="color: #888;">No GEX data available for ' + data.symbol + '</div>';
+                document.getElementById('gexContent').innerHTML = `<div class="loading" style="color: #888;">No GEX data available for ${data.symbol}</div>`;
                 return;
             }
 
@@ -633,19 +763,29 @@
         }
 
         async function initialize() {
-            console.log('🚀 Initializing GEX Dashboard');
+            addDebugLog('🚀 Starting GEX Dashboard initialization', 'info');
             
+            // Test backend connection first
+            const backendOk = await testBackendConnection();
+            
+            if (!backendOk) {
+                return; // Stop if backend not available
+            }
+            
+            // Load watchlist
             await loadWatchlist();
             
+            // Start time updates
             setInterval(updateTime, 1000);
             updateTime();
             
             // Auto-refresh every 60 seconds
             setInterval(refreshAllData, 60000);
             
-            console.log('✅ GEX dashboard initialized');
+            addDebugLog('✅ GEX dashboard fully initialized', 'success');
         }
 
+        // Start initialization
         initialize();
     </script>
 </body>
