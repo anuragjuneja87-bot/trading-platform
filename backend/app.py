@@ -437,8 +437,9 @@ def get_gex_analysis(symbol):
     """Get GEX analysis"""
     try:
         symbol = symbol.upper()
-        logger.info(f"📊 GEX analysis requested for {symbol}")
-        result = analyzer.analyze_full_gex(symbol)
+        price = request.args.get('price', type=float)  # Get ?price= parameter
+        logger.info(f"📊 GEX analysis requested for {symbol}" + (f" with price={price}" if price else ""))
+        result = analyzer.analyze_full_gex(symbol, price)  # Pass price
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting GEX: {str(e)}")

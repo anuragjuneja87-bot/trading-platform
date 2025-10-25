@@ -460,6 +460,10 @@ python app.py</pre>
                     SYMBOLS = data.symbols;
                     addDebugLog(`✅ Loaded ${SYMBOLS.length} symbols from watchlist`, 'success');
                     createSymbolTabs();
+                    
+                    // OPTIMIZATION: Preload all GEX data in parallel
+                    await preloadAllGexData();
+                    
                     return true;
                 }
             } catch (error) {
@@ -469,7 +473,50 @@ python app.py</pre>
             SYMBOLS = ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL'];
             addDebugLog(`Using default symbols: ${SYMBOLS.join(', ')}`, 'info');
             createSymbolTabs();
+            
+            // OPTIMIZATION: Preload all GEX data in parallel
+            await preloadAllGexData();
+            
             return false;
+        }
+
+        // NEW: Preload all GEX data in parallel for instant tab switching
+        async function preloadAllGexData() {
+            addDebugLog(`⚡ Preloading GEX data for ${SYMBOLS.length} symbols in parallel...`, 'info');
+            
+            const startTime = Date.now();
+            
+            // Fetch all symbols at once (parallel)
+            const promises = SYMBOLS.map(symbol => 
+                fetch(`${API_BASE}/gex/${symbol}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.available) {
+                            gexData[symbol] = data;
+                            addDebugLog(`  ✅ ${symbol}: Loaded`, 'success');
+                        } else {
+                            addDebugLog(`  ⚠️ ${symbol}: ${data.error || 'No data'}`, 'error');
+                        }
+                        return {symbol, success: data.available};
+                    })
+                    .catch(error => {
+                        addDebugLog(`  ❌ ${symbol}: ${error.message}`, 'error');
+                        return {symbol, success: false, error: error.message};
+                    })
+            );
+            
+            // Wait for all to complete
+            const results = await Promise.all(promises);
+            
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            const successCount = results.filter(r => r.success).length;
+            
+            addDebugLog(`✅ Preloaded ${successCount}/${SYMBOLS.length} symbols in ${elapsed}s`, 'success');
+            
+            // Render first symbol
+            if (currentSymbol && gexData[currentSymbol]) {
+                renderGexData(gexData[currentSymbol]);
+            }
         }
 
         function createSymbolTabs() {
@@ -488,9 +535,7 @@ python app.py</pre>
                 container.appendChild(tab);
             });
             
-            if (currentSymbol) {
-                loadGexData(currentSymbol);
-            }
+            // Don't load here - preloadAllGexData() handles it
         }
 
         function selectSymbol(symbol) {
@@ -503,9 +548,12 @@ python app.py</pre>
                 }
             });
             
+            // Use cached data if available (instant!), otherwise load
             if (gexData[symbol]) {
+                addDebugLog(`📊 Displaying cached data for ${symbol}`, 'info');
                 renderGexData(gexData[symbol]);
             } else {
+                addDebugLog(`⚠️ No cached data for ${symbol}, loading...`, 'info');
                 loadGexData(symbol);
             }
         }

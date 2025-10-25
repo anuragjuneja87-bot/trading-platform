@@ -1,12 +1,8 @@
 """
 backend/analyzers/enhanced_professional_analyzer.py
-Enhanced Professional Analyzer v4.2 - WITH NET GEX INTEGRATION
-NOW INCLUDES:
-- Tradier API for real Open Interest and Volume data
-- 0DTE gamma wall detection with real OI/Volume
-- Premium analysis for put/call imbalance
-- NET GAMMA EXPOSURE (GEX) CALCULATOR (NEW!)
-- All existing features preserved (Phase 1 + Option A)
+Enhanced Professional Analyzer v4.3 - CLEANED VERSION
+REMOVED: VWAP, Camarilla, Twitter, Reddit
+KEPT: All Gamma features, Wall Strength Tracking, Volume Analysis, News
 """
 
 import sys
@@ -28,6 +24,18 @@ import pytz
 # Import GEX Calculator
 from analyzers.gex_calculator import GEXCalculator
 
+# Import Wall Strength Tracker
+from analyzers.wall_strength_tracker import WallStrengthTracker
+# Import ThetaData Client v3 (Optimized)
+from analyzers.thetadata_client_v3 import ThetaDataClientV3
+# Import Unusual Activity Detector (Feature 3)
+try:
+    from analyzers.unusual_activity_detector import UnusualActivityDetector
+    UNUSUAL_ACTIVITY_AVAILABLE = True
+except ImportError:
+    UNUSUAL_ACTIVITY_AVAILABLE = False
+    logging.warning("Unusual Activity Detector not available")
+
 # Import new modules
 try:
     from analyzers.volume_analyzer import VolumeAnalyzer
@@ -45,35 +53,40 @@ except ImportError:
 
 
 class EnhancedProfessionalAnalyzer:
-    def __init__(self, polygon_api_key: str, twitter_bearer_token: Optional[str] = None,
-                 reddit_client_id: Optional[str] = None, reddit_client_secret: Optional[str] = None,
-                 tradier_api_key: Optional[str] = None, tradier_account_type: str = 'sandbox',
+    def __init__(self, polygon_api_key: str, 
+                 tradier_api_key: Optional[str] = None, 
+                 tradier_account_type: str = 'sandbox',
                  debug_mode: bool = False):
         """
-        Initialize Enhanced Professional Analyzer v4.2 - With GEX Integration
+        Initialize Enhanced Professional Analyzer v4.3 - WITH THETADATA
         
         Args:
-            polygon_api_key: Polygon.io API key
-            twitter_bearer_token: Twitter API Bearer Token (optional)
-            reddit_client_id: Reddit app client ID (optional)
-            reddit_client_secret: Reddit app client secret (optional)
-            tradier_api_key: Tradier API key for real options data (optional)
-            tradier_account_type: 'sandbox' or 'production' (default: sandbox)
+            polygon_api_key: Polygon.io API key (fallback)
+            tradier_api_key: Tradier API key (legacy, kept for backward compatibility)
+            tradier_account_type: 'sandbox' or 'production' (legacy)
             debug_mode: Enable detailed diagnostic logging (default: False)
         """
         self.polygon_api_key = polygon_api_key
         self.base_url = "https://api.polygon.io"
         self.logger = logging.getLogger(__name__)
         
-        # Tradier API setup
+        # ThetaData API setup (PRIMARY - Optimized v3)
+        try:
+            self.thetadata_client = ThetaDataClientV3(cache_seconds=60)
+            self.logger.info("✅ ThetaData v3 client initialized (60s cache for day trading)")
+            self.logger.info("   💡 Using IV-based strike filtering for efficiency")
+        except Exception as e:
+            self.logger.error(f"❌ ThetaData v3 initialization failed: {str(e)}")
+            self.thetadata_client = None
+        
+        # Tradier API setup (LEGACY - Emergency fallback only)
         self.tradier_api_key = tradier_api_key
         self.tradier_account_type = tradier_account_type
         if tradier_api_key:
             self.tradier_base_url = "https://sandbox.tradier.com" if tradier_account_type == 'sandbox' else "https://api.tradier.com"
-            self.logger.info(f"✅ Tradier API enabled ({tradier_account_type} mode)")
+            self.logger.info(f"⚠️ Tradier API kept as emergency fallback ({tradier_account_type} mode)")
         else:
             self.tradier_base_url = None
-            self.logger.warning("⚠️ Tradier API not configured - gamma walls will use basic Polygon data")
         
         # Debug mode
         self.debug_mode = debug_mode
@@ -125,11 +138,25 @@ class EnhancedProfessionalAnalyzer:
         self.near_misses = []
         
         self.logger.info(f"📊 Signal Thresholds: Base={self.base_signal_threshold}, High Impact={self.high_impact_threshold}")
-        self.logger.info(f"💡 Tradier Gamma Walls: {'ENABLED' if tradier_api_key else 'DISABLED (using Polygon fallback)'}")
+        self.logger.info(f"💡 Gamma Walls: ThetaData (PRIMARY)")
         
         # Initialize GEX Calculator
         self.gex_calculator = GEXCalculator()
         self.logger.info("✅ GEX Calculator initialized")
+        
+        # Initialize Wall Strength Tracker
+        self.wall_tracker = WallStrengthTracker()
+        self.logger.info("✅ Wall Strength Tracker initialized")
+        # Initialize Unusual Activity Detector (Feature 3)
+        self.unusual_activity_detector = None
+        if UNUSUAL_ACTIVITY_AVAILABLE:
+            try:
+                self.unusual_activity_detector = UnusualActivityDetector()
+                self.logger.info("✅ Unusual Activity Detector initialized")
+            except Exception as e:
+                self.logger.error(f"⚠️ Unusual Activity Detector initialization failed: {str(e)}")
+        else:
+            self.logger.warning("⚠️ Unusual Activity Detector not available")
     
     def _make_request(self, endpoint: str, params: dict = None) -> dict:
         """Make Polygon API request"""
@@ -147,86 +174,172 @@ class EnhancedProfessionalAnalyzer:
             self.logger.error(f"API request failed for {endpoint}: {str(e)}")
             return {}
     
-    def _make_tradier_request(self, endpoint: str, params: dict = None) -> dict:
-        """Make Tradier API request"""
-        if not self.tradier_api_key or not self.tradier_base_url:
-            return {}
-        
-        if params is None:
-            params = {}
-        
-        url = f"{self.tradier_base_url}{endpoint}"
-        headers = {
-            'Authorization': f'Bearer {self.tradier_api_key}',
-            'Accept': 'application/json'
-        }
-        
-        try:
-            response = requests.get(url, params=params, headers=headers, timeout=15)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Tradier API request failed for {endpoint}: {str(e)}")
-            return {}
-    
-    def get_tradier_expirations(self, symbol: str) -> List[str]:
-        """Get available option expiration dates from Tradier"""
-        endpoint = "/v1/markets/options/expirations"
-        params = {'symbol': symbol, 'includeAllRoots': 'true', 'strikes': 'false'}
-        
-        data = self._make_tradier_request(endpoint, params)
-        
-        if 'expirations' in data and 'date' in data['expirations']:
-            dates = data['expirations']['date']
-            if isinstance(dates, list):
-                return dates
-            elif isinstance(dates, str):
-                return [dates]
-        
-        return []
-    
-    def get_tradier_options_chain(self, symbol: str, expiration: str) -> List[Dict]:
-        """Get options chain from Tradier with real OI and Volume"""
-        endpoint = "/v1/markets/options/chains"
-        params = {
-            'symbol': symbol,
-            'expiration': expiration,
-            'greeks': 'true'
-        }
-        
-        data = self._make_tradier_request(endpoint, params)
-        
-        if 'options' in data and 'option' in data['options']:
-            options = data['options']['option']
-            if isinstance(options, dict):
-                return [options]
-            return options
-        
-        return []
-    
-    def analyze_gamma_walls_tradier(self, symbol: str, current_price: float) -> Dict:
+ 
+
+    def get_options_chain(self, symbol: str, current_price: float = None) -> List[Dict]:
         """
-        Analyze gamma walls using Tradier API with REAL Open Interest and Volume
+        Get options chain using ThetaData v3 with IV-based filtering
         
-        This replaces the Polygon contract counting with actual market data
+        Args:
+            symbol: Stock symbol
+            current_price: Current price (optional, will fetch if not provided)
         
         Returns:
-            Complete gamma wall analysis with top 2-3 levels, OI, Volume, and premium data
+            List of option contracts with Greeks, OI, Volume
         """
         try:
-            # Get expiration dates
-            expirations = self.get_tradier_expirations(symbol)
+            # Get current price if not provided
+            if current_price is None:
+                quote = self.get_real_time_quote(symbol)
+                current_price = quote.get('price', 0)
+            
+            if current_price == 0:
+                self.logger.error(f"Cannot get current price for {symbol}")
+                return []
+            
+            # PRIMARY: Try ThetaData v3
+            if self.thetadata_client:
+                et_tz = pytz.timezone('America/New_York')
+                today_str = datetime.now(et_tz).date().strftime('%Y-%m-%d')
+                
+                # Get expirations
+                expirations = self.thetadata_client.get_expirations(symbol)
+                
+                if expirations:
+                    # Find best expiration (0DTE if available, else nearest)
+                    expiry_date = None
+                    if today_str in expirations:
+                        expiry_date = today_str
+                        self.logger.debug(f"Using 0DTE expiration for {symbol}")
+                    else:
+                        future_expirations = [exp for exp in expirations if exp > today_str]
+                        if future_expirations:
+                            expiry_date = sorted(future_expirations)[0]
+                            self.logger.debug(f"Using nearest expiration {expiry_date} for {symbol}")
+                    
+                    if expiry_date:
+                        # Get complete options chain with IV-based filtering
+                        chain_data = self.thetadata_client.get_complete_options_chain(
+                            symbol, expiry_date, current_price
+                        )
+                        
+                        # Convert to unified format
+                        options = []
+                        
+                        # Process calls
+                        for call in chain_data.get('calls', []):
+                            options.append({
+                                'symbol': symbol,
+                                'strike': call['strike'],
+                                'option_type': 'call',
+                                'expiration_date': expiry_date,
+                                'open_interest': call.get('open_interest', 0),
+                                'volume': call.get('volume', 0),
+                                'bid': call.get('bid', 0),
+                                'ask': call.get('ask', 0),
+                                'last': (call.get('bid', 0) + call.get('ask', 0)) / 2,
+                                'delta': call.get('delta', 0),
+                                'gamma': call.get('gamma', 0),
+                                'theta': call.get('theta', 0),
+                                'vega': call.get('vega', 0),
+                                'implied_vol': call.get('implied_vol', 0),
+                                'greeks': {
+                                    'delta': call.get('delta', 0),
+                                    'gamma': call.get('gamma', 0),
+                                    'theta': call.get('theta', 0),
+                                    'vega': call.get('vega', 0)
+                                }
+                            })
+                        
+                        # Process puts
+                        for put in chain_data.get('puts', []):
+                            options.append({
+                                'symbol': symbol,
+                                'strike': put['strike'],
+                                'option_type': 'put',
+                                'expiration_date': expiry_date,
+                                'open_interest': put.get('open_interest', 0),
+                                'volume': put.get('volume', 0),
+                                'bid': put.get('bid', 0),
+                                'ask': put.get('ask', 0),
+                                'last': (put.get('bid', 0) + put.get('ask', 0)) / 2,
+                                'delta': put.get('delta', 0),
+                                'gamma': put.get('gamma', 0),
+                                'theta': put.get('theta', 0),
+                                'vega': put.get('vega', 0),
+                                'implied_vol': put.get('implied_vol', 0),
+                                'greeks': {
+                                    'delta': put.get('delta', 0),
+                                    'gamma': put.get('gamma', 0),
+                                    'theta': put.get('theta', 0),
+                                    'vega': put.get('vega', 0)
+                                }
+                            })
+                        
+                        self.logger.info(
+                            f"✅ ThetaData v3: {symbol} - {len(options)} options "
+                            f"(filtered from {chain_data['strikes_before_filter']} strikes)"
+                        )
+                        
+                        return options
+            
+            # FALLBACK: Use Polygon (kept for backward compatibility)
+            self.logger.warning(f"⚠️ ThetaData not available, using Polygon fallback for {symbol}")
+            
+            endpoint = f"/v3/reference/options/contracts"
+            params = {
+                'underlying_ticker': symbol,
+                'limit': 250,
+                'expired': 'false'
+            }
+            
+            data = self._make_request(endpoint, params)
+            
+            if 'results' in data and data['results']:
+                options = []
+                for contract in data['results']:
+                    options.append({
+                        'symbol': contract.get('ticker'),
+                        'strike': float(contract.get('strike_price', 0)),
+                        'option_type': contract.get('contract_type', ''),
+                        'expiration_date': contract.get('expiration_date', ''),
+                        'open_interest': 0,
+                        'volume': 0,
+                        'last': 0,
+                        'greeks': {}
+                    })
+                
+                self.logger.warning(f"⚠️ Using Polygon (limited data) for {symbol}")
+                return options
+            
+            return []
+            
+        except Exception as e:
+            self.logger.error(f"Error getting options chain for {symbol}: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
+            return []
+            
+    def analyze_gamma_walls(self, symbol: str, current_price: float) -> Dict:
+        """
+        Analyze gamma walls using Tradier API with REAL Open Interest and Volume
+        Returns ALL gamma_levels for wall strength tracking
+        """
+        try:
+            # Use ThetaData if available
+            if not self.thetadata_client or not True:
+                return {'available': False, 'error': 'ThetaData not available'}
+            
+            expirations = self.thetadata_client.get_expirations(symbol)
             
             if not expirations:
                 self.logger.warning(f"No options expirations found for {symbol}")
                 return {'available': False, 'error': 'No expirations found'}
             
-            # Find today's date (0DTE) or nearest expiration
             et_tz = pytz.timezone('America/New_York')
             today = datetime.now(et_tz).date()
             today_str = today.strftime('%Y-%m-%d')
             
-            # Check if today is an expiration day
             expiry_date = None
             is_0dte = False
             hours_until_expiry = 0
@@ -234,13 +347,11 @@ class EnhancedProfessionalAnalyzer:
             if today_str in expirations:
                 expiry_date = today_str
                 is_0dte = True
-                # Calculate hours until 4pm ET
                 now_et = datetime.now(et_tz)
                 market_close = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
                 hours_until_expiry = (market_close - now_et).total_seconds() / 3600
                 hours_until_expiry = max(0, hours_until_expiry)
             else:
-                # Find next expiration
                 future_expirations = [exp for exp in expirations if exp > today_str]
                 if future_expirations:
                     expiry_date = sorted(future_expirations)[0]
@@ -251,14 +362,19 @@ class EnhancedProfessionalAnalyzer:
             if not expiry_date:
                 return {'available': False, 'error': 'No valid expiration found'}
             
-            # Get options chain for this expiration
-            options_chain = self.get_tradier_options_chain(symbol, expiry_date)
+            chain_data = self.thetadata_client.get_complete_options_chain(symbol, expiry_date, current_price)
+            options_chain = chain_data.get("calls", []) + chain_data.get("puts", []) if isinstance(chain_data, dict) else []
             
             if not options_chain:
                 self.logger.warning(f"No options chain data for {symbol} expiring {expiry_date}")
                 return {'available': False, 'error': 'No options chain data'}
             
-            # Aggregate data by strike
+            if not isinstance(options_chain, list):
+                self.logger.error(f"Invalid options_chain type for {symbol}: {type(options_chain)}")
+                return {'available': False, 'error': 'Invalid options chain format'}
+            
+            self.logger.debug(f"Processing {len(options_chain)} options for {symbol}")
+            
             strikes_data = defaultdict(lambda: {
                 'call_oi': 0,
                 'call_volume': 0,
@@ -272,26 +388,27 @@ class EnhancedProfessionalAnalyzer:
             })
             
             for option in options_chain:
+                # Skip None or invalid entries
+                if not option or not isinstance(option, dict):
+                    continue
+                
                 strike = float(option.get('strike', 0))
                 option_type = option.get('option_type', '').lower()
                 
                 if strike <= 0:
                     continue
                 
-                # Get data
                 oi = int(option.get('open_interest', 0))
                 volume = int(option.get('volume', 0))
                 bid = float(option.get('bid', 0))
                 ask = float(option.get('ask', 0))
                 
-                # Get gamma if available
                 greeks = option.get('greeks', {})
                 if greeks:
                     gamma = float(greeks.get('gamma', 0))
                 else:
                     gamma = 0
                 
-                # Store by type
                 if option_type == 'call':
                     strikes_data[strike]['call_oi'] = oi
                     strikes_data[strike]['call_volume'] = volume
@@ -305,34 +422,26 @@ class EnhancedProfessionalAnalyzer:
                     strikes_data[strike]['put_ask'] = ask
                     strikes_data[strike]['gamma'] += gamma
             
-            # Calculate gamma exposure and rank strikes
             gamma_levels = []
             
             for strike, data in strikes_data.items():
-                # Calculate total OI and volume
                 total_oi = data['call_oi'] + data['put_oi']
                 total_volume = data['call_volume'] + data['put_volume']
                 
-                # Skip strikes with no activity
                 if total_oi < 100:
                     continue
                 
-                # Calculate distance from current price
                 distance = strike - current_price
                 distance_pct = (distance / current_price) * 100
                 
-                # Only consider strikes within ±5% for 0DTE, ±10% for longer dated
                 max_distance = 5 if is_0dte else 10
                 if abs(distance_pct) > max_distance:
                     continue
                 
-                # Calculate gamma exposure (simplified)
                 gamma_exposure = total_oi * abs(data['gamma']) if data['gamma'] != 0 else total_oi
                 
-                # Determine if resistance or support
                 strike_type = 'RESISTANCE' if strike > current_price else 'SUPPORT'
                 
-                # Determine strength based on OI and gamma
                 if gamma_exposure > 100000 or total_oi > 50000:
                     strength = 'STRONG'
                 elif gamma_exposure > 50000 or total_oi > 20000:
@@ -340,7 +449,6 @@ class EnhancedProfessionalAnalyzer:
                 else:
                     strength = 'WEAK'
                 
-                # Calculate premium for calls and puts
                 call_premium = (data['call_bid'] + data['call_ask']) / 2 if data['call_bid'] > 0 else 0
                 put_premium = (data['put_bid'] + data['put_ask']) / 2 if data['put_bid'] > 0 else 0
                 
@@ -362,13 +470,10 @@ class EnhancedProfessionalAnalyzer:
                     'direction': '⬆️' if strike > current_price else '⬇️'
                 })
             
-            # Sort by gamma exposure (highest first)
             gamma_levels.sort(key=lambda x: x['gamma_exposure'], reverse=True)
             
-            # Get top 3 levels
             top_levels = gamma_levels[:3]
             
-            # Calculate expected range
             if len(top_levels) >= 2:
                 strikes = [level['strike'] for level in top_levels]
                 expected_low = min(strikes)
@@ -379,7 +484,6 @@ class EnhancedProfessionalAnalyzer:
                 expected_high = current_price * 1.02
                 expected_mid = current_price
             
-            # Determine pinning effect
             if is_0dte and hours_until_expiry < 3:
                 pinning_effect = 'EXTREME'
             elif is_0dte:
@@ -389,10 +493,8 @@ class EnhancedProfessionalAnalyzer:
             else:
                 pinning_effect = 'LOW'
             
-            # Find dominant wall (highest gamma exposure)
             dominant_wall = top_levels[0]['strike'] if top_levels else current_price
             
-            # Generate recommendation
             if len(top_levels) >= 2:
                 recommendation = f"Expected range: ${expected_low:.0f}-${expected_high:.0f}"
             else:
@@ -401,7 +503,8 @@ class EnhancedProfessionalAnalyzer:
             if self.debug_mode:
                 self.logger.debug(f"{symbol} Gamma Analysis (Tradier):")
                 self.logger.debug(f"  Expiration: {expiry_date} ({'0DTE' if is_0dte else f'{hours_until_expiry/24:.1f} days'})")
-                self.logger.debug(f"  Top {len(top_levels)} gamma levels identified")
+                self.logger.debug(f"  Total gamma levels found: {len(gamma_levels)}")
+                self.logger.debug(f"  Top 3 gamma levels:")
                 for level in top_levels:
                     self.logger.debug(f"    ${level['strike']}: {level['total_oi']:,} OI, {level['gamma_exposure']:,} gamma exp")
             
@@ -410,7 +513,7 @@ class EnhancedProfessionalAnalyzer:
                 'expires_today': is_0dte,
                 'hours_until_expiry': round(hours_until_expiry, 1),
                 'current_price': current_price,
-                'gamma_levels': top_levels,
+                'gamma_levels': gamma_levels,
                 'expected_range': {
                     'low': round(expected_low, 2),
                     'high': round(expected_high, 2),
@@ -432,28 +535,33 @@ class EnhancedProfessionalAnalyzer:
             self.logger.debug(traceback.format_exc())
             return {'available': False, 'error': str(e)}
     
-    def analyze_full_gex(self, symbol: str) -> Dict:
+    def analyze_full_gex(self, symbol: str, current_price: float = None) -> Dict:
         """
         Analyze Net Gamma Exposure (GEX) for symbol
-        Uses Tradier to get ALL options, then calculates net GEX
-        
-        Returns:
-            Complete GEX analysis with net GEX, zero gamma level, regime, etc.
+        Uses ThetaData to get ALL options, then calculates net GEX
         """
         try:
-            # Get current price
-            quote = self.get_real_time_quote(symbol)
-            current_price = quote['price']
-            
+            if current_price is None:
+                quote = self.get_real_time_quote(symbol)
+                current_price = quote['price']
+        
             if current_price == 0:
                 return {
                     'symbol': symbol,
                     'available': False,
-                    'error': 'Invalid price'
+                    'error': 'Invalid price - please provide ?price= parameter'
+                }
+                
+            
+            # Use ThetaData for expirations
+            if not self.thetadata_client or not True:
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'error': 'ThetaData not available'
                 }
             
-            # Get expirations
-            expirations = self.get_tradier_expirations(symbol)
+            expirations = self.thetadata_client.get_expirations(symbol)
             
             if not expirations:
                 return {
@@ -462,7 +570,6 @@ class EnhancedProfessionalAnalyzer:
                     'error': 'No expirations found'
                 }
             
-            # Find 0DTE or nearest expiration
             et_tz = pytz.timezone('America/New_York')
             today = datetime.now(et_tz).date()
             today_str = today.strftime('%Y-%m-%d')
@@ -482,8 +589,9 @@ class EnhancedProfessionalAnalyzer:
                     'error': 'No valid expiration found'
                 }
             
-            # Get options chain
-            options_chain = self.get_tradier_options_chain(symbol, expiry_date)
+            # Use ThetaData for options chain
+            chain_data = self.thetadata_client.get_complete_options_chain(symbol, expiry_date, current_price)
+            options_chain = chain_data.get("calls", []) + chain_data.get("puts", []) if isinstance(chain_data, dict) else []
             
             if not options_chain:
                 return {
@@ -492,12 +600,10 @@ class EnhancedProfessionalAnalyzer:
                     'error': 'No options chain data'
                 }
             
-            # Calculate GEX
             gex_result = self.gex_calculator.calculate_net_gex(
                 symbol, options_chain, current_price
             )
             
-            # Add expiration info
             gex_result['expiration'] = expiry_date
             gex_result['expires_today'] = (expiry_date == today_str)
             
@@ -587,7 +693,6 @@ class EnhancedProfessionalAnalyzer:
         
         news_items = data['results']
         
-        # Enhanced keyword lists
         strong_positive = ['beats', 'soars', 'surge', 'breakthrough', 'record', 
                           'blowout earnings', 'raised target', 'massive gains']
         positive = ['upgrade', 'rally', 'bullish', 'growth', 'gain', 'wins', 
@@ -624,7 +729,6 @@ class EnhancedProfessionalAnalyzer:
                 except:
                     pass
             
-            # Check Polygon's built-in insights first
             insights = item.get('insights', [])
             insight_found = False
             
@@ -646,7 +750,6 @@ class EnhancedProfessionalAnalyzer:
                     
                     break
             
-            # Fallback to keyword analysis
             if not insight_found:
                 if any(word in title for word in strong_positive):
                     sentiment_score += 3
@@ -658,17 +761,14 @@ class EnhancedProfessionalAnalyzer:
                 elif any(word in title for word in negative):
                     sentiment_score -= 2
             
-            # Additional scoring for very strong keywords
             if any(word in title for word in strong_negative):
                 sentiment_score -= 2
             if any(word in title for word in strong_positive):
                 sentiment_score += 1
             
-            # Check urgency
             if any(word in title for word in urgent_keywords):
                 urgency = 'HIGH'
         
-        # Determine overall sentiment
         if sentiment_score >= 5:
             sentiment = 'VERY POSITIVE'
         elif sentiment_score >= 2:
@@ -680,7 +780,6 @@ class EnhancedProfessionalAnalyzer:
         else:
             sentiment = 'NEUTRAL'
         
-        # Determine news impact
         if abs(sentiment_score) >= 6 and very_recent_count >= 2:
             news_impact = 'EXTREME'
         elif abs(sentiment_score) >= 5 and very_recent_count >= 2:
@@ -692,7 +791,6 @@ class EnhancedProfessionalAnalyzer:
         else:
             news_impact = 'NONE'
         
-        # Upgrade urgency based on impact
         if news_impact == 'EXTREME':
             urgency = 'EXTREME'
         elif news_impact == 'HIGH':
@@ -725,48 +823,6 @@ class EnhancedProfessionalAnalyzer:
                 'timestamp': data['results'].get('t', 0)
             }
         return {'price': 0, 'size': 0, 'timestamp': 0}
-    
-    def calculate_vwap(self, symbol: str) -> float:
-        """Calculate VWAP"""
-        today = datetime.now().strftime('%Y-%m-%d')
-        endpoint = f"/v2/aggs/ticker/{symbol}/range/1/minute/{today}/{today}"
-        
-        data = self._make_request(endpoint, {'adjusted': 'true', 'sort': 'asc', 'limit': 50000})
-        
-        if 'results' not in data or not data['results']:
-            return 0.0
-        
-        df = pd.DataFrame(data['results'])
-        df['vwap'] = (df['c'] * df['v']).cumsum() / df['v'].cumsum()
-        
-        return float(df['vwap'].iloc[-1]) if len(df) > 0 else 0.0
-    
-    def calculate_camarilla_levels(self, symbol: str) -> Dict:
-        """Calculate Camarilla pivots"""
-        test_date = datetime.now() - timedelta(days=1)
-        while test_date.weekday() >= 5:
-            test_date -= timedelta(days=1)
-        yesterday = test_date.strftime('%Y-%m-%d')
-        
-        endpoint = f"/v2/aggs/ticker/{symbol}/range/1/day/{yesterday}/{yesterday}"
-        data = self._make_request(endpoint, {'adjusted': 'true'})
-        
-        if 'results' not in data or not data['results']:
-            return {'R4': 0, 'R3': 0, 'S3': 0, 'S4': 0}
-        
-        prev_day = data['results'][0]
-        high = prev_day['h']
-        low = prev_day['l']
-        close = prev_day['c']
-        range_val = high - low
-        
-        return {
-            'R4': round(close + (range_val * 1.1 / 2), 2),
-            'R3': round(close + (range_val * 1.1 / 4), 2),
-            'S3': round(close - (range_val * 1.1 / 4), 2),
-            'S4': round(close - (range_val * 1.1 / 2), 2),
-            'pivot': round(close, 2)
-        }
     
     def get_support_resistance(self, symbol: str, current_price: float, lookback_days: int = 10) -> Dict:
         """Calculate support/resistance"""
@@ -829,110 +885,103 @@ class EnhancedProfessionalAnalyzer:
     
     def analyze_open_interest(self, symbol: str, current_price: float) -> Dict:
         """
-        UPDATED: Use Tradier if available, fallback to Polygon contract counting
+        Use ThetaData for gamma walls analysis
+        Returns ALL gamma_levels for wall strength tracking
         """
-        # Try Tradier first
-        if self.tradier_api_key:
-            tradier_result = self.analyze_gamma_walls_tradier(symbol, current_price)
-            if tradier_result.get('available'):
-                return tradier_result
+        # Use ThetaData gamma walls (primary method)
+        if self.thetadata_client:
+            theta_result = self.analyze_gamma_walls(symbol, current_price)
+            if theta_result.get('available'):
+                return theta_result
             else:
-                self.logger.warning(f"Tradier gamma analysis failed for {symbol}, falling back to Polygon")
+                self.logger.warning(f"ThetaData gamma analysis failed for {symbol}, falling back to Polygon")
         
-        # Fallback to original Polygon method
-        try:
-            today = datetime.now()
-            two_weeks = today + timedelta(days=14)
-            
-            endpoint = f"/v3/reference/options/contracts"
-            params = {
-                'underlying_ticker': symbol,
-                'expiration_date.gte': today.strftime('%Y-%m-%d'),
-                'expiration_date.lte': two_weeks.strftime('%Y-%m-%d'),
-                'limit': 250
-            }
-            
-            data = self._make_request(endpoint, params)
-            
-            if 'results' not in data or not data['results']:
+            try:
+                today = datetime.now()
+                two_weeks = today + timedelta(days=14)
+                
+                endpoint = f"/v3/reference/options/contracts"
+                params = {
+                    'underlying_ticker': symbol,
+                    'expiration_date.gte': today.strftime('%Y-%m-%d'),
+                    'expiration_date.lte': two_weeks.strftime('%Y-%m-%d'),
+                    'limit': 250
+                }
+                
+                data = self._make_request(endpoint, params)
+                
+                if 'results' not in data or not data['results']:
+                    return {
+                        'gamma_walls': [],
+                        'nearest_wall': None,
+                        'signal_strength': 0,
+                        'available': False
+                    }
+                
+                oi_by_strike = defaultdict(lambda: {'calls': 0, 'puts': 0, 'total': 0})
+                
+                for contract in data['results']:
+                    strike = contract.get('strike_price', 0)
+                    contract_type = contract.get('contract_type', '').lower()
+                    
+                    if strike > 0:
+                        if contract_type == 'call':
+                            oi_by_strike[strike]['calls'] += 1
+                        elif contract_type == 'put':
+                            oi_by_strike[strike]['puts'] += 1
+                        oi_by_strike[strike]['total'] += 1
+                
+                strikes_sorted = sorted(
+                    oi_by_strike.items(),
+                    key=lambda x: x[1]['total'],
+                    reverse=True
+                )[:10]
+                
+                gamma_walls = []
+                for strike, data in strikes_sorted:
+                    distance = abs(strike - current_price)
+                    distance_pct = (distance / current_price) * 100
+                    
+                    if distance_pct <= 5:
+                        gamma_walls.append({
+                            'strike': strike,
+                            'distance': round(distance, 2),
+                            'distance_pct': round(distance_pct, 2),
+                            'contracts_available': data['total'],
+                            'type': 'resistance' if strike > current_price else 'support'
+                        })
+                
+                gamma_walls.sort(key=lambda x: x['distance'])
+                
+                nearest_wall = gamma_walls[0] if gamma_walls else None
+                
+                signal_strength = 0
+                if nearest_wall:
+                    if nearest_wall['distance_pct'] < 1:
+                        signal_strength = 3
+                    elif nearest_wall['distance_pct'] < 2:
+                        signal_strength = 2
+                    elif nearest_wall['distance_pct'] < 3:
+                        signal_strength = 1
+                
+                return {
+                    'gamma_walls': gamma_walls[:5],
+                    'nearest_wall': nearest_wall,
+                    'signal_strength': signal_strength,
+                    'available': True,
+                    'data_source': 'polygon_fallback',
+                    'note': 'Using contract counting - not real OI'
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Open Interest analysis failed for {symbol}: {str(e)}")
                 return {
                     'gamma_walls': [],
                     'nearest_wall': None,
                     'signal_strength': 0,
-                    'available': False
+                    'available': False,
+                    'error': str(e)
                 }
-            
-            # Aggregate by strike price
-            oi_by_strike = defaultdict(lambda: {'calls': 0, 'puts': 0, 'total': 0})
-            
-            for contract in data['results']:
-                strike = contract.get('strike_price', 0)
-                contract_type = contract.get('contract_type', '').lower()
-                
-                if strike > 0:
-                    if contract_type == 'call':
-                        oi_by_strike[strike]['calls'] += 1
-                    elif contract_type == 'put':
-                        oi_by_strike[strike]['puts'] += 1
-                    oi_by_strike[strike]['total'] += 1
-            
-            # Find strikes with most activity
-            strikes_sorted = sorted(
-                oi_by_strike.items(),
-                key=lambda x: x[1]['total'],
-                reverse=True
-            )[:10]
-            
-            # Identify strikes near current price
-            gamma_walls = []
-            for strike, data in strikes_sorted:
-                distance = abs(strike - current_price)
-                distance_pct = (distance / current_price) * 100
-                
-                # Only consider walls within 5%
-                if distance_pct <= 5:
-                    gamma_walls.append({
-                        'strike': strike,
-                        'distance': round(distance, 2),
-                        'distance_pct': round(distance_pct, 2),
-                        'contracts_available': data['total'],
-                        'type': 'resistance' if strike > current_price else 'support'
-                    })
-            
-            # Sort by distance
-            gamma_walls.sort(key=lambda x: x['distance'])
-            
-            # Find nearest wall
-            nearest_wall = gamma_walls[0] if gamma_walls else None
-            
-            # Calculate signal strength
-            signal_strength = 0
-            if nearest_wall:
-                if nearest_wall['distance_pct'] < 1:
-                    signal_strength = 3
-                elif nearest_wall['distance_pct'] < 2:
-                    signal_strength = 2
-                elif nearest_wall['distance_pct'] < 3:
-                    signal_strength = 1
-            
-            return {
-                'gamma_walls': gamma_walls[:5],
-                'nearest_wall': nearest_wall,
-                'signal_strength': signal_strength,
-                'available': True,
-                'data_source': 'polygon_fallback',
-                'note': 'Using contract counting - not real OI'
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Open Interest analysis failed for {symbol}: {str(e)}")
-            return {
-                'gamma_walls': [],
-                'nearest_wall': None,
-                'signal_strength': 0,
-                'available': False,
-                'error': str(e)
-            }
     
     def detect_dark_pool_activity(self, symbol: str) -> Dict:
         """Enhanced dark pool detection"""
@@ -953,7 +1002,6 @@ class EnhancedProfessionalAnalyzer:
             
             trades = data['results']
             
-            # Calculate statistics
             sizes = [t.get('size', 0) for t in trades]
             prices = [t.get('price', 0) for t in trades]
             
@@ -969,7 +1017,6 @@ class EnhancedProfessionalAnalyzer:
             avg_size = np.mean(sizes)
             total_volume = sum(sizes)
             
-            # Define "large trade" as 3x average
             large_trade_threshold = avg_size * 3
             large_trades = [
                 {'size': t.get('size', 0), 'price': t.get('price', 0), 'time': t.get('participant_timestamp', 0)}
@@ -977,10 +1024,8 @@ class EnhancedProfessionalAnalyzer:
                 if t.get('size', 0) > large_trade_threshold
             ]
             
-            # Calculate block trade value
             block_trade_value = sum(t['size'] * t['price'] for t in large_trades)
             
-            # Determine flow direction
             recent_large_trades = large_trades[:10]
             if len(recent_large_trades) >= 3:
                 mid_point = len(recent_large_trades) // 2
@@ -996,7 +1041,6 @@ class EnhancedProfessionalAnalyzer:
             else:
                 institutional_flow = 'NEUTRAL'
             
-            # Determine activity level
             large_trade_pct = len(large_trades) / len(trades) if trades else 0
             large_value_pct = sum(t['size'] for t in large_trades) / total_volume if total_volume > 0 else 0
             
@@ -1010,7 +1054,6 @@ class EnhancedProfessionalAnalyzer:
                 activity = 'LIGHT'
                 signal_strength = 0
             
-            # Boost signal if strong directional flow
             if institutional_flow in ['BUYING', 'SELLING'] and activity in ['HEAVY', 'MODERATE']:
                 signal_strength += 2
             
@@ -1103,17 +1146,19 @@ class EnhancedProfessionalAnalyzer:
         return shift_detected
     
     def calculate_entry_and_targets(self, symbol: str, signal: str, current_price: float,
-                                    camarilla: Dict, support_resistance: Dict) -> Dict:
-        """Calculate entry/TP/SL"""
+                                    support_resistance: Dict) -> Dict:
+        """Calculate entry/TP/SL based on support/resistance"""
         if signal == 'BUY':
             entry = min(current_price, support_resistance['support'] + 0.10)
-            tp1 = camarilla['R3']
-            tp2 = camarilla['R4']
+            # Use 2% above entry for TP1, 4% for TP2
+            tp1 = entry * 1.02
+            tp2 = entry * 1.04
             stop_loss = support_resistance['support'] - 0.20
         elif signal == 'SELL':
             entry = max(current_price, support_resistance['resistance'] - 0.10)
-            tp1 = camarilla['S3']
-            tp2 = camarilla['S4']
+            # Use 2% below entry for TP1, 4% for TP2
+            tp1 = entry * 0.98
+            tp2 = entry * 0.96
             stop_loss = support_resistance['resistance'] + 0.20
         else:
             return {}
@@ -1138,27 +1183,24 @@ class EnhancedProfessionalAnalyzer:
         }
     
     def generate_professional_signal(self, symbol: str) -> Dict:
-        """Generate signal with Tradier gamma walls integration"""
+        """Generate signal with Tradier gamma walls + Wall Strength Tracking integration"""
         try:
             if self.debug_mode:
                 self.logger.debug(f"\n{'='*60}")
                 self.logger.debug(f"Starting analysis for {symbol}")
                 self.logger.debug(f"{'='*60}")
             
-            # Get current price
             quote = self.get_real_time_quote(symbol)
             current_price = quote['price']
             
             if current_price == 0:
                 return {'symbol': symbol, 'error': 'Invalid price', 'signal': None}
             
-            # Get all data
+            # Get all data (NO VWAP OR CAMARILLA)
             gap_data = self.detect_gap(symbol, current_price)
-            vwap = self.calculate_vwap(symbol)
-            camarilla = self.calculate_camarilla_levels(symbol)
             support_resistance = self.get_support_resistance(symbol, current_price)
             options_flow = self.analyze_options_flow(symbol)
-            open_interest = self.analyze_open_interest(symbol, current_price)  # Uses Tradier if available
+            open_interest = self.analyze_open_interest(symbol, current_price)
             dark_pool = self.detect_dark_pool_activity(symbol)
             news = self.get_enhanced_news_sentiment(symbol)
             bias_1h = self.calculate_timeframe_bias(symbol, '1H')
@@ -1195,9 +1237,25 @@ class EnhancedProfessionalAnalyzer:
                 except Exception as e:
                     self.logger.error(f"Key level detection failed: {str(e)}")
             
+            # Wall Strength Tracking
+            wall_strength = {}
+            if open_interest.get('available'):
+                try:
+                    wall_strength = self.wall_tracker.track_wall_strength(
+                        symbol, current_price, open_interest
+                    )
+                    
+                    if self.debug_mode and wall_strength.get('tracking_active'):
+                        self.logger.debug(f"Wall Strength Tracking: {len(wall_strength.get('tracked_walls', []))} walls monitored")
+                        for wall_alert in wall_strength.get('alerts', []):
+                            self.logger.debug(f"  ALERT: {wall_alert['alert_type']} at ${wall_alert['strike']}")
+                            
+                except Exception as e:
+                    self.logger.error(f"Wall strength tracking failed: {str(e)}")
+            
             momentum_shifted = self.detect_momentum_shift(symbol, bias_1h['bias'])
             
-            # Signal scoring (preserved from original)
+            # Signal scoring
             bullish_factors = 0
             bearish_factors = 0
             
@@ -1206,7 +1264,7 @@ class EnhancedProfessionalAnalyzer:
                 'bearish': []
             }
             
-            # [All existing factor logic preserved - gap, news, bias, etc.]
+            # Gap factors
             if gap_data['gap_type'] == 'GAP_DOWN' and abs(gap_data['gap_size']) > 2:
                 bearish_factors += 4
                 factor_breakdown['bearish'].append(f"Large gap down ({gap_data['gap_size']}%) [+4]")
@@ -1214,6 +1272,7 @@ class EnhancedProfessionalAnalyzer:
                 bullish_factors += 4
                 factor_breakdown['bullish'].append(f"Large gap up ({gap_data['gap_size']}%) [+4]")
             
+            # News factors
             if news['sentiment'] == 'VERY NEGATIVE':
                 bearish_factors += 3
                 factor_breakdown['bearish'].append(f"Very negative news (score: {news['sentiment_score']}) [+3]")
@@ -1227,18 +1286,21 @@ class EnhancedProfessionalAnalyzer:
                 bullish_factors += 2
                 factor_breakdown['bullish'].append(f"Positive news [+2]")
             
+            # Bias factors
             if bias_1h['bias'] == 'BULLISH':
                 bullish_factors += 2
                 factor_breakdown['bullish'].append("1H bullish bias [+2]")
             if bias_daily['bias'] == 'BULLISH':
                 bullish_factors += 1
                 factor_breakdown['bullish'].append("Daily bullish bias [+1]")
-            if current_price > vwap:
-                bullish_factors += 1
-                factor_breakdown['bullish'].append("Price > VWAP [+1]")
-            if current_price <= camarilla['S3']:
+            
+            # Support/Resistance factors (replacing VWAP/Camarilla)
+            price_to_support = (current_price - support_resistance['support']) / current_price * 100
+            price_to_resistance = (support_resistance['resistance'] - current_price) / current_price * 100
+            
+            if price_to_support <= 1.0:  # Within 1% of support
                 bullish_factors += 2
-                factor_breakdown['bullish'].append("At/below S3 support [+2]")
+                factor_breakdown['bullish'].append("At/near support [+2]")
             
             if bias_1h['bias'] == 'BEARISH':
                 bearish_factors += 2
@@ -1246,12 +1308,10 @@ class EnhancedProfessionalAnalyzer:
             if bias_daily['bias'] == 'BEARISH':
                 bearish_factors += 1
                 factor_breakdown['bearish'].append("Daily bearish bias [+1]")
-            if current_price < vwap:
-                bearish_factors += 1
-                factor_breakdown['bearish'].append("Price < VWAP [+1]")
-            if current_price >= camarilla['R3']:
+            
+            if price_to_resistance <= 1.0:  # Within 1% of resistance
                 bearish_factors += 2
-                factor_breakdown['bearish'].append("At/above R3 resistance [+2]")
+                factor_breakdown['bearish'].append("At/near resistance [+2]")
             
             # Dark pool factors
             dark_pool_strength = dark_pool.get('signal_strength', 0)
@@ -1263,14 +1323,12 @@ class EnhancedProfessionalAnalyzer:
                     bearish_factors += dark_pool_strength
                     factor_breakdown['bearish'].append(f"Institutional selling (${dark_pool.get('block_trade_value', 0):,.0f}) [+{dark_pool_strength}]")
             
-            # Gamma wall factors (now using Tradier data if available)
+            # Gamma wall factors
             if open_interest.get('available'):
                 gamma_levels = open_interest.get('gamma_levels', [])
                 
-                # Check for 0DTE gamma pinning effect
                 if open_interest.get('expires_today') and open_interest.get('hours_until_expiry', 999) < 3:
-                    # Extreme gamma pinning in final 3 hours of 0DTE
-                    for level in gamma_levels:
+                    for level in gamma_levels[:3]:
                         if abs(level['distance_pct']) < 1.5:
                             if level['type'] == 'SUPPORT':
                                 bullish_factors += 4
@@ -1279,8 +1337,7 @@ class EnhancedProfessionalAnalyzer:
                                 bearish_factors += 4
                                 factor_breakdown['bearish'].append(f"0DTE gamma pin at ${level['strike']} ({level['total_oi']:,} OI) [+4]")
                 else:
-                    # Regular gamma wall logic
-                    for level in gamma_levels:
+                    for level in gamma_levels[:5]:
                         if abs(level['distance_pct']) < 2:
                             strength_points = 3 if level['strength'] == 'STRONG' else 2 if level['strength'] == 'MODERATE' else 1
                             if level['type'] == 'SUPPORT':
@@ -1290,7 +1347,7 @@ class EnhancedProfessionalAnalyzer:
                                 bearish_factors += strength_points
                                 factor_breakdown['bearish'].append(f"Gamma wall resistance at ${level['strike']} [+{strength_points}]")
             
-            # Volume factors (preserved)
+            # Volume factors
             if volume_analysis:
                 rvol_data = volume_analysis.get('rvol', {})
                 spike_data = volume_analysis.get('volume_spike', {})
@@ -1313,7 +1370,7 @@ class EnhancedProfessionalAnalyzer:
                         bearish_factors += spike_strength
                         factor_breakdown['bearish'].append(f"Volume spike detected [+{spike_strength}]")
             
-            # Key level factors (preserved)
+            # Key level factors
             if key_levels and 'error' not in key_levels:
                 confluence_score = key_levels.get('confluence_score', 0)
                 at_resistance = key_levels.get('at_resistance', False)
@@ -1372,7 +1429,7 @@ class EnhancedProfessionalAnalyzer:
             # Calculate targets
             entry_targets = self.calculate_entry_and_targets(
                 symbol, signal if signal else 'HOLD',
-                current_price, camarilla, support_resistance
+                current_price, support_resistance
             )
             
             if self.debug_mode:
@@ -1386,14 +1443,12 @@ class EnhancedProfessionalAnalyzer:
                 'alert_type': alert_type,
                 'confidence': round(confidence, 1),
                 'current_price': current_price,
-                'vwap': vwap,
-                'camarilla': camarilla,
                 'support': support_resistance['support'],
                 'resistance': support_resistance['resistance'],
                 'bias_1h': bias_1h['bias'],
                 'bias_daily': bias_daily['bias'],
                 'options_sentiment': options_flow['sentiment'],
-                'open_interest': open_interest,  # Now includes Tradier gamma data
+                'open_interest': open_interest,
                 'dark_pool_activity': dark_pool['institutional_flow'],
                 'dark_pool_details': dark_pool,
                 'gap_data': gap_data,
@@ -1403,6 +1458,7 @@ class EnhancedProfessionalAnalyzer:
                 'volume_analysis': volume_analysis,
                 'premarket_rvol': premarket_rvol,
                 'key_levels': key_levels,
+                'wall_strength': wall_strength,
                 'entry_targets': entry_targets,
                 'momentum_shifted': momentum_shifted,
                 'bullish_score': bullish_factors,
@@ -1415,11 +1471,10 @@ class EnhancedProfessionalAnalyzer:
         except Exception as e:
             self.logger.error(f"Error analyzing {symbol}: {str(e)}")
             import traceback
-            self.logger.debug(traceback.format_exc())
+            self.logger.error(f"Traceback:\n{traceback.format_exc()}")
             return {'symbol': symbol, 'error': str(e), 'signal': None}
 
 
-# CLI Testing
 if __name__ == '__main__':
     import os
     from dotenv import load_dotenv
@@ -1443,10 +1498,9 @@ if __name__ == '__main__':
     )
     
     print("=" * 80)
-    print("ENHANCED ANALYZER WITH GEX INTEGRATION TEST")
+    print("ENHANCED ANALYZER V4.3 - CLEANED (NO VWAP/CAMARILLA/TWITTER/REDDIT)")
     print("=" * 80)
     
-    # Test regular analysis
     result = analyzer.generate_professional_signal('SPY')
     
     print(f"\n📊 TRADING SIGNAL:")
@@ -1454,30 +1508,10 @@ if __name__ == '__main__':
     print(f"Signal: {result.get('signal', 'None')}")
     print(f"Alert Type: {result.get('alert_type')}")
     print(f"Confidence: {result.get('confidence', 0):.1f}%")
+    print(f"Current Price: ${result.get('current_price', 0):.2f}")
+    print(f"Support: ${result.get('support', 0):.2f}")
+    print(f"Resistance: ${result.get('resistance', 0):.2f}")
     
-    # Test GEX analysis
     print("\n" + "=" * 80)
-    print("NET GEX ANALYSIS TEST")
+    print("✅ ALL TESTS COMPLETE")
     print("=" * 80)
-    
-    gex_result = analyzer.analyze_full_gex('SPY')
-    
-    if gex_result.get('available'):
-        net_gex = gex_result['net_gex']
-        zero_gamma = gex_result['zero_gamma']
-        
-        print(f"\n💰 NET GEX: ${net_gex['total']/1e9:+.2f}B")
-        print(f"   Regime: {net_gex['regime']}")
-        print(f"   Strength: {net_gex['regime_strength']}")
-        
-        if zero_gamma['level']:
-            print(f"\n💥 ZERO GAMMA: ${zero_gamma['level']:.2f}")
-            print(f"   Position: {zero_gamma['position']}")
-            print(f"   Distance: {zero_gamma['distance_pct']:+.2f}%")
-        
-        print(f"\n📖 SUMMARY:")
-        print(f"   {gex_result.get('summary', 'N/A')}")
-    else:
-        print(f"\n❌ GEX analysis not available: {gex_result.get('error')}")
-    
-    print("\n" + "=" * 80)

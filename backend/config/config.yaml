@@ -6,6 +6,13 @@
 # API Keys
 polygon_api_key: ${POLYGON_API_KEY}
 
+# ========================================
+# THETADATA CONFIGURATION
+# ========================================
+thetadata:
+  base_url: ${THETADATA_BASE_URL}
+  enabled: ${THETADATA_ENABLED}
+
 # Watchlist Configuration
 watchlist:
   file: "data/watchlist.txt"

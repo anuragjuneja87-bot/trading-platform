@@ -104,13 +104,10 @@ class GEXCalculator:
                 if strike <= 0 or oi == 0:
                     continue
                 
-                # Get greeks
+                # Get greeks (support both nested and top-level)
                 greeks = option.get('greeks', {})
-                if not greeks:
-                    continue
-                
-                delta = float(greeks.get('delta', 0))
-                gamma = float(greeks.get('gamma', 0))
+                delta = float(greeks.get('delta', 0) if greeks else option.get('delta', 0))
+                gamma = float(greeks.get('gamma', 0) if greeks else option.get('gamma', 0))
                 
                 if gamma == 0:
                     continue

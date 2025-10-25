@@ -26,7 +26,8 @@ from analyzers.gex_calculator import GEXCalculator
 
 # Import Wall Strength Tracker
 from analyzers.wall_strength_tracker import WallStrengthTracker
-
+# Import ThetaData Client v3 (Optimized)
+from analyzers.thetadata_client_v3 import ThetaDataClientV3
 # Import Unusual Activity Detector (Feature 3)
 try:
     from analyzers.unusual_activity_detector import UnusualActivityDetector
@@ -57,27 +58,35 @@ class EnhancedProfessionalAnalyzer:
                  tradier_account_type: str = 'sandbox',
                  debug_mode: bool = False):
         """
-        Initialize Enhanced Professional Analyzer v4.3 - CLEANED
+        Initialize Enhanced Professional Analyzer v4.3 - WITH THETADATA
         
         Args:
-            polygon_api_key: Polygon.io API key
-            tradier_api_key: Tradier API key for real options data (optional)
-            tradier_account_type: 'sandbox' or 'production' (default: sandbox)
+            polygon_api_key: Polygon.io API key (fallback)
+            tradier_api_key: Tradier API key (legacy, kept for backward compatibility)
+            tradier_account_type: 'sandbox' or 'production' (legacy)
             debug_mode: Enable detailed diagnostic logging (default: False)
         """
         self.polygon_api_key = polygon_api_key
         self.base_url = "https://api.polygon.io"
         self.logger = logging.getLogger(__name__)
         
-        # Tradier API setup
+        # ThetaData API setup (PRIMARY - Optimized v3)
+        try:
+            self.thetadata_client = ThetaDataClientV3(cache_seconds=60)
+            self.logger.info("✅ ThetaData v3 client initialized (60s cache for day trading)")
+            self.logger.info("   💡 Using IV-based strike filtering for efficiency")
+        except Exception as e:
+            self.logger.error(f"❌ ThetaData v3 initialization failed: {str(e)}")
+            self.thetadata_client = None
+        
+        # Tradier API setup (LEGACY - Emergency fallback only)
         self.tradier_api_key = tradier_api_key
         self.tradier_account_type = tradier_account_type
         if tradier_api_key:
             self.tradier_base_url = "https://sandbox.tradier.com" if tradier_account_type == 'sandbox' else "https://api.tradier.com"
-            self.logger.info(f"✅ Tradier API enabled ({tradier_account_type} mode)")
+            self.logger.info(f"⚠️ Tradier API kept as emergency fallback ({tradier_account_type} mode)")
         else:
             self.tradier_base_url = None
-            self.logger.warning("⚠️ Tradier API not configured - gamma walls will use basic Polygon data")
         
         # Debug mode
         self.debug_mode = debug_mode
@@ -129,7 +138,7 @@ class EnhancedProfessionalAnalyzer:
         self.near_misses = []
         
         self.logger.info(f"📊 Signal Thresholds: Base={self.base_signal_threshold}, High Impact={self.high_impact_threshold}")
-        self.logger.info(f"💡 Tradier Gamma Walls: {'ENABLED' if tradier_api_key else 'DISABLED (using Polygon fallback)'}")
+        self.logger.info(f"💡 Gamma Walls: ThetaData (PRIMARY)")
         
         # Initialize GEX Calculator
         self.gex_calculator = GEXCalculator()
@@ -165,90 +174,117 @@ class EnhancedProfessionalAnalyzer:
             self.logger.error(f"API request failed for {endpoint}: {str(e)}")
             return {}
     
-    def _make_tradier_request(self, endpoint: str, params: dict = None) -> dict:
-        """Make Tradier API request"""
-        if not self.tradier_api_key or not self.tradier_base_url:
-            return {}
-        
-        if params is None:
-            params = {}
-        
-        url = f"{self.tradier_base_url}{endpoint}"
-        headers = {
-            'Authorization': f'Bearer {self.tradier_api_key}',
-            'Accept': 'application/json'
-        }
-        
-        try:
-            response = requests.get(url, params=params, headers=headers, timeout=15)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Tradier API request failed for {endpoint}: {str(e)}")
-            return {}
-    
-    def get_tradier_expirations(self, symbol: str) -> List[str]:
-        """Get available option expiration dates from Tradier"""
-        endpoint = "/v1/markets/options/expirations"
-        params = {'symbol': symbol, 'includeAllRoots': 'true', 'strikes': 'false'}
-        
-        data = self._make_tradier_request(endpoint, params)
-        
-        if 'expirations' in data and 'date' in data['expirations']:
-            dates = data['expirations']['date']
-            if isinstance(dates, list):
-                return dates
-            elif isinstance(dates, str):
-                return [dates]
-        
-        return []
-    
-    def get_tradier_options_chain(self, symbol: str, expiration: str) -> List[Dict]:
-        """Get options chain from Tradier with real OI and Volume"""
-        endpoint = "/v1/markets/options/chains"
-        params = {
-            'symbol': symbol,
-            'expiration': expiration,
-            'greeks': 'true'
-        }
-        
-        data = self._make_tradier_request(endpoint, params)
-        
-        if 'options' in data and 'option' in data['options']:
-            options = data['options']['option']
-            if isinstance(options, dict):
-                return [options]
-            return options
-        
-        return []
-        
-    def get_options_chain(self, symbol: str) -> List[Dict]:
+ 
+
+    def get_options_chain(self, symbol: str, current_price: float = None) -> List[Dict]:
         """
-        Get options chain for unusual activity detection
-        Uses Tradier if available, falls back to Polygon
+        Get options chain using ThetaData v3 with IV-based filtering
+        
+        Args:
+            symbol: Stock symbol
+            current_price: Current price (optional, will fetch if not provided)
+        
+        Returns:
+            List of option contracts with Greeks, OI, Volume
         """
         try:
-            if self.tradier_api_key:
-                expirations = self.get_tradier_expirations(symbol)
+            # Get current price if not provided
+            if current_price is None:
+                quote = self.get_real_time_quote(symbol)
+                current_price = quote.get('price', 0)
+            
+            if current_price == 0:
+                self.logger.error(f"Cannot get current price for {symbol}")
+                return []
+            
+            # PRIMARY: Try ThetaData v3
+            if self.thetadata_client:
+                et_tz = pytz.timezone('America/New_York')
+                today_str = datetime.now(et_tz).date().strftime('%Y-%m-%d')
+                
+                # Get expirations
+                expirations = self.thetadata_client.get_expirations(symbol)
+                
                 if expirations:
-                    et_tz = pytz.timezone('America/New_York')
-                    today_str = datetime.now(et_tz).date().strftime('%Y-%m-%d')
-                    
+                    # Find best expiration (0DTE if available, else nearest)
                     expiry_date = None
                     if today_str in expirations:
                         expiry_date = today_str
+                        self.logger.debug(f"Using 0DTE expiration for {symbol}")
                     else:
                         future_expirations = [exp for exp in expirations if exp > today_str]
                         if future_expirations:
                             expiry_date = sorted(future_expirations)[0]
+                            self.logger.debug(f"Using nearest expiration {expiry_date} for {symbol}")
                     
                     if expiry_date:
-                        options_chain = self.get_tradier_options_chain(symbol, expiry_date)
-                        if options_chain:
-                            self.logger.debug(f"✅ Got {len(options_chain)} options from Tradier for {symbol}")
-                            return options_chain
+                        # Get complete options chain with IV-based filtering
+                        chain_data = self.thetadata_client.get_complete_options_chain(
+                            symbol, expiry_date, current_price
+                        )
+                        
+                        # Convert to unified format
+                        options = []
+                        
+                        # Process calls
+                        for call in chain_data.get('calls', []):
+                            options.append({
+                                'symbol': symbol,
+                                'strike': call['strike'],
+                                'option_type': 'call',
+                                'expiration_date': expiry_date,
+                                'open_interest': call.get('open_interest', 0),
+                                'volume': call.get('volume', 0),
+                                'bid': call.get('bid', 0),
+                                'ask': call.get('ask', 0),
+                                'last': (call.get('bid', 0) + call.get('ask', 0)) / 2,
+                                'delta': call.get('delta', 0),
+                                'gamma': call.get('gamma', 0),
+                                'theta': call.get('theta', 0),
+                                'vega': call.get('vega', 0),
+                                'implied_vol': call.get('implied_vol', 0),
+                                'greeks': {
+                                    'delta': call.get('delta', 0),
+                                    'gamma': call.get('gamma', 0),
+                                    'theta': call.get('theta', 0),
+                                    'vega': call.get('vega', 0)
+                                }
+                            })
+                        
+                        # Process puts
+                        for put in chain_data.get('puts', []):
+                            options.append({
+                                'symbol': symbol,
+                                'strike': put['strike'],
+                                'option_type': 'put',
+                                'expiration_date': expiry_date,
+                                'open_interest': put.get('open_interest', 0),
+                                'volume': put.get('volume', 0),
+                                'bid': put.get('bid', 0),
+                                'ask': put.get('ask', 0),
+                                'last': (put.get('bid', 0) + put.get('ask', 0)) / 2,
+                                'delta': put.get('delta', 0),
+                                'gamma': put.get('gamma', 0),
+                                'theta': put.get('theta', 0),
+                                'vega': put.get('vega', 0),
+                                'implied_vol': put.get('implied_vol', 0),
+                                'greeks': {
+                                    'delta': put.get('delta', 0),
+                                    'gamma': put.get('gamma', 0),
+                                    'theta': put.get('theta', 0),
+                                    'vega': put.get('vega', 0)
+                                }
+                            })
+                        
+                        self.logger.info(
+                            f"✅ ThetaData v3: {symbol} - {len(options)} options "
+                            f"(filtered from {chain_data['strikes_before_filter']} strikes)"
+                        )
+                        
+                        return options
             
-            self.logger.warning(f"Tradier not available or no data, trying Polygon for {symbol}")
+            # FALLBACK: Use Polygon (kept for backward compatibility)
+            self.logger.warning(f"⚠️ ThetaData not available, using Polygon fallback for {symbol}")
             
             endpoint = f"/v3/reference/options/contracts"
             params = {
@@ -273,22 +309,28 @@ class EnhancedProfessionalAnalyzer:
                         'greeks': {}
                     })
                 
-                self.logger.warning(f"⚠️ Using Polygon data (limited OI/Volume) for {symbol}")
+                self.logger.warning(f"⚠️ Using Polygon (limited data) for {symbol}")
                 return options
             
             return []
             
         except Exception as e:
             self.logger.error(f"Error getting options chain for {symbol}: {str(e)}")
+            import traceback
+            self.logger.debug(traceback.format_exc())
             return []
             
-    def analyze_gamma_walls_tradier(self, symbol: str, current_price: float) -> Dict:
+    def analyze_gamma_walls(self, symbol: str, current_price: float) -> Dict:
         """
         Analyze gamma walls using Tradier API with REAL Open Interest and Volume
         Returns ALL gamma_levels for wall strength tracking
         """
         try:
-            expirations = self.get_tradier_expirations(symbol)
+            # Use ThetaData if available
+            if not self.thetadata_client or not True:
+                return {'available': False, 'error': 'ThetaData not available'}
+            
+            expirations = self.thetadata_client.get_expirations(symbol)
             
             if not expirations:
                 self.logger.warning(f"No options expirations found for {symbol}")
@@ -320,11 +362,18 @@ class EnhancedProfessionalAnalyzer:
             if not expiry_date:
                 return {'available': False, 'error': 'No valid expiration found'}
             
-            options_chain = self.get_tradier_options_chain(symbol, expiry_date)
+            chain_data = self.thetadata_client.get_complete_options_chain(symbol, expiry_date, current_price)
+            options_chain = chain_data.get("calls", []) + chain_data.get("puts", []) if isinstance(chain_data, dict) else []
             
             if not options_chain:
                 self.logger.warning(f"No options chain data for {symbol} expiring {expiry_date}")
                 return {'available': False, 'error': 'No options chain data'}
+            
+            if not isinstance(options_chain, list):
+                self.logger.error(f"Invalid options_chain type for {symbol}: {type(options_chain)}")
+                return {'available': False, 'error': 'Invalid options chain format'}
+            
+            self.logger.debug(f"Processing {len(options_chain)} options for {symbol}")
             
             strikes_data = defaultdict(lambda: {
                 'call_oi': 0,
@@ -339,6 +388,10 @@ class EnhancedProfessionalAnalyzer:
             })
             
             for option in options_chain:
+                # Skip None or invalid entries
+                if not option or not isinstance(option, dict):
+                    continue
+                
                 strike = float(option.get('strike', 0))
                 option_type = option.get('option_type', '').lower()
                 
@@ -482,23 +535,33 @@ class EnhancedProfessionalAnalyzer:
             self.logger.debug(traceback.format_exc())
             return {'available': False, 'error': str(e)}
     
-    def analyze_full_gex(self, symbol: str) -> Dict:
+    def analyze_full_gex(self, symbol: str, current_price: float = None) -> Dict:
         """
         Analyze Net Gamma Exposure (GEX) for symbol
-        Uses Tradier to get ALL options, then calculates net GEX
+        Uses ThetaData to get ALL options, then calculates net GEX
         """
         try:
-            quote = self.get_real_time_quote(symbol)
-            current_price = quote['price']
-            
+            if current_price is None:
+                quote = self.get_real_time_quote(symbol)
+                current_price = quote['price']
+        
             if current_price == 0:
                 return {
                     'symbol': symbol,
                     'available': False,
-                    'error': 'Invalid price'
+                    'error': 'Invalid price - please provide ?price= parameter'
+                }
+                
+            
+            # Use ThetaData for expirations
+            if not self.thetadata_client or not True:
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'error': 'ThetaData not available'
                 }
             
-            expirations = self.get_tradier_expirations(symbol)
+            expirations = self.thetadata_client.get_expirations(symbol)
             
             if not expirations:
                 return {
@@ -526,7 +589,9 @@ class EnhancedProfessionalAnalyzer:
                     'error': 'No valid expiration found'
                 }
             
-            options_chain = self.get_tradier_options_chain(symbol, expiry_date)
+            # Use ThetaData for options chain
+            chain_data = self.thetadata_client.get_complete_options_chain(symbol, expiry_date, current_price)
+            options_chain = chain_data.get("calls", []) + chain_data.get("puts", []) if isinstance(chain_data, dict) else []
             
             if not options_chain:
                 return {
@@ -820,102 +885,103 @@ class EnhancedProfessionalAnalyzer:
     
     def analyze_open_interest(self, symbol: str, current_price: float) -> Dict:
         """
-        Use Tradier if available, fallback to Polygon contract counting
+        Use ThetaData for gamma walls analysis
         Returns ALL gamma_levels for wall strength tracking
         """
-        if self.tradier_api_key:
-            tradier_result = self.analyze_gamma_walls_tradier(symbol, current_price)
-            if tradier_result.get('available'):
-                return tradier_result
+        # Use ThetaData gamma walls (primary method)
+        if self.thetadata_client:
+            theta_result = self.analyze_gamma_walls(symbol, current_price)
+            if theta_result.get('available'):
+                return theta_result
             else:
-                self.logger.warning(f"Tradier gamma analysis failed for {symbol}, falling back to Polygon")
+                self.logger.warning(f"ThetaData gamma analysis failed for {symbol}, falling back to Polygon")
         
-        try:
-            today = datetime.now()
-            two_weeks = today + timedelta(days=14)
-            
-            endpoint = f"/v3/reference/options/contracts"
-            params = {
-                'underlying_ticker': symbol,
-                'expiration_date.gte': today.strftime('%Y-%m-%d'),
-                'expiration_date.lte': two_weeks.strftime('%Y-%m-%d'),
-                'limit': 250
-            }
-            
-            data = self._make_request(endpoint, params)
-            
-            if 'results' not in data or not data['results']:
+            try:
+                today = datetime.now()
+                two_weeks = today + timedelta(days=14)
+                
+                endpoint = f"/v3/reference/options/contracts"
+                params = {
+                    'underlying_ticker': symbol,
+                    'expiration_date.gte': today.strftime('%Y-%m-%d'),
+                    'expiration_date.lte': two_weeks.strftime('%Y-%m-%d'),
+                    'limit': 250
+                }
+                
+                data = self._make_request(endpoint, params)
+                
+                if 'results' not in data or not data['results']:
+                    return {
+                        'gamma_walls': [],
+                        'nearest_wall': None,
+                        'signal_strength': 0,
+                        'available': False
+                    }
+                
+                oi_by_strike = defaultdict(lambda: {'calls': 0, 'puts': 0, 'total': 0})
+                
+                for contract in data['results']:
+                    strike = contract.get('strike_price', 0)
+                    contract_type = contract.get('contract_type', '').lower()
+                    
+                    if strike > 0:
+                        if contract_type == 'call':
+                            oi_by_strike[strike]['calls'] += 1
+                        elif contract_type == 'put':
+                            oi_by_strike[strike]['puts'] += 1
+                        oi_by_strike[strike]['total'] += 1
+                
+                strikes_sorted = sorted(
+                    oi_by_strike.items(),
+                    key=lambda x: x[1]['total'],
+                    reverse=True
+                )[:10]
+                
+                gamma_walls = []
+                for strike, data in strikes_sorted:
+                    distance = abs(strike - current_price)
+                    distance_pct = (distance / current_price) * 100
+                    
+                    if distance_pct <= 5:
+                        gamma_walls.append({
+                            'strike': strike,
+                            'distance': round(distance, 2),
+                            'distance_pct': round(distance_pct, 2),
+                            'contracts_available': data['total'],
+                            'type': 'resistance' if strike > current_price else 'support'
+                        })
+                
+                gamma_walls.sort(key=lambda x: x['distance'])
+                
+                nearest_wall = gamma_walls[0] if gamma_walls else None
+                
+                signal_strength = 0
+                if nearest_wall:
+                    if nearest_wall['distance_pct'] < 1:
+                        signal_strength = 3
+                    elif nearest_wall['distance_pct'] < 2:
+                        signal_strength = 2
+                    elif nearest_wall['distance_pct'] < 3:
+                        signal_strength = 1
+                
+                return {
+                    'gamma_walls': gamma_walls[:5],
+                    'nearest_wall': nearest_wall,
+                    'signal_strength': signal_strength,
+                    'available': True,
+                    'data_source': 'polygon_fallback',
+                    'note': 'Using contract counting - not real OI'
+                }
+                
+            except Exception as e:
+                self.logger.error(f"Open Interest analysis failed for {symbol}: {str(e)}")
                 return {
                     'gamma_walls': [],
                     'nearest_wall': None,
                     'signal_strength': 0,
-                    'available': False
+                    'available': False,
+                    'error': str(e)
                 }
-            
-            oi_by_strike = defaultdict(lambda: {'calls': 0, 'puts': 0, 'total': 0})
-            
-            for contract in data['results']:
-                strike = contract.get('strike_price', 0)
-                contract_type = contract.get('contract_type', '').lower()
-                
-                if strike > 0:
-                    if contract_type == 'call':
-                        oi_by_strike[strike]['calls'] += 1
-                    elif contract_type == 'put':
-                        oi_by_strike[strike]['puts'] += 1
-                    oi_by_strike[strike]['total'] += 1
-            
-            strikes_sorted = sorted(
-                oi_by_strike.items(),
-                key=lambda x: x[1]['total'],
-                reverse=True
-            )[:10]
-            
-            gamma_walls = []
-            for strike, data in strikes_sorted:
-                distance = abs(strike - current_price)
-                distance_pct = (distance / current_price) * 100
-                
-                if distance_pct <= 5:
-                    gamma_walls.append({
-                        'strike': strike,
-                        'distance': round(distance, 2),
-                        'distance_pct': round(distance_pct, 2),
-                        'contracts_available': data['total'],
-                        'type': 'resistance' if strike > current_price else 'support'
-                    })
-            
-            gamma_walls.sort(key=lambda x: x['distance'])
-            
-            nearest_wall = gamma_walls[0] if gamma_walls else None
-            
-            signal_strength = 0
-            if nearest_wall:
-                if nearest_wall['distance_pct'] < 1:
-                    signal_strength = 3
-                elif nearest_wall['distance_pct'] < 2:
-                    signal_strength = 2
-                elif nearest_wall['distance_pct'] < 3:
-                    signal_strength = 1
-            
-            return {
-                'gamma_walls': gamma_walls[:5],
-                'nearest_wall': nearest_wall,
-                'signal_strength': signal_strength,
-                'available': True,
-                'data_source': 'polygon_fallback',
-                'note': 'Using contract counting - not real OI'
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Open Interest analysis failed for {symbol}: {str(e)}")
-            return {
-                'gamma_walls': [],
-                'nearest_wall': None,
-                'signal_strength': 0,
-                'available': False,
-                'error': str(e)
-            }
     
     def detect_dark_pool_activity(self, symbol: str) -> Dict:
         """Enhanced dark pool detection"""
@@ -1405,7 +1471,7 @@ class EnhancedProfessionalAnalyzer:
         except Exception as e:
             self.logger.error(f"Error analyzing {symbol}: {str(e)}")
             import traceback
-            self.logger.debug(traceback.format_exc())
+            self.logger.error(f"Traceback:\n{traceback.format_exc()}")
             return {'symbol': symbol, 'error': str(e), 'signal': None}
 
 
