@@ -22,6 +22,7 @@ import pytz
 from collections import defaultdict
 
 from analyzers.enhanced_professional_analyzer import EnhancedProfessionalAnalyzer
+from analyzers.pin_probability_calculator import PinProbabilityCalculator
 
 
 class ODTEGammaMonitor:
@@ -50,16 +51,31 @@ class ODTEGammaMonitor:
             debug_mode=False
         )
         
+        # Initialize Pin Probability Calculator
+        self.pin_calculator = PinProbabilityCalculator()
+        
         # Get 0DTE config
         odte_config = config.get('odte_gamma_monitor', {})
         
-        # Alert timing
-        self.alert_time = odte_config.get('alert_time', '09:00')  # 9:00 AM EST
-        self.alert_window_minutes = odte_config.get('alert_window_minutes', 5)  # 5 min window
+        # Alert timing (extended for pre-market + open)
+        self.alert_time = odte_config.get('alert_time', '08:45')  # 8:45 AM EST (pre-market)
+        self.alert_window_minutes = odte_config.get('alert_window_minutes', 50)  # 50 min window (8:45-9:35 AM)
         
-        # Proximity thresholds (1-2%)
-        self.min_proximity_pct = odte_config.get('min_proximity_pct', 1.0)
-        self.max_proximity_pct = odte_config.get('max_proximity_pct', 2.0)
+        # Proximity thresholds (0.5-3% for 6-figure trading - catch early)
+        self.min_proximity_pct = odte_config.get('min_proximity_pct', 0.5)
+        self.max_proximity_pct = odte_config.get('max_proximity_pct', 3.0)
+        
+        # PIN ALERT THRESHOLDS (AGGRESSIVE for 6-7 figure trader)
+        self.pin_alert_thresholds = {
+            'min_probability': 60,        # Alert at 60%+ (was 75%)
+            'max_hours_to_expiry': 3,     # Alert <3 hours (was 2)
+            'distance_threshold_pct': 1.0, # Alert >1% from max pain
+            'morning_alert_time': '10:00', # Morning planning alert
+            'power_hour_time': '15:00'     # Final confirmation alert
+        }
+        
+        # Track pin alerts sent (prevent spam)
+        self.pin_alerts_sent = set()  # {(symbol, alert_type, date)}
         
         # Only weekdays
         self.weekdays_only = odte_config.get('weekdays_only', True)
@@ -406,6 +422,231 @@ class ODTEGammaMonitor:
             self.stats['errors'] += 1
             return False
     
+    def check_pin_alert(self, symbol: str, current_price: float, 
+                        options_data: list, gamma_data: Dict) -> bool:
+        """
+        Check if pin alert should be sent (AGGRESSIVE thresholds)
+        
+        Returns:
+            True if alert sent
+        """
+        try:
+            import requests
+            from datetime import date
+            
+            # Get expiration date
+            expiration = gamma_data.get('expiration', datetime.now().strftime('%Y%m%d'))
+            
+            # Calculate pin probability
+            pin_result = self.pin_calculator.analyze_pin_probability(
+                symbol,
+                current_price,
+                options_data,
+                gamma_data,
+                expiration
+            )
+            
+            if not pin_result.get('available'):
+                return False
+            
+            # Extract key values
+            pin_pct = pin_result['pin_probability']['percent']
+            hours_left = pin_result['time_analysis']['hours_until_expiry']
+            max_pain = pin_result['max_pain']
+            distance_pct = abs(pin_result['distance_from_max_pain']['percent'])
+            
+            # Check thresholds
+            should_alert = False
+            alert_type = None
+            
+            # 1. High probability pin forming
+            if (pin_pct >= self.pin_alert_thresholds['min_probability'] and 
+                hours_left <= self.pin_alert_thresholds['max_hours_to_expiry']):
+                should_alert = True
+                alert_type = 'HIGH_PIN_PROBABILITY'
+            
+            # 2. Price far from max pain with high pin (fade opportunity)
+            elif (pin_pct >= 65 and 
+                  distance_pct >= self.pin_alert_thresholds['distance_threshold_pct'] and
+                  hours_left <= 4):
+                should_alert = True
+                alert_type = 'FADE_OPPORTUNITY'
+            
+            # 3. Morning planning alert (10 AM)
+            elif (self.get_time_period() == 'morning' and 
+                  datetime.now().hour == 10 and 
+                  pin_pct >= 70):
+                should_alert = True
+                alert_type = 'MORNING_PLAN'
+            
+            # 4. Power hour confirmation (3 PM)
+            elif (datetime.now().hour == 15 and 
+                  0 <= datetime.now().minute <= 5 and
+                  pin_pct >= 75):
+                should_alert = True
+                alert_type = 'POWER_HOUR_PIN'
+            
+            if not should_alert:
+                return False
+            
+            # Check if already alerted today
+            today = date.today().isoformat()
+            alert_key = (symbol, alert_type, today)
+            
+            if alert_key in self.pin_alerts_sent:
+                self.logger.debug(f"Pin alert already sent today: {symbol} - {alert_type}")
+                return False
+            
+            # Send Discord alert
+            success = self._send_pin_alert(symbol, pin_result, alert_type)
+            
+            if success:
+                self.pin_alerts_sent.add(alert_key)
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error checking pin alert: {str(e)}")
+            return False
+    
+    def _send_pin_alert(self, symbol: str, pin_result: Dict, alert_type: str) -> bool:
+        """Send pin probability alert to Discord"""
+        try:
+            import requests
+            
+            pin_pct = pin_result['pin_probability']['percent']
+            max_pain = pin_result['max_pain']
+            current_price = pin_result['current_price']
+            hours_left = pin_result['time_analysis']['hours_until_expiry']
+            pin_range = pin_result['pin_range']
+            distance = pin_result['distance_from_max_pain']
+            
+            # Determine alert color and title
+            if alert_type == 'HIGH_PIN_PROBABILITY':
+                color = 0xFFD700  # Gold
+                title = f"📍 HIGH PIN PROBABILITY - {symbol}"
+                urgency = "STRONG"
+            elif alert_type == 'FADE_OPPORTUNITY':
+                color = 0xFF6600  # Orange
+                title = f"🎯 FADE SETUP - {symbol}"
+                urgency = "OPPORTUNITY"
+            elif alert_type == 'MORNING_PLAN':
+                color = 0x00BFFF  # Deep Sky Blue
+                title = f"🌅 MORNING PIN ALERT - {symbol}"
+                urgency = "PLANNING"
+            else:  # POWER_HOUR_PIN
+                color = 0xFF0000  # Red
+                title = f"⚡ POWER HOUR PIN - {symbol}"
+                urgency = "FINAL"
+            
+            embed = {
+                'title': title,
+                'description': f"**${max_pain:.2f} Max Pain** - {pin_pct:.0f}% pin probability",
+                'color': color,
+                'timestamp': datetime.utcnow().isoformat(),
+                'fields': []
+            }
+            
+            # Current position
+            direction_emoji = '⬆️' if current_price > max_pain else '⬇️'
+            embed['fields'].append({
+                'name': f'{direction_emoji} Current Position',
+                'value': f"**${current_price:.2f}** ({distance['direction']} max pain)\n{distance['percent']:.1f}% away",
+                'inline': True
+            })
+            
+            # Pin probability
+            strength = pin_result['pin_probability']['strength']
+            embed['fields'].append({
+                'name': '📊 Pin Probability',
+                'value': f"**{pin_pct:.0f}%** ({strength})",
+                'inline': True
+            })
+            
+            # Time remaining
+            embed['fields'].append({
+                'name': '⏱️ Time to Expiry',
+                'value': f"**{hours_left:.1f} hours**",
+                'inline': True
+            })
+            
+            # Expected pin range
+            embed['fields'].append({
+                'name': '🎯 Expected Pin Range',
+                'value': f"**${pin_range['low']:.2f} - ${pin_range['high']:.2f}**\n(±{pin_range['width_pct']:.2f}%)",
+                'inline': False
+            })
+            
+            # Trading action
+            action = pin_result['trading_action']
+            embed['fields'].append({
+                'name': '💡 Trading Action',
+                'value': f"**{action}**",
+                'inline': False
+            })
+            
+            # Interpretation
+            if alert_type == 'HIGH_PIN_PROBABILITY':
+                interpretation = (
+                    "🔥 **High probability pin forming**\n"
+                    f"→ Price likely stays near ${max_pain:.2f}\n"
+                    f"→ Range: ${pin_range['low']:.2f}-${pin_range['high']:.2f}\n"
+                    "→ Fade moves away from max pain"
+                )
+            elif alert_type == 'FADE_OPPORTUNITY':
+                if current_price > max_pain:
+                    interpretation = (
+                        "🎯 **FADE SETUP: Price above max pain**\n"
+                        f"→ Expect pullback toward ${max_pain:.2f}\n"
+                        "→ Sell calls / short setup\n"
+                        "→ High conviction fade"
+                    )
+                else:
+                    interpretation = (
+                        "🎯 **FADE SETUP: Price below max pain**\n"
+                        f"→ Expect rally toward ${max_pain:.2f}\n"
+                        "→ Buy dips / long setup\n"
+                        "→ High conviction fade"
+                    )
+            elif alert_type == 'MORNING_PLAN':
+                interpretation = (
+                    "🌅 **Plan your day around max pain**\n"
+                    f"→ Key level: ${max_pain:.2f}\n"
+                    "→ Watch for pin effect into close\n"
+                    "→ Set alerts around pin range"
+                )
+            else:  # POWER_HOUR_PIN
+                interpretation = (
+                    "⚡ **Final hour - strong pin likely**\n"
+                    f"→ Expect gravity toward ${max_pain:.2f}\n"
+                    "→ Range tightening into close\n"
+                    "→ Pin effect intensifying"
+                )
+            
+            embed['fields'].append({
+                'name': '📝 Interpretation',
+                'value': interpretation,
+                'inline': False
+            })
+            
+            # Footer
+            embed['footer'] = {
+                'text': f'Pin Probability Monitor • {urgency} • {datetime.now().strftime("%H:%M:%S ET")}'
+            }
+            
+            # Send to Discord
+            payload = {'embeds': [embed]}
+            response = requests.post(self.discord_webhook, json=payload, timeout=10)
+            response.raise_for_status()
+            
+            self.logger.info(f"✅ Pin alert sent: {symbol} ${max_pain:.2f} ({pin_pct:.0f}%) - {alert_type}")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error sending pin alert: {str(e)}")
+            return False
+    
     def run_single_check(self) -> int:
         """
         Run single check of all watchlist symbols
@@ -467,12 +708,20 @@ class ODTEGammaMonitor:
             if not alert_data:
                 continue
             
-            # Send alert
+            # Send gamma wall proximity alert
             success = self.send_alert(alert_data)
             
             if success:
                 self.alerted_today.add(symbol)
                 alerts_sent += 1
+            
+            # ADDITIONAL: Check pin probability alert (AGGRESSIVE)
+            # Uses same options data, no extra API calls
+            options_data = self.analyzer.get_options_chain(symbol)
+            if options_data:
+                pin_alert_sent = self.check_pin_alert(symbol, current_price, options_data, gamma_data)
+                if pin_alert_sent:
+                    alerts_sent += 1
             
             # Small delay between symbols
             time.sleep(0.5)

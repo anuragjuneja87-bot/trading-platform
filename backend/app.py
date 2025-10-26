@@ -30,6 +30,22 @@ from utils.watchlist_manager import WatchlistManager
 from utils.earnings_state_manager import EarningsStateManager
 from alerts.alert_manager import AlertManager
 
+# Pin Probability Calculator (Feature #4)
+try:
+    from analyzers.pin_probability_calculator import PinProbabilityCalculator
+    PIN_CALC_AVAILABLE = True
+except ImportError:
+    PIN_CALC_AVAILABLE = False
+    logging.warning("Pin Probability Calculator not available")
+
+# Confluence Alert System (Feature #5)
+try:
+    from analyzers.confluence_alert_system import ConfluenceAlertSystem
+    CONFLUENCE_AVAILABLE = True
+except ImportError:
+    CONFLUENCE_AVAILABLE = False
+    logging.warning("Confluence Alert System not available")
+
 # PHASE 1: Import new modules
 try:
     from utils.signal_metrics import SignalMetricsTracker
@@ -139,6 +155,24 @@ analyzer = EnhancedProfessionalAnalyzer(
     tradier_account_type=TRADIER_ACCOUNT_TYPE,
     debug_mode=False
 )
+
+# Initialize Pin Probability Calculator
+pin_calculator = None
+if PIN_CALC_AVAILABLE:
+    try:
+        pin_calculator = PinProbabilityCalculator()
+        logger.info("✅ Pin Probability Calculator initialized")
+    except Exception as e:
+        logger.error(f"⚠️ Pin Probability Calculator failed: {str(e)}")
+
+# Initialize Confluence Alert System
+confluence_system = None
+if CONFLUENCE_AVAILABLE:
+    try:
+        confluence_system = ConfluenceAlertSystem()
+        logger.info("✅ Confluence Alert System initialized")
+    except Exception as e:
+        logger.error(f"⚠️ Confluence Alert System failed: {str(e)}")
 
 # Initialize watchlist manager
 watchlist_path = os.path.join(os.path.dirname(__file__), 'data', 'watchlist.txt')
@@ -643,6 +677,120 @@ def trigger_unusual_activity_check():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# PIN PROBABILITY API ENDPOINTS (Feature #4)
+# ============================================================================
+
+@app.route('/api/pin-probability/<symbol>')
+def get_pin_probability(symbol):
+    """Get 0DTE pin probability analysis"""
+    try:
+        symbol = symbol.upper()
+        logger.info(f"📍 Pin probability requested for {symbol}")
+        
+        if not pin_calculator:
+            return jsonify({
+                'symbol': symbol,
+                'available': False,
+                'reason': 'Pin calculator not initialized'
+            }), 503
+        
+        # Get current price
+        quote = analyzer.get_real_time_quote(symbol)
+        current_price = quote.get('price', 0)
+        
+        if current_price == 0:
+            return jsonify({
+                'symbol': symbol,
+                'available': False,
+                'reason': 'Unable to get current price'
+            }), 400
+        
+        # Get options data and GEX analysis
+        gamma_data = analyzer.analyze_full_gex(symbol, current_price)
+        
+        if not gamma_data.get('available'):
+            return jsonify({
+                'symbol': symbol,
+                'available': False,
+                'reason': 'No options data available'
+            })
+        
+        # Get options chain for max pain calculation
+        options_data = analyzer.get_options_chain(symbol)
+        
+        if not options_data:
+            return jsonify({
+                'symbol': symbol,
+                'available': False,
+                'reason': 'No options chain available'
+            })
+        
+        # Get expiration date from gamma data
+        expiration = gamma_data.get('expiration', datetime.now().strftime('%Y%m%d'))
+        
+        # Calculate pin probability
+        result = pin_calculator.analyze_pin_probability(
+            symbol,
+            current_price,
+            options_data,
+            gamma_data,
+            expiration
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error getting pin probability: {str(e)}")
+        return jsonify({
+            'symbol': symbol,
+            'available': False,
+            'error': str(e)
+        }), 500
+
+
+# ============================================================================
+# CONFLUENCE ALERT SYSTEM API ENDPOINTS (Feature #5)
+# ============================================================================
+
+@app.route('/api/confluence/<symbol>')
+def get_confluence_analysis(symbol):
+    """Get confluence analysis combining all signals"""
+    try:
+        symbol = symbol.upper()
+        logger.info(f"🎯 Confluence analysis requested for {symbol}")
+        
+        if not confluence_system:
+            return jsonify({
+                'symbol': symbol,
+                'available': False,
+                'reason': 'Confluence system not initialized'
+            }), 503
+        
+        # Get complete analysis (includes all signals)
+        analysis_data = analyzer.generate_professional_signal(symbol)
+        
+        if not analysis_data:
+            return jsonify({
+                'symbol': symbol,
+                'available': False,
+                'reason': 'Unable to analyze symbol'
+            }), 400
+        
+        # Analyze confluence
+        result = confluence_system.analyze_confluence(symbol, analysis_data)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error getting confluence analysis: {str(e)}")
+        return jsonify({
+            'symbol': symbol,
+            'available': False,
+            'error': str(e)
+        }), 500
 
 
 # ============================================================================

@@ -412,13 +412,13 @@ momentum_signal_monitor:
 odte_gamma_monitor:
   enabled: true
   
-  # Alert timing
-  alert_time: "09:00"                   # 9:00 AM EST sharp
-  alert_window_minutes: 5               # 5-minute alert window (9:00-9:05 AM)
+  # Alert timing (EXTENDED for 6-figure day trading)
+  alert_time: "08:45"                   # 8:45 AM EST (pre-market start)
+  alert_window_minutes: 50              # 50-minute window (8:45-9:35 AM)
   
-  # Proximity thresholds (1-2%)
-  min_proximity_pct: 1.0                # Minimum 1% away from gamma wall
-  max_proximity_pct: 2.0                # Maximum 2% away from gamma wall
+  # Proximity thresholds (WIDENED for earlier warnings)
+  min_proximity_pct: 0.5                # Minimum 0.5% away from gamma wall
+  max_proximity_pct: 3.0                # Maximum 3% away from gamma wall
   
   # Filters
   weekdays_only: true                   # Only alert Monday-Friday

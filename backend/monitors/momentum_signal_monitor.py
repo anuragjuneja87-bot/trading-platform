@@ -26,6 +26,7 @@ from collections import defaultdict
 from typing import Dict, Optional
 
 from analyzers.enhanced_professional_analyzer import EnhancedProfessionalAnalyzer
+from analyzers.confluence_alert_system import ConfluenceAlertSystem
 
 
 class MomentumSignalMonitor:
@@ -61,7 +62,8 @@ class MomentumSignalMonitor:
             'momentum_signal': 15,
             'gamma_approach': 10,
             'dark_pool_flip': 5,
-            'extreme_setup': 30
+            'extreme_setup': 30,
+            'confluence_alert': 15  # Same as momentum
         })
         
         # Thresholds
@@ -105,11 +107,15 @@ class MomentumSignalMonitor:
             debug_mode=False
         )
         
+        # Initialize Confluence Alert System (Feature #5)
+        self.confluence_system = ConfluenceAlertSystem()
+        
         self.logger.info("✅ Momentum Signal Monitor initialized")
         self.logger.info(f"   Check Interval: {self.check_interval}s")
         self.logger.info(f"   Min RVOL: {self.min_rvol}x")
         self.logger.info(f"   Min Dark Pool Strength: {self.min_dark_pool_strength}")
         self.logger.info(f"   Gamma Wall Distance: {self.gamma_wall_distance}%")
+        self.logger.info(f"   🎯 Confluence alerts: 75%+ confidence")
     
     def set_discord_webhook(self, webhook_url: str):
         """Set Discord webhook URL"""
@@ -698,6 +704,17 @@ class MomentumSignalMonitor:
                     self.stats['momentum_sell_signals'] += 1
                     self.logger.info(f"🔴 MOMENTUM SELL ALERT: {symbol} ({sell_signal['factor_count']} factors)")
             
+            # FEATURE #5: Confluence Alert (75%+ confidence)
+            confluence = self.check_confluence_alert(symbol, data)
+            if confluence and self.can_alert(symbol, 'confluence_alert'):
+                embed = self.create_confluence_embed(symbol, confluence)
+                if self.send_discord_alert(embed):
+                    self.mark_alerted(symbol, 'confluence_alert')
+                    self.stats['total_alerts_sent'] += 1
+                    priority = confluence['confluence']['priority']
+                    confidence = confluence['confluence']['confidence']
+                    self.logger.info(f"🎯 CONFLUENCE ALERT: {symbol} ({confidence:.0f}% - {priority})")
+            
         except Exception as e:
             self.logger.error(f"Error checking {symbol}: {str(e)}")
     
@@ -756,6 +773,154 @@ class MomentumSignalMonitor:
             except Exception as e:
                 self.logger.error(f"Error in monitoring loop: {str(e)}")
                 time.sleep(60)
+
+
+    # ========================================================================
+    # FEATURE #5: CONFLUENCE ALERT METHODS
+    # ========================================================================
+    
+    def check_confluence_alert(self, symbol: str, data: Dict) -> Optional[Dict]:
+        """
+        Check if confluence alert should be sent (75%+ confidence)
+        
+        Returns confluence analysis if should alert, None otherwise
+        """
+        try:
+            # Analyze confluence
+            confluence_result = self.confluence_system.analyze_confluence(symbol, data)
+            
+            if not confluence_result.get('available'):
+                return None
+            
+            confluence_data = confluence_result['confluence']
+            
+            # Check if meets alert threshold (75%+)
+            if not confluence_data['should_alert']:
+                return None
+            
+            # Check cooldown (use same as momentum_signal)
+            alert_type = 'confluence_alert'
+            if not self.confluence_system.check_cooldown(symbol, alert_type):
+                return None
+            
+            # Mark as sent
+            self.confluence_system.mark_alert_sent(symbol, alert_type)
+            
+            return confluence_result
+            
+        except Exception as e:
+            self.logger.error(f"Error checking confluence for {symbol}: {str(e)}")
+            return None
+    
+    def create_confluence_embed(self, symbol: str, confluence_result: Dict) -> dict:
+        """Create Discord embed for confluence alert"""
+        
+        confluence = confluence_result['confluence']
+        confidence = confluence['confidence']
+        direction = confluence['direction']
+        priority = confluence['priority']
+        setup_type = confluence['setup_type']
+        signals = confluence_result['active_signals']
+        current_price = confluence_result['current_price']
+        targets = confluence_result.get('targets', {})
+        
+        # Determine color based on priority
+        if priority == 'EXTREME':
+            color = 0xFF0000  # Red - Extreme
+            emoji = '🔥🔥🔥'
+        elif priority == 'HIGH':
+            color = 0xFF6600  # Orange - High
+            emoji = '🔥🔥'
+        else:
+            color = 0xFFD700  # Gold - Medium
+            emoji = '🔥'
+        
+        # Direction emoji
+        dir_emoji = '📈' if direction == 'BULLISH' else '📉'
+        
+        embed = {
+            'title': f"{emoji} {priority} CONFLUENCE - {symbol}",
+            'description': f"**{confidence:.0f}% Confidence** {dir_emoji} {direction} {setup_type}",
+            'color': color,
+            'timestamp': datetime.utcnow().isoformat(),
+            'fields': []
+        }
+        
+        # Current price
+        embed['fields'].append({
+            'name': '💰 Current Price',
+            'value': f"**${current_price:.2f}**",
+            'inline': True
+        })
+        
+        # Signals count
+        embed['fields'].append({
+            'name': '✅ Signals Aligned',
+            'value': f"**{len(signals)}/{len(confluence_result['all_signals'])}** factors",
+            'inline': True
+        })
+        
+        # Priority
+        embed['fields'].append({
+            'name': '⚡ Priority',
+            'value': f"**{priority}**",
+            'inline': True
+        })
+        
+        # Active signals breakdown
+        signals_text = ""
+        for signal in signals:
+            name = signal['name'].replace('_', ' ').title()
+            strength_pct = int(signal['strength'] * 100)
+            reason = signal['reason']
+            
+            if signal['direction'] == 'BULLISH':
+                emoji_dir = '🟢'
+            else:
+                emoji_dir = '🔴'
+            
+            signals_text += f"{emoji_dir} **{name}** ({strength_pct}%)\n└─ {reason}\n\n"
+        
+        embed['fields'].append({
+            'name': '📊 Active Signals',
+            'value': signals_text.strip(),
+            'inline': False
+        })
+        
+        # Targets (if available)
+        if targets.get('entry'):
+            targets_text = (
+                f"**Entry:** ${targets['entry']:.2f}\n"
+                f"**TP1:** ${targets['tp1']:.2f}\n"
+                f"**TP2:** ${targets['tp2']:.2f}\n"
+                f"**Stop:** ${targets['stop_loss']:.2f}\n"
+                f"**R:R:** {targets.get('risk_reward', 0):.1f}"
+            )
+            embed['fields'].append({
+                'name': '🎯 Targets',
+                'value': targets_text,
+                'inline': False
+            })
+        
+        # Interpretation
+        interpretation = confluence_result.get('interpretation', '')
+        if interpretation:
+            # Truncate if too long
+            if len(interpretation) > 500:
+                interpretation = interpretation[:497] + "..."
+            
+            embed['fields'].append({
+                'name': '💡 Analysis',
+                'value': interpretation,
+                'inline': False
+            })
+        
+        # Footer
+        embed['footer'] = {
+            'text': f'Confluence Alert System • {priority} • {datetime.now().strftime("%H:%M:%S ET")}'
+        }
+        
+        return embed
 
 
 # CLI Testing
