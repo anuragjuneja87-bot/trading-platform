@@ -214,18 +214,39 @@ if CONFIG_MANAGER_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Config Manager failed: {str(e)}")
 
-# Initialize all monitors
+# ============================================================================
+# NEWS SYSTEM INITIALIZATION
+# ============================================================================
+
+# Initialize Unified News Engine (core component for all news monitors)
+unified_news_engine = None
+try:
+    from news.unified_news_engine import UnifiedNewsEngine
+    unified_news_engine = UnifiedNewsEngine(
+        polygon_api_key=POLYGON_API_KEY,
+        use_benzinga=True,
+        use_polygon=True
+    )
+    logger.info("✅ Unified News Engine initialized (Benzinga + Polygon)")
+except Exception as e:
+    logger.error(f"❌ Unified News Engine failed: {str(e)}")
+    logger.warning("⚠️  News monitors will be disabled")
+
+# Initialize all monitors with OPTIMIZED REAL-TIME INTERVALS
 openai_monitor = None
-if OPENAI_MONITOR_AVAILABLE:
+if OPENAI_MONITOR_AVAILABLE and unified_news_engine and alert_manager:
     try:
-        openai_monitor = OpenAINewsMonitor(polygon_api_key=POLYGON_API_KEY, config=config_yaml)
-        webhook = os.getenv('DISCORD_OPENAI_NEWS')
-        if webhook:
-            openai_monitor.set_discord_webhook(webhook)
-            logger.info("✅ OpenAI News Monitor initialized")
+        from monitors.openai_news_monitor import OpenAINewsMonitor
+        openai_monitor = OpenAINewsMonitor(
+            unified_news_engine=unified_news_engine,
+            discord_alerter=alert_manager.discord,
+            check_interval=30  # 30 seconds - AI sector news
+        )
+        logger.info("✅ OpenAI News Monitor initialized (30s interval)")
     except Exception as e:
         logger.error(f"❌ OpenAI News Monitor failed: {str(e)}")
 
+# Market Impact Monitor - Watchlist news to DISCORD_NEWS_ONLY
 market_impact_monitor = None
 if MARKET_IMPACT_AVAILABLE:
     try:
@@ -234,12 +255,59 @@ if MARKET_IMPACT_AVAILABLE:
             config=config_yaml,
             watchlist_manager=watchlist_manager
         )
-        webhook = os.getenv('DISCORD_NEWS_ALERTS')
+        # Route to DISCORD_NEWS_ONLY for watchlist-specific news
+        webhook = os.getenv('DISCORD_NEWS_ONLY')
         if webhook:
             market_impact_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Market Impact Monitor initialized")
+            logger.info("✅ Market Impact Monitor initialized (15s interval)")
+            logger.info("   📡 Routes to: DISCORD_NEWS_ONLY (Watchlist News)")
     except Exception as e:
         logger.error(f"❌ Market Impact Monitor failed: {str(e)}")
+
+# Initialize Macro News Detector - CRITICAL signals to DISCORD_CRITICAL_SIGNALS
+macro_news_detector = None
+try:
+    from monitors.macro_news_detector import MacroNewsDetector
+    if unified_news_engine and alert_manager:
+        macro_news_detector = MacroNewsDetector(
+            unified_news_engine=unified_news_engine,
+            discord_alerter=alert_manager.discord,
+            check_interval=15  # 15 seconds - FASTEST for Fed/Tariffs
+        )
+        # Override Discord webhook to use CRITICAL channel
+        critical_webhook = os.getenv('DISCORD_CRITICAL_SIGNALS') or os.getenv('DISCORD_WEBHOOK_URL')
+        if critical_webhook and hasattr(macro_news_detector, 'discord'):
+            # Update the discord alerter webhook for critical signals
+            logger.info("✅ Macro News Detector initialized (15s interval - CRITICAL)")
+            logger.info("   🚨 Routes to: DISCORD_CRITICAL_SIGNALS (Fed/Tariffs/Economic)")
+except ImportError:
+    logger.warning("⚠️  Macro News Detector not available")
+except Exception as e:
+    logger.error(f"❌ Macro News Detector failed: {str(e)}")
+
+# Initialize Spillover Detector - Routes to DISCORD_NEWS_ALERTS
+spillover_detector = None
+try:
+    from monitors.spillover_detector import SpilloverDetector
+    if unified_news_engine and alert_manager:
+        spillover_map = config_yaml.get('market_impact_monitor', {}).get('spillover_map', {
+            'NVDA': ['NVTS', 'SMCI', 'ARM', 'AMD', 'AVGO'],
+            'TSLA': ['RIVN', 'LCID', 'F', 'GM'],
+            'AAPL': ['QCOM', 'CIRR', 'SWKS']
+        })
+        spillover_detector = SpilloverDetector(
+            unified_news_engine=unified_news_engine,
+            discord_alerter=alert_manager.discord,
+            polygon_api_key=POLYGON_API_KEY,
+            spillover_map=spillover_map,
+            check_interval=20  # 20 seconds - catch momentum early
+        )
+        logger.info("✅ Spillover Detector initialized (20s interval)")
+        logger.info("   📊 Routes to: DISCORD_NEWS_ALERTS (Related Tickers)")
+except ImportError:
+    logger.warning("⚠️  Spillover Detector not available")
+except Exception as e:
+    logger.error(f"❌ Spillover Detector failed: {str(e)}")
 
 extended_hours_monitor = None
 if EXTENDED_HOURS_MONITOR_AVAILABLE:
@@ -836,6 +904,36 @@ if __name__ == '__main__':
         print(f"   🕐 Scans every {unusual_activity_monitor.check_interval} seconds")
         print(f"   📡 Routes to: DISCORD_UNUSUAL_ACTIVITY")
     
+    # Start News Monitors
+    if openai_monitor:
+        print(f"\n🤖 Starting OpenAI News Monitor...")
+        openai_monitor.start()
+        print(f"   ✅ OpenAI news monitor started")
+        print(f"   🕐 Checks every 30 seconds (REAL-TIME)")
+        print(f"   📡 Routes to: DISCORD_OPENAI_NEWS")
+    
+    if macro_news_detector:
+        print(f"\n🚨 Starting Macro News Detector...")
+        macro_news_detector.start()
+        print(f"   ✅ Macro news detector started")
+        print(f"   🕐 Checks every 15 seconds (CRITICAL - FASTEST)")
+        print(f"   📡 Routes to: DISCORD_CRITICAL_SIGNALS")
+        print(f"   🎯 Monitors: Fed, FOMC, Tariffs, CPI, Jobs, GDP")
+    
+    if spillover_detector:
+        print(f"\n📊 Starting Spillover Detector...")
+        spillover_detector.start()
+        print(f"   ✅ Spillover detector started")
+        print(f"   🕐 Checks every 20 seconds (HIGH PRIORITY)")
+        print(f"   📡 Routes to: DISCORD_NEWS_ALERTS")
+        print(f"   🎯 Monitors: NVDA→SMCI, TSLA→RIVN, etc.")
+    
+    if market_impact_monitor:
+        print(f"\n📰 Market Impact Monitor Active...")
+        print(f"   🕐 Checks every 15 seconds (REAL-TIME)")
+        print(f"   📡 Routes to: DISCORD_NEWS_ONLY")
+        print(f"   🎯 Monitors: Watchlist stocks only")
+    
     print(f"\n" + "=" * 60)
     print("✅ ALL SYSTEMS ONLINE - READY FOR TRADING!")
     print("=" * 60)
@@ -843,6 +941,9 @@ if __name__ == '__main__':
     print(f"   • Wall Strength Tracker - Monitors gamma walls")
     print(f"   • Unusual Activity Detector - Smart money tracking")
     print(f"   • Alert Management Console - Real-time config")
+    print(f"   • OpenAI News Monitor - AI sector news")
+    print(f"   • Macro News Detector - Fed/Tariffs/Economic")
+    print(f"   • Spillover Detector - Related ticker opportunities")
     print(f"   • 5-minute monitoring during market hours")
     print("=" * 60 + "\n")
     
