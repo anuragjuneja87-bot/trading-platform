@@ -28,6 +28,15 @@ from analyzers.gex_calculator import GEXCalculator
 from analyzers.wall_strength_tracker import WallStrengthTracker
 # Import ThetaData Client v3 (Optimized)
 from analyzers.thetadata_client_v3 import ThetaDataClientV3
+
+# Import Unified News Engine
+try:
+    from news.unified_news_engine import UnifiedNewsEngine
+    UNIFIED_NEWS_AVAILABLE = True
+except ImportError:
+    UNIFIED_NEWS_AVAILABLE = False
+    logging.warning("Unified News Engine not available - using legacy Polygon only")
+
 # Import Unusual Activity Detector (Feature 3)
 try:
     from analyzers.unusual_activity_detector import UnusualActivityDetector
@@ -78,6 +87,21 @@ class EnhancedProfessionalAnalyzer:
         except Exception as e:
             self.logger.error(f"❌ ThetaData v3 initialization failed: {str(e)}")
             self.thetadata_client = None
+        
+        # Unified News Engine (Benzinga + Polygon)
+        if UNIFIED_NEWS_AVAILABLE:
+            try:
+                self.unified_news = UnifiedNewsEngine(
+                    polygon_api_key=polygon_api_key,
+                    use_benzinga=True,
+                    use_polygon=True
+                )
+                self.logger.info("✅ Unified News Engine initialized (Benzinga + Polygon)")
+            except Exception as e:
+                self.logger.error(f"❌ Unified News Engine failed: {str(e)}")
+                self.unified_news = None
+        else:
+            self.unified_news = None
         
         # Tradier API setup (LEGACY - Emergency fallback only)
         self.tradier_api_key = tradier_api_key
@@ -541,6 +565,40 @@ class EnhancedProfessionalAnalyzer:
         Uses ThetaData to get ALL options, then calculates net GEX
         """
         try:
+            # ===== MARKET HOURS CHECK - SKIP OPTIONS DATA ON WEEKENDS =====
+            et_tz = pytz.timezone('America/New_York')
+            now = datetime.now(et_tz)
+            
+            # Skip options data on weekends
+            if now.weekday() >= 5:
+                self.logger.debug(f"⏸️ Weekend - skipping options data for {symbol}")
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'reason': 'Markets closed - Weekend',
+                    'gamma_walls': [],
+                    'nearest_wall': None,
+                    'signal_strength': 0,
+                    'data_source': 'unavailable'
+                }
+            
+            # Skip options data outside extended hours (4 AM - 8 PM ET)
+            market_open = now.replace(hour=4, minute=0, second=0, microsecond=0)
+            market_close = now.replace(hour=20, minute=0, second=0, microsecond=0)
+            
+            if not (market_open <= now <= market_close):
+                self.logger.debug(f"⏸️ Outside market hours - skipping options data for {symbol}")
+                return {
+                    'symbol': symbol,
+                    'available': False,
+                    'reason': 'Markets closed - Outside hours',
+                    'gamma_walls': [],
+                    'nearest_wall': None,
+                    'signal_strength': 0,
+                    'data_source': 'unavailable'
+                }
+            # ===== END MARKET HOURS CHECK =====
+            
             if current_price is None:
                 quote = self.get_real_time_quote(symbol)
                 current_price = quote['price']
@@ -570,8 +628,7 @@ class EnhancedProfessionalAnalyzer:
                     'error': 'No expirations found'
                 }
             
-            et_tz = pytz.timezone('America/New_York')
-            today = datetime.now(et_tz).date()
+            today = now.date()
             today_str = today.strftime('%Y-%m-%d')
             
             expiry_date = None
@@ -624,8 +681,7 @@ class EnhancedProfessionalAnalyzer:
                 'symbol': symbol,
                 'available': False,
                 'error': str(e)
-            }
-    
+            } 
     def detect_gap(self, symbol: str, current_price: float = None) -> Dict:
         """Detect pre-market gap"""
         try:
@@ -675,24 +731,40 @@ class EnhancedProfessionalAnalyzer:
             return {'gap_type': 'UNKNOWN', 'gap_size': 0, 'gap_amount': 0}
     
     def get_enhanced_news_sentiment(self, symbol: str) -> Dict:
-        """Get news sentiment from Polygon"""
-        endpoint = f"/v2/reference/news"
-        params = {'ticker': symbol, 'limit': 20, 'order': 'desc'}
+        """Get news sentiment from Unified Engine (Benzinga + Polygon)"""
         
-        data = self._make_request(endpoint, params)
+        # Try unified engine first (Benzinga + Polygon)
+        if self.unified_news:
+            try:
+                articles = self.unified_news.get_unified_news(ticker=symbol, hours=24, limit=20)
+                
+                if not articles:
+                    return self._empty_news_response()
+                
+                return self._process_news_articles(symbol, articles)
+                
+            except Exception as e:
+                self.logger.error(f"Unified news engine error for {symbol}: {str(e)}")
+                # Fall through to legacy
         
-        if 'results' not in data or not data['results']:
-            return {
-                'sentiment': 'NEUTRAL',
-                'urgency': 'LOW',
-                'recent_news': 0,
-                'headlines': [],
-                'sentiment_score': 0,
-                'news_impact': 'NONE'
-            }
-        
-        news_items = data['results']
-        
+        # FALLBACK: Legacy Polygon-only
+        return self._get_polygon_news_legacy(symbol)
+    
+    def _empty_news_response(self) -> Dict:
+        """Return empty news response"""
+        return {
+            'sentiment': 'NEUTRAL',
+            'urgency': 'LOW',
+            'recent_news': 0,
+            'headlines': [],
+            'article_urls': [],
+            'sentiment_score': 0,
+            'news_impact': 'NONE',
+            'very_recent_count': 0
+        }
+    
+    def _process_news_articles(self, symbol: str, articles: List[Dict]) -> Dict:
+        """Process news articles and return sentiment analysis"""
         strong_positive = ['beats', 'soars', 'surge', 'breakthrough', 'record', 
                           'blowout earnings', 'raised target', 'massive gains']
         positive = ['upgrade', 'rally', 'bullish', 'growth', 'gain', 'wins', 
@@ -711,64 +783,55 @@ class EnhancedProfessionalAnalyzer:
         
         sentiment_score = 0
         headlines = []
+        article_urls = []
         urgency = 'LOW'
         now = datetime.now()
         very_recent_count = 0
         
-        for item in news_items[:10]:
-            title = item.get('title', '').lower()
-            headlines.append(item.get('title', ''))
+        for article in articles[:10]:
+            title = article.get('title', '')
+            url = article.get('url', '')
             
-            pub_time_str = item.get('published_utc', '')
+            # Filter: Only include if symbol mentioned
+            if symbol.upper() not in title.upper():
+                continue
+            
+            headlines.append(title)
+            article_urls.append(url)
+            
+            title_lower = title.lower()
+            teaser_lower = article.get('teaser', '').lower()
+            full_text = f"{title_lower} {teaser_lower}"
+            
+            # Check recency
+            pub_time_str = article.get('published_utc', '')
             if pub_time_str:
                 try:
-                    pub_time = datetime.strptime(pub_time_str, '%Y-%m-%dT%H:%M:%SZ')
+                    if 'T' in pub_time_str:
+                        pub_time = datetime.strptime(pub_time_str, '%Y-%m-%dT%H:%M:%SZ')
+                    else:
+                        pub_time = datetime.strptime(pub_time_str, '%Y-%m-%d %H:%M:%S')
                     hours_ago = (now - pub_time).total_seconds() / 3600
                     if hours_ago < 2:
                         very_recent_count += 1
                 except:
                     pass
             
-            insights = item.get('insights', [])
-            insight_found = False
-            
-            for insight in insights:
-                if insight.get('ticker') == symbol:
-                    insight_found = True
-                    insight_sentiment = insight.get('sentiment', 'neutral').lower()
-                    reasoning = insight.get('sentiment_reasoning', '').lower()
-                    
-                    if insight_sentiment == 'positive':
-                        sentiment_score += 2
-                    elif insight_sentiment == 'negative':
-                        sentiment_score -= 2
-                    
-                    if any(word in reasoning for word in ['upgrade', 'beats', 'breakthrough', 'surge']):
-                        sentiment_score += 1
-                    if any(word in reasoning for word in ['downgrade', 'plunge', 'crash', 'concern']):
-                        sentiment_score -= 1
-                    
-                    break
-            
-            if not insight_found:
-                if any(word in title for word in strong_positive):
-                    sentiment_score += 3
-                elif any(word in title for word in positive):
-                    sentiment_score += 1
-                
-                if any(word in title for word in strong_negative):
-                    sentiment_score -= 4
-                elif any(word in title for word in negative):
-                    sentiment_score -= 2
-            
-            if any(word in title for word in strong_negative):
-                sentiment_score -= 2
-            if any(word in title for word in strong_positive):
+            # Sentiment scoring
+            if any(word in full_text for word in strong_positive):
+                sentiment_score += 3
+            elif any(word in full_text for word in positive):
                 sentiment_score += 1
             
-            if any(word in title for word in urgent_keywords):
+            if any(word in full_text for word in strong_negative):
+                sentiment_score -= 4
+            elif any(word in full_text for word in negative):
+                sentiment_score -= 2
+            
+            if any(word in full_text for word in urgent_keywords):
                 urgency = 'HIGH'
         
+        # Determine overall sentiment
         if sentiment_score >= 5:
             sentiment = 'VERY POSITIVE'
         elif sentiment_score >= 2:
@@ -780,6 +843,7 @@ class EnhancedProfessionalAnalyzer:
         else:
             sentiment = 'NEUTRAL'
         
+        # Determine impact
         if abs(sentiment_score) >= 6 and very_recent_count >= 2:
             news_impact = 'EXTREME'
         elif abs(sentiment_score) >= 5 and very_recent_count >= 2:
@@ -804,12 +868,38 @@ class EnhancedProfessionalAnalyzer:
         return {
             'sentiment': sentiment,
             'urgency': urgency,
-            'recent_news': len(news_items),
+            'recent_news': len(articles),
             'headlines': headlines[:5],
+            'article_urls': article_urls[:5],
             'sentiment_score': sentiment_score,
             'news_impact': news_impact,
             'very_recent_count': very_recent_count
         }
+    
+    def _get_polygon_news_legacy(self, symbol: str) -> Dict:
+        """Legacy Polygon-only news (fallback)"""
+        endpoint = f"/v2/reference/news"
+        params = {'ticker': symbol, 'limit': 20, 'order': 'desc'}
+        
+        data = self._make_request(endpoint, params)
+        
+        if 'results' not in data or not data['results']:
+            return self._empty_news_response()
+        
+        news_items = data['results']
+        
+        # Convert to unified format
+        unified_articles = []
+        for item in news_items:
+            unified_articles.append({
+                'title': item.get('title', ''),
+                'url': item.get('article_url', ''),
+                'published_utc': item.get('published_utc', ''),
+                'teaser': item.get('description', ''),
+                'source': 'POLYGON'
+            })
+        
+        return self._process_news_articles(symbol, unified_articles)
     
     def get_real_time_quote(self, symbol: str) -> Dict:
         """Get real-time quote"""

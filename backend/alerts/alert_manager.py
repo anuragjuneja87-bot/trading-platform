@@ -81,6 +81,10 @@ class AlertManager:
         self.last_news_check = {}
         self.last_news_reset = datetime.now().date()
         
+        # 24-hour news cache for dashboard
+        self.news_cache = defaultdict(list)  # {symbol: [news_items]}
+        self.news_cache_hours = 24
+        
         # NEW: Volume spike cooldown tracking
         self._volume_spike_cooldowns = {}
         self.volume_spike_config = {
@@ -459,18 +463,32 @@ class AlertManager:
             if current_impact_idx < min_impact_idx:
                 return False
             
-            headlines = news_data.get('headlines', [])
-            if headlines:
-                news_hash = self._create_news_hash(symbol, headlines[0])
+            # Improved deduplication: Use article URL instead of headline
+            article_urls = news_data.get('article_urls', [])
+            if article_urls:
+                # Hash the first article URL as unique identifier
+                news_hash = hashlib.md5(article_urls[0].encode()).hexdigest()
                 if news_hash in self.seen_news_hashes:
                     return False
                 self.seen_news_hashes.add(news_hash)
+            else:
+                # Fallback to headline if no URL (should rarely happen)
+                headlines = news_data.get('headlines', [])
+                if headlines:
+                    news_hash = self._create_news_hash(symbol, headlines[0])
+                    if news_hash in self.seen_news_hashes:
+                        return False
+                    self.seen_news_hashes.add(news_hash)
             
             if self.discord:
                 success = self.discord.send_news_alert(symbol, news_data)
                 if success:
                     self.news_alert_counts[symbol] += 1
                     self.stats['news_alerts_sent'] += 1
+                    
+                    # Add to 24-hour news cache
+                    self._add_to_news_cache(symbol, news_data)
+                    
                     return True
         
         except Exception as e:
@@ -482,6 +500,52 @@ class AlertManager:
         """Create unique hash for news article"""
         hash_str = f"{symbol}_{headline[:50]}_{datetime.now().strftime('%Y%m%d%H')}"
         return hashlib.md5(hash_str.encode()).hexdigest()
+    
+    def _add_to_news_cache(self, symbol: str, news_data: Dict):
+        """Add news to 24-hour cache for dashboard"""
+        headlines = news_data.get('headlines', [])
+        article_urls = news_data.get('article_urls', [])
+        sentiment = news_data.get('sentiment', 'NEUTRAL')
+        
+        timestamp = datetime.now()
+        
+        for headline, url in zip(headlines, article_urls):
+            news_item = {
+                'headline': headline,
+                'url': url,
+                'sentiment': sentiment,
+                'timestamp': timestamp.isoformat(),
+                'time_str': timestamp.strftime('%I:%M %p')
+            }
+            self.news_cache[symbol].append(news_item)
+        
+        # Clean old news (older than 24 hours)
+        self._clean_news_cache(symbol)
+    
+    def _clean_news_cache(self, symbol: str):
+        """Remove news older than 24 hours"""
+        cutoff_time = datetime.now() - timedelta(hours=self.news_cache_hours)
+        
+        self.news_cache[symbol] = [
+            item for item in self.news_cache[symbol]
+            if datetime.fromisoformat(item['timestamp']) > cutoff_time
+        ]
+    
+    def get_symbol_news_history(self, symbol: str, hours: int = 24) -> List[Dict]:
+        """Get news history for symbol (for dashboard API)"""
+        self._clean_news_cache(symbol)
+        
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        
+        news_list = [
+            item for item in self.news_cache.get(symbol, [])
+            if datetime.fromisoformat(item['timestamp']) > cutoff_time
+        ]
+        
+        # Sort by timestamp (newest first)
+        news_list.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return news_list
     
     def print_stats(self):
         """PHASE 1: Print enhanced statistics"""

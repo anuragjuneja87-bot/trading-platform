@@ -1,12 +1,9 @@
 """
-backend/app.py - COMPLETE VERSION v4.4
-WITH WALL STRENGTH TRACKER + UNUSUAL ACTIVITY MONITOR
+backend/app.py - COMPLETE VERSION v4.5
+WITH ALERT CONSOLE + WALL STRENGTH + UNUSUAL ACTIVITY
 
 COMPLETE REPLACEMENT FILE
 Copy this entire file to replace your existing app.py
-
-This is Part 1 - Contains imports, initialization, and helper functions
-Part 2 contains API routes
 """
 
 from flask import Flask, jsonify, send_from_directory, request
@@ -29,6 +26,15 @@ from analyzers.enhanced_professional_analyzer import EnhancedProfessionalAnalyze
 from utils.watchlist_manager import WatchlistManager
 from utils.earnings_state_manager import EarningsStateManager
 from alerts.alert_manager import AlertManager
+
+# ALERT CONSOLE: Import Config Manager and Routes
+try:
+    from utils.config_manager import ConfigManager
+    from routes.config_routes import config_bp, init_config_routes
+    CONFIG_MANAGER_AVAILABLE = True
+except ImportError:
+    CONFIG_MANAGER_AVAILABLE = False
+    logging.warning("Alert Console not available - install config_manager.py and config_routes.py")
 
 # Pin Probability Calculator (Feature #4)
 try:
@@ -102,7 +108,7 @@ except ImportError:
     ODTE_MONITOR_AVAILABLE = False
     logging.warning("0DTE Gamma Monitor not available")
 
-# Wall Strength Monitor (NEW!)
+# Wall Strength Monitor
 try:
     from monitors.wall_strength_monitor import WallStrengthMonitor
     WALL_STRENGTH_AVAILABLE = True
@@ -199,6 +205,15 @@ try:
 except Exception as e:
     logger.error(f"❌ Failed to initialize Alert Manager: {str(e)}")
 
+# ALERT CONSOLE: Initialize Config Manager
+config_manager = None
+if CONFIG_MANAGER_AVAILABLE:
+    try:
+        config_manager = ConfigManager()
+        logger.info("✅ Config Manager initialized")
+    except Exception as e:
+        logger.error(f"❌ Config Manager failed: {str(e)}")
+
 # Initialize all monitors
 openai_monitor = None
 if OPENAI_MONITOR_AVAILABLE:
@@ -252,9 +267,9 @@ if REALTIME_MONITOR_AVAILABLE:
         webhook = os.getenv('DISCORD_VOLUME_SPIKE')
         if webhook:
             realtime_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Real-Time Volume Monitor initialized")
+            logger.info("✅ Real-Time Volume Spike Monitor initialized")
     except Exception as e:
-        logger.error(f"❌ Real-Time Volume Monitor failed: {str(e)}")
+        logger.error(f"❌ Real-Time Volume Spike Monitor failed: {str(e)}")
 
 momentum_monitor = None
 if MOMENTUM_MONITOR_AVAILABLE:
@@ -274,13 +289,10 @@ if MOMENTUM_MONITOR_AVAILABLE:
 odte_monitor = None
 if ODTE_MONITOR_AVAILABLE:
     try:
-        config_yaml['tradier_api_key'] = TRADIER_API_KEY
-        config_yaml['tradier_account_type'] = TRADIER_ACCOUNT_TYPE
-        
         odte_monitor = ODTEGammaMonitor(
             polygon_api_key=POLYGON_API_KEY,
-            config=config_yaml,
-            watchlist_manager=watchlist_manager
+            watchlist_manager=watchlist_manager,
+            config=config_yaml
         )
         webhook = os.getenv('DISCORD_ODTE_LEVELS')
         if webhook:
@@ -289,383 +301,269 @@ if ODTE_MONITOR_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ 0DTE Gamma Monitor failed: {str(e)}")
 
-# Initialize Wall Strength Monitor (NEW!)
 wall_strength_monitor = None
 if WALL_STRENGTH_AVAILABLE:
     try:
-        wall_strength_monitor = WallStrengthMonitor(
-            analyzer=analyzer,
-            wall_tracker=analyzer.wall_tracker,
-            config=config_yaml
-        )
-        webhook = os.getenv('DISCORD_ODTE_LEVELS')
-        if webhook:
-            wall_strength_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Wall Strength Monitor initialized")
-            logger.info(f"   🕐 Check interval: {wall_strength_monitor.check_interval} seconds")
+        if hasattr(analyzer, 'wall_tracker'):
+            wall_strength_monitor = WallStrengthMonitor(
+                analyzer=analyzer,
+                wall_tracker=analyzer.wall_tracker,
+                config=config_yaml
+            )
+            webhook = os.getenv('DISCORD_ODTE_LEVELS')
+            if webhook:
+                wall_strength_monitor.set_discord_webhook(webhook)
+                logger.info("✅ Wall Strength Monitor initialized")
+        else:
+            logger.warning("⚠️ Wall tracker not available in analyzer")
     except Exception as e:
         logger.error(f"❌ Wall Strength Monitor failed: {str(e)}")
 
-# Initialize Unusual Activity Monitor (Feature 3)
 unusual_activity_monitor = None
 if UNUSUAL_ACTIVITY_AVAILABLE:
     try:
-        unusual_activity_monitor = UnusualActivityMonitor(
-            analyzer=analyzer,
-            detector=analyzer.unusual_activity_detector,
-            config=config_yaml
-        )
-        webhook = os.getenv('DISCORD_UNUSUAL_ACTIVITY')
-        if webhook:
-            unusual_activity_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Unusual Activity Monitor initialized")
-            logger.info(f"   🕐 Check interval: {unusual_activity_monitor.check_interval} seconds")
+        if hasattr(analyzer, 'unusual_activity_detector'):
+            unusual_activity_monitor = UnusualActivityMonitor(
+                analyzer=analyzer,
+                detector=analyzer.unusual_activity_detector,
+                config=config_yaml
+            )
+            webhook = os.getenv('DISCORD_UNUSUAL_ACTIVITY')
+            if webhook:
+                unusual_activity_monitor.set_discord_webhook(webhook)
+                logger.info("✅ Unusual Activity Monitor initialized")
+        else:
+            logger.warning("⚠️ Unusual activity detector not available in analyzer")
     except Exception as e:
         logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
 
-# Initialize scheduler
-scheduler = BackgroundScheduler()
-scheduler.start()
+# ALERT CONSOLE: Register Blueprint
+if CONFIG_MANAGER_AVAILABLE and config_manager:
+    app.register_blueprint(config_bp)
+    logger.info("✅ Config routes blueprint registered")
 
-logger.info("=" * 60)
-logger.info("🚀 PROFESSIONAL TRADING DASHBOARD v4.4")
-logger.info("   (WITH WALL STRENGTH + UNUSUAL ACTIVITY)")
-logger.info("=" * 60)
+# ============================================================================
+# BACKGROUND MONITORS
+# ============================================================================
 
-# Monitor background thread functions
 def run_alert_system():
-    """Run alert manager"""
+    """Run alert system continuously"""
     if alert_manager:
-        logger.info("📢 Starting Alert System...")
         try:
             alert_manager.run_continuous()
         except Exception as e:
-            logger.error(f"❌ Alert system error: {str(e)}")
+            logger.error(f"Alert system error: {str(e)}")
 
 def run_wall_strength_monitor():
-    """Run Wall Strength monitor (NEW!)"""
+    """Run wall strength monitor continuously"""
     if wall_strength_monitor:
-        logger.info("📊 Starting Wall Strength Monitor...")
         try:
             wall_strength_monitor.run_continuous(watchlist_manager)
         except Exception as e:
-            logger.error(f"❌ Wall Strength monitor error: {str(e)}")
+            logger.error(f"Wall strength monitor error: {str(e)}")
 
 def run_unusual_activity_monitor():
-    """Run Unusual Activity monitor (Feature 3)"""
+    """Run unusual activity monitor continuously"""
     if unusual_activity_monitor:
-        logger.info("🔍 Starting Unusual Activity Monitor...")
         try:
             unusual_activity_monitor.run_continuous(watchlist_manager)
         except Exception as e:
-            logger.error(f"❌ Unusual Activity monitor error: {str(e)}")
-
-# Sunday earnings routine
-def get_october_2025_earnings():
-    """Get earnings for October 2025"""
-    today = datetime.now()
-    earnings_by_week = {
-        42: [
-            {'symbol': 'JPM', 'company': 'JPMorgan', 'date': 'Oct 11', 'time': 'Before Market', 'period': 'Q3'},
-            {'symbol': 'WFC', 'company': 'Wells Fargo', 'date': 'Oct 11', 'time': 'Before Market', 'period': 'Q3'},
-        ],
-        43: [
-            {'symbol': 'TSLA', 'company': 'Tesla', 'date': 'Oct 23', 'time': 'After Market', 'period': 'Q3'},
-        ],
-        44: [
-            {'symbol': 'GOOGL', 'company': 'Alphabet', 'date': 'Oct 29', 'time': 'After Market', 'period': 'Q3'},
-            {'symbol': 'MSFT', 'company': 'Microsoft', 'date': 'Oct 30', 'time': 'After Market', 'period': 'Q1'},
-            {'symbol': 'META', 'company': 'Meta', 'date': 'Oct 30', 'time': 'After Market', 'period': 'Q3'},
-            {'symbol': 'AAPL', 'company': 'Apple', 'date': 'Oct 31', 'time': 'After Market', 'period': 'Q4'},
-            {'symbol': 'AMZN', 'company': 'Amazon', 'date': 'Oct 31', 'time': 'After Market', 'period': 'Q3'},
-        ],
-    }
-    current_week = today.isocalendar()[1]
-    return {
-        'this_week': earnings_by_week.get(current_week, []),
-        'next_week': earnings_by_week.get(current_week + 1, []),
-        'current_week': current_week
-    }
-
-def sunday_earnings_routine():
-    """Sunday earnings routine"""
-    logger.info("\n" + "=" * 80)
-    logger.info("🗓️ SUNDAY EARNINGS ROUTINE - STARTING")
-    logger.info("=" * 80)
-    
-    try:
-        watchlist_symbols = watchlist_manager.load_symbols()
-        earnings_data = get_october_2025_earnings()
-        
-        all_earnings = earnings_data['this_week'] + earnings_data['next_week']
-        all_earnings_symbols = [e['symbol'] for e in all_earnings]
-        
-        earnings_manager.update_earnings_symbols(all_earnings_symbols, {
-            'week': earnings_data['current_week'],
-            'this_week_count': len(earnings_data['this_week']),
-            'next_week_count': len(earnings_data['next_week'])
-        })
-        
-        logger.info(f"✅ Updated earnings watchlist: {len(all_earnings_symbols)} symbols")
-        
-    except Exception as e:
-        logger.error(f"❌ Sunday earnings routine failed: {str(e)}")
-    
-    logger.info("=" * 80 + "\n")
-
-def schedule_sunday_routine():
-    """Schedule Sunday routine"""
-    scheduler.add_job(
-        sunday_earnings_routine,
-        CronTrigger(day_of_week='sun', hour=20, minute=0),
-        id='sunday_earnings',
-        name='Sunday Weekly Earnings',
-        replace_existing=True
-    )
-    logger.info("📅 Scheduled: Sunday earnings routine")
-
-# SEE PART 2 FOR API ROUTES AND MAIN SECTION
-"""
-backend/app.py - Part 2 of 2 - API ROUTES
-
-APPEND THIS TO PART 1
-
-This contains all Flask routes + main section
-"""
+            logger.error(f"Unusual activity monitor error: {str(e)}")
 
 # ============================================================================
-# FLASK ROUTES
+# EARNINGS MONITORING
+# ============================================================================
+
+scheduler = BackgroundScheduler()
+
+def run_sunday_earnings_scan():
+    """Run Sunday earnings scan"""
+    logger.info("🗓️ Running Sunday earnings scan...")
+    try:
+        if openai_monitor:
+            openai_monitor.run_weekly_earnings_scan()
+    except Exception as e:
+        logger.error(f"Sunday earnings scan failed: {str(e)}")
+
+def schedule_sunday_routine():
+    """Schedule Sunday earnings scan"""
+    trigger = CronTrigger(
+        day_of_week='sun',
+        hour=7,
+        minute=0,
+        timezone='America/New_York'
+    )
+    scheduler.add_job(run_sunday_earnings_scan, trigger)
+    scheduler.start()
+    logger.info("📅 Sunday earnings scan scheduled (7:00 AM ET)")
+
+# ============================================================================
+# FRONTEND ROUTES
 # ============================================================================
 
 @app.route('/')
 def index():
-    """Serve dashboard"""
+    """Serve main dashboard"""
     return send_from_directory(app.static_folder, 'professional_dashboard.html')
 
+@app.route('/gamma')
+def gamma_dashboard():
+    """Serve gamma dashboard"""
+    return send_from_directory(app.static_folder, 'gamma_dashboard.html')
 
-@app.route('/api/analyze/<symbol>')
-def analyze_symbol(symbol):
-    """Analyze symbol"""
-    try:
-        symbol = symbol.upper()
-        logger.info(f"Analyzing {symbol}...")
-        
-        result = analyzer.generate_professional_signal(symbol)
-        
-        if metrics_tracker and result.get('alert_type') not in ['MONITOR', None]:
-            try:
-                signal_id = metrics_tracker.record_signal(result)
-                logger.debug(f"📊 Tracked signal: {signal_id}")
-            except Exception as e:
-                logger.error(f"⚠️ Metrics tracking failed: {str(e)}")
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error analyzing {symbol}: {str(e)}")
-        return jsonify({'symbol': symbol, 'error': str(e), 'signal': None}), 500
+@app.route('/gex')
+def gex_dashboard():
+    """Serve GEX calculator"""
+    return send_from_directory(app.static_folder, 'gex_dashboard.html')
 
+@app.route('/alert-console')
+def alert_console():
+    """Serve alert management console"""
+    return send_from_directory(app.static_folder, 'alert_console.html')
 
-@app.route('/api/gex/<symbol>')
-def get_gex_analysis(symbol):
-    """Get GEX analysis"""
-    try:
-        symbol = symbol.upper()
-        price = request.args.get('price', type=float)  # Get ?price= parameter
-        logger.info(f"📊 GEX analysis requested for {symbol}" + (f" with price={price}" if price else ""))
-        result = analyzer.analyze_full_gex(symbol, price)  # Pass price
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error getting GEX: {str(e)}")
-        return jsonify({'symbol': symbol, 'error': str(e), 'available': False}), 500
-
+# ============================================================================
+# API ROUTES
+# ============================================================================
 
 @app.route('/api/watchlist')
 def get_watchlist():
-    """Get watchlist"""
+    """Get current watchlist"""
     try:
         symbols = watchlist_manager.load_symbols()
-        return jsonify({'symbols': symbols, 'count': len(symbols), 'path': watchlist_path})
+        return jsonify({
+            'symbols': symbols,
+            'count': len(symbols)
+        })
     except Exception as e:
+        logger.error(f"Error loading watchlist: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-
-# ============================================================================
-# EARNINGS API ENDPOINTS
-# ============================================================================
-
-@app.route('/api/earnings/status')
-def get_earnings_status():
-    """Get earnings status"""
-    try:
-        return jsonify(earnings_manager.get_status())
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/earnings/enable', methods=['POST'])
-def enable_earnings():
-    """Enable earnings monitoring"""
-    try:
-        earnings_manager.enable()
-        if alert_manager:
-            alert_manager.earnings_manager = EarningsStateManager()
-        logger.info("✅ Earnings monitoring enabled")
-        return jsonify({'success': True, 'status': earnings_manager.get_status()})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/earnings/disable', methods=['POST'])
-def disable_earnings():
-    """Disable earnings monitoring"""
-    try:
-        earnings_manager.disable()
-        if alert_manager:
-            alert_manager.earnings_manager = EarningsStateManager()
-        logger.info("📕 Earnings monitoring disabled")
-        return jsonify({'success': True, 'status': earnings_manager.get_status()})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# WALL STRENGTH API ENDPOINTS (NEW!)
-# ============================================================================
-
-@app.route('/api/wall-strength/<symbol>')
-def get_wall_strength(symbol):
-    """Get wall strength analysis"""
+@app.route('/api/analyze/<symbol>')
+def analyze_symbol(symbol):
+    """Analyze single symbol"""
     try:
         symbol = symbol.upper()
-        logger.info(f"📊 Wall strength requested for {symbol}")
-        result = analyzer.wall_tracker.get_wall_strength_summary(symbol)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"Error getting wall strength: {str(e)}")
-        return jsonify({'symbol': symbol, 'available': False, 'error': str(e)}), 500
-
-
-@app.route('/api/wall-alerts/<symbol>')
-def get_wall_alerts(symbol):
-    """Get recent wall alerts"""
-    try:
-        symbol = symbol.upper()
-        limit = int(request.args.get('limit', 10))
-        alerts = analyzer.wall_tracker.get_recent_alerts(symbol, limit=limit)
-        return jsonify({'symbol': symbol, 'alerts': alerts, 'count': len(alerts)})
-    except Exception as e:
-        return jsonify({'symbol': symbol, 'error': str(e)}), 500
-
-
-@app.route('/api/wall-strength/status')
-def get_wall_strength_monitor_status():
-    """Get Wall Strength monitor status"""
-    if not wall_strength_monitor:
-        return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
-    
-    return jsonify({
-        'enabled': wall_strength_monitor.enabled,
-        'check_interval': wall_strength_monitor.check_interval,
-        'market_hours_only': wall_strength_monitor.market_hours_only,
-        'cooldown_minutes': wall_strength_monitor.cooldown_minutes,
-        'is_market_hours': wall_strength_monitor.is_market_hours(),
-        'stats': wall_strength_monitor.stats,
-        'tracker_stats': analyzer.wall_tracker.get_statistics()
-    })
-
-
-@app.route('/api/wall-strength/check', methods=['POST'])
-def trigger_wall_strength_check():
-    """Manually trigger wall strength check"""
-    if not wall_strength_monitor:
-        return jsonify({'error': 'Monitor not available'}), 503
-    
-    try:
-        watchlist = watchlist_manager.load_symbols()
-        alerts_sent = wall_strength_monitor.run_single_check(watchlist)
-        return jsonify({'success': True, 'alerts_sent': alerts_sent, 'stats': wall_strength_monitor.stats})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# UNUSUAL ACTIVITY API ENDPOINTS (Feature 3)
-# ============================================================================
-
-@app.route('/api/unusual-activity/<symbol>')
-def get_unusual_activity(symbol):
-    """Get unusual activity analysis"""
-    try:
-        symbol = symbol.upper()
-        logger.info(f"🔍 Unusual activity requested for {symbol}")
+        logger.info(f"📊 Analyzing {symbol}...")
         
-        # Get options data and analyze
-        options_data = analyzer.get_options_chain(symbol)
-        if not options_data:
-            return jsonify({
-                'symbol': symbol,
-                'detected': False,
-                'reason': 'No options data available'
-            })
+        result = analyzer.generate_professional_signal(symbol)
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Error analyzing {symbol}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analyze-all')
+def analyze_all():
+    """Analyze all watchlist symbols"""
+    try:
+        symbols = watchlist_manager.load_symbols()
+        results = []
+        
+        for symbol in symbols:
+            try:
+                result = analyzer.generate_professional_signal(symbol)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error analyzing {symbol}: {str(e)}")
+                results.append({'symbol': symbol, 'error': str(e)})
+        
+        return jsonify({
+            'results': results,
+            'count': len(results)
+        })
+    
+    except Exception as e:
+        logger.error(f"Error in analyze-all: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/gamma/<symbol>')
+def get_gamma_analysis(symbol):
+    """Get gamma analysis for symbol"""
+    try:
+        symbol = symbol.upper()
+        logger.info(f"🎯 Gamma analysis for {symbol}")
         
         quote = analyzer.get_real_time_quote(symbol)
         current_price = quote.get('price', 0)
         
-        result = analyzer.unusual_activity_detector.analyze_unusual_activity(
-            symbol,
-            options_data,
-            current_price
-        )
+        if current_price == 0:
+            return jsonify({'error': 'Unable to get current price'}), 400
         
+        result = analyzer.analyze_open_interest(symbol, current_price)
         return jsonify(result)
+    
     except Exception as e:
-        logger.error(f"Error getting unusual activity: {str(e)}")
-        return jsonify({
-            'symbol': symbol,
-            'detected': False,
-            'error': str(e)
-        }), 500
+        logger.error(f"Error in gamma analysis: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
-
-@app.route('/api/unusual-activity/alerts/<symbol>')
-def get_unusual_activity_alerts(symbol):
-    """Get recent unusual activity alerts"""
+@app.route('/api/gex/<symbol>')
+def get_gex_analysis(symbol):
+    """Get GEX analysis for symbol"""
     try:
         symbol = symbol.upper()
-        limit = int(request.args.get('limit', 10))
-        alerts = analyzer.unusual_activity_detector.get_recent_alerts(symbol, limit=limit)
+        logger.info(f"💰 GEX analysis for {symbol}")
+        
+        quote = analyzer.get_real_time_quote(symbol)
+        current_price = quote.get('price', 0)
+        
+        if current_price == 0:
+            return jsonify({'error': 'Unable to get current price'}), 400
+        
+        result = analyzer.analyze_full_gex(symbol, current_price)
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Error in GEX analysis: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/earnings/status')
+def get_earnings_status():
+    """Get earnings monitoring status"""
+    try:
+        status = earnings_manager.get_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/earnings/toggle', methods=['POST'])
+def toggle_earnings():
+    """Toggle earnings monitoring"""
+    try:
+        data = request.json
+        enabled = data.get('enabled', False)
+        
+        earnings_manager.set_enabled(enabled)
+        
         return jsonify({
-            'symbol': symbol,
-            'alerts': alerts,
-            'count': len(alerts)
+            'success': True,
+            'enabled': enabled,
+            'status': earnings_manager.get_status()
         })
     except Exception as e:
-        return jsonify({'symbol': symbol, 'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
-
-@app.route('/api/unusual-activity/status')
-def get_unusual_activity_monitor_status():
-    """Get Unusual Activity monitor status"""
-    if not unusual_activity_monitor:
-        return jsonify({'enabled': False, 'error': 'Monitor not available'}), 503
+@app.route('/api/wall-strength/check', methods=['POST'])
+def check_wall_strength():
+    """Manual wall strength check"""
+    if not wall_strength_monitor:
+        return jsonify({'error': 'Wall strength monitor not available'}), 503
     
-    return jsonify({
-        'enabled': unusual_activity_monitor.enabled,
-        'check_interval': unusual_activity_monitor.check_interval,
-        'market_hours_only': unusual_activity_monitor.market_hours_only,
-        'cooldown_minutes': unusual_activity_monitor.cooldown_minutes,
-        'is_market_hours': unusual_activity_monitor.is_market_hours(),
-        'stats': unusual_activity_monitor.stats,
-        'detector_stats': analyzer.unusual_activity_detector.get_statistics()
-    })
-
+    try:
+        watchlist = watchlist_manager.load_symbols()
+        alerts_sent = wall_strength_monitor.run_single_check(watchlist)
+        return jsonify({
+            'success': True,
+            'alerts_sent': alerts_sent,
+            'stats': wall_strength_monitor.stats
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/unusual-activity/check', methods=['POST'])
-def trigger_unusual_activity_check():
-    """Manually trigger unusual activity check"""
+def check_unusual_activity():
+    """Manual unusual activity check"""
     if not unusual_activity_monitor:
-        return jsonify({'error': 'Monitor not available'}), 503
+        return jsonify({'error': 'Unusual activity monitor not available'}), 503
     
     try:
         watchlist = watchlist_manager.load_symbols()
@@ -677,11 +575,6 @@ def trigger_unusual_activity_check():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
-# ============================================================================
-# PIN PROBABILITY API ENDPOINTS (Feature #4)
-# ============================================================================
 
 @app.route('/api/pin-probability/<symbol>')
 def get_pin_probability(symbol):
@@ -697,7 +590,6 @@ def get_pin_probability(symbol):
                 'reason': 'Pin calculator not initialized'
             }), 503
         
-        # Get current price
         quote = analyzer.get_real_time_quote(symbol)
         current_price = quote.get('price', 0)
         
@@ -708,7 +600,6 @@ def get_pin_probability(symbol):
                 'reason': 'Unable to get current price'
             }), 400
         
-        # Get options data and GEX analysis
         gamma_data = analyzer.analyze_full_gex(symbol, current_price)
         
         if not gamma_data.get('available'):
@@ -718,7 +609,6 @@ def get_pin_probability(symbol):
                 'reason': 'No options data available'
             })
         
-        # Get options chain for max pain calculation
         options_data = analyzer.get_options_chain(symbol)
         
         if not options_data:
@@ -728,10 +618,8 @@ def get_pin_probability(symbol):
                 'reason': 'No options chain available'
             })
         
-        # Get expiration date from gamma data
         expiration = gamma_data.get('expiration', datetime.now().strftime('%Y%m%d'))
         
-        # Calculate pin probability
         result = pin_calculator.analyze_pin_probability(
             symbol,
             current_price,
@@ -750,11 +638,6 @@ def get_pin_probability(symbol):
             'error': str(e)
         }), 500
 
-
-# ============================================================================
-# CONFLUENCE ALERT SYSTEM API ENDPOINTS (Feature #5)
-# ============================================================================
-
 @app.route('/api/confluence/<symbol>')
 def get_confluence_analysis(symbol):
     """Get confluence analysis combining all signals"""
@@ -769,7 +652,6 @@ def get_confluence_analysis(symbol):
                 'reason': 'Confluence system not initialized'
             }), 503
         
-        # Get complete analysis (includes all signals)
         analysis_data = analyzer.generate_professional_signal(symbol)
         
         if not analysis_data:
@@ -779,7 +661,6 @@ def get_confluence_analysis(symbol):
                 'reason': 'Unable to analyze symbol'
             }), 400
         
-        # Analyze confluence
         result = confluence_system.analyze_confluence(symbol, analysis_data)
         
         return jsonify(result)
@@ -792,10 +673,60 @@ def get_confluence_analysis(symbol):
             'error': str(e)
         }), 500
 
+@app.route('/api/news-feed/all')
+def get_all_news():
+    """Get all news from cache (for news dashboard)"""
+    try:
+        if not alert_manager:
+            return jsonify({'error': 'Alert manager not available'}), 503
+        
+        # Get all symbols from watchlist
+        watchlist = watchlist_manager.load_symbols()
+        
+        news_data = {}
+        for symbol in watchlist:
+            news_list = alert_manager.get_symbol_news_history(symbol, hours=24)
+            if news_list:
+                news_data[symbol] = news_list
+        
+        return jsonify({
+            'success': True,
+            'news': news_data,
+            'symbols_count': len(news_data),
+            'total_articles': sum(len(items) for items in news_data.values())
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting news feed: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
-# ============================================================================
-# HEALTH CHECK
-# ============================================================================
+@app.route('/api/news-feed/<symbol>')
+def get_symbol_news(symbol):
+    """Get news history for specific symbol"""
+    try:
+        symbol = symbol.upper()
+        
+        if not alert_manager:
+            return jsonify({'error': 'Alert manager not available'}), 503
+        
+        hours = request.args.get('hours', 24, type=int)
+        news_list = alert_manager.get_symbol_news_history(symbol, hours=hours)
+        
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'news': news_list,
+            'count': len(news_list)
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting news for {symbol}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/news-dashboard')
+def news_dashboard():
+    """Serve news dashboard"""
+    return send_from_directory('../frontend', 'news_dashboard.html')
 
 @app.route('/api/health')
 def health_check():
@@ -804,9 +735,10 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '4.4-wall-strength-unusual-activity',
+        'version': '4.5-alert-console',
         'polygon_enabled': bool(POLYGON_API_KEY),
         'alerts_enabled': alert_manager is not None,
+        'config_manager_enabled': config_manager is not None,
         'earnings_monitoring': {
             'enabled': earnings_status['enabled'],
             'symbols_count': earnings_status['symbols_count']
@@ -835,17 +767,17 @@ def health_check():
         }
     })
 
-
 # ============================================================================
 # MAIN
 # ============================================================================
 
 if __name__ == '__main__':
     print("\n" + "=" * 60)
-    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.4")
-    print("   (WITH WALL STRENGTH + UNUSUAL ACTIVITY)")
+    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.5")
+    print("   (WITH ALERT CONSOLE + WALL STRENGTH + UNUSUAL ACTIVITY)")
     print("=" * 60)
     print(f"\n📊 Dashboard: http://localhost:5001")
+    print(f"⚙️  Alert Console: http://localhost:5001/alert-console")
     print(f"🩺 Health: http://localhost:5001/api/health")
     
     # Show earnings status
@@ -856,6 +788,26 @@ if __name__ == '__main__':
     # Schedule Sunday routine
     schedule_sunday_routine()
     
+    # ALERT CONSOLE: Initialize config routes with monitor instances
+    if CONFIG_MANAGER_AVAILABLE and config_manager:
+        monitor_instances = {
+            'realtime_volume': realtime_monitor,
+            'extended_hours': extended_hours_monitor,
+            'market_impact': market_impact_monitor,
+            'openai': openai_monitor,
+            'odte': odte_monitor,
+            'wall_strength': wall_strength_monitor,
+            'unusual_activity': unusual_activity_monitor,
+            'momentum': momentum_monitor
+        }
+        
+        init_config_routes(config_manager, alert_manager, monitor_instances)
+        logger.info("✅ Config routes initialized with monitor instances")
+        print(f"\n⚙️  Alert Console: READY")
+        print(f"   • Real-time configuration")
+        print(f"   • Test alerts")
+        print(f"   • Hot reload")
+    
     # Start alert system
     if alert_manager:
         print(f"\n📢 Starting Alert System...")
@@ -863,7 +815,7 @@ if __name__ == '__main__':
         alert_thread.start()
         print(f"   ✅ Alert system started")
     
-    # Start Wall Strength Monitor (NEW!)
+    # Start Wall Strength Monitor
     if wall_strength_monitor:
         print(f"\n📊 Starting Wall Strength Monitor...")
         wall_strength_thread = threading.Thread(target=run_wall_strength_monitor, daemon=True)
@@ -872,7 +824,7 @@ if __name__ == '__main__':
         print(f"   🕐 Tracks OI/Volume changes every 5 minutes")
         print(f"   📡 Routes to: DISCORD_ODTE_LEVELS")
     
-    # Start Unusual Activity Monitor (Feature 3)
+    # Start Unusual Activity Monitor
     if unusual_activity_monitor:
         print(f"\n🔍 Starting Unusual Activity Monitor...")
         unusual_activity_thread = threading.Thread(
@@ -890,6 +842,7 @@ if __name__ == '__main__':
     print(f"\n🎯 ACTIVE FEATURES:")
     print(f"   • Wall Strength Tracker - Monitors gamma walls")
     print(f"   • Unusual Activity Detector - Smart money tracking")
+    print(f"   • Alert Management Console - Real-time config")
     print(f"   • 5-minute monitoring during market hours")
     print("=" * 60 + "\n")
     

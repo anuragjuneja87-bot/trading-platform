@@ -28,19 +28,21 @@ class DiscordAlerter:
                 'earnings_realtime': self._expand_env_var(config.get('webhook_earnings_realtime')),
                 'market_impact': self._expand_env_var(config.get('webhook_market_impact')),
                 'volume_spike': self._expand_env_var(config.get('webhook_volume_spike')),
-                'odte_levels': self._expand_env_var(config.get('webhook_odte_levels'))
+                'odte_levels': self._expand_env_var(config.get('webhook_odte_levels')),
+                'news_alerts': self._expand_env_var(config.get('webhook_news_alerts')),
+                'openai_news': self._expand_env_var(config.get('webhook_openai_news'))
             }
             
             if webhook_url:
                 for channel in ['trading', 'news', 'earnings_weekly', 'earnings_realtime', 
-                               'market_impact', 'volume_spike', 'odte_levels']:
+                               'market_impact', 'volume_spike', 'odte_levels', 'news_alerts', 'openai_news']:
                     if not self.webhooks.get(channel):
                         self.webhooks[channel] = webhook_url
             
             if not webhook_url and 'webhook_url' in config:
                 fallback_webhook = self._expand_env_var(config.get('webhook_url'))
                 for channel in ['trading', 'news', 'earnings_weekly', 'earnings_realtime', 
-                               'market_impact', 'volume_spike', 'odte_levels']:
+                               'market_impact', 'volume_spike', 'odte_levels', 'news_alerts', 'openai_news']:
                     if not self.webhooks.get(channel):
                         self.webhooks[channel] = fallback_webhook
         else:
@@ -51,7 +53,9 @@ class DiscordAlerter:
                 'earnings_realtime': webhook_url,
                 'market_impact': webhook_url,
                 'volume_spike': webhook_url,
-                'odte_levels': webhook_url
+                'odte_levels': webhook_url,
+                'news_alerts': webhook_url,
+                'openai_news': webhook_url
             }
         
         active_channels = []
@@ -578,7 +582,7 @@ class DiscordAlerter:
         return self.send_trading_signal(analysis)
     
     def send_news_alert(self, symbol: str, news_data: Dict) -> bool:
-        """Send news alert"""
+        """Send news alert - CLEAN 4-FIELD FORMAT"""
         sentiment = news_data.get('sentiment', 'NEUTRAL')
         
         if 'POSITIVE' in sentiment:
@@ -591,30 +595,39 @@ class DiscordAlerter:
             color = 0x666666
             emoji = '📰'
         
+        headlines = news_data.get('headlines', [])
+        article_urls = news_data.get('article_urls', [])
+        
+        # Build title: Symbol - Sentiment
+        title = f"{emoji} {symbol} - {sentiment}"
+        
+        # Description: Article count + time
+        article_count = len(headlines)
+        time_str = datetime.now().strftime('%I:%M %p ET')
+        description = f"**{article_count} new article{'s' if article_count != 1 else ''}** at {time_str}"
+        
         embed = {
-            'title': f"{emoji} News Alert - {symbol}",
+            'title': title,
+            'description': description,
             'color': color,
             'timestamp': datetime.utcnow().isoformat(),
-            'fields': [
-                {
-                    'name': '📰 Sentiment Analysis',
-                    'value': (
-                        f"**Sentiment:** {sentiment}\n"
-                        f"**Impact:** {news_data.get('news_impact', 'N/A')}\n"
-                        f"**Urgency:** {news_data.get('urgency', 'N/A')}\n"
-                        f"**Score:** {news_data.get('sentiment_score', 0)}"
-                    ),
-                    'inline': False
-                }
-            ]
+            'fields': []
         }
         
-        headlines = news_data.get('headlines', [])
+        # Make headlines clickable
         if headlines:
-            headline_text = '\n'.join([f"• {h[:120]}..." for h in headlines[:3]])
+            headline_links = []
+            for i, (headline, url) in enumerate(zip(headlines[:3], article_urls[:3]), 1):
+                if url:
+                    # Clickable markdown link
+                    headline_links.append(f"{i}. [{headline[:80]}...]({url})")
+                else:
+                    # Plain text if no URL
+                    headline_links.append(f"{i}. {headline[:80]}...")
+            
             embed['fields'].append({
-                'name': '🗞️ Latest Headlines',
-                'value': headline_text,
+                'name': '📰 Headlines',
+                'value': '\n'.join(headline_links),
                 'inline': False
             })
         
@@ -849,3 +862,177 @@ class DiscordAlerter:
         
         payload = {'embeds': [embed]}
         return self._send_webhook('earnings_realtime', payload)
+    
+    def send_ai_news_alert(self, alert_data: Dict) -> bool:
+        """
+        Send AI sector news alert to #openai-news channel
+        
+        Args:
+            alert_data: Dict with topic, emoji, urgency, articles
+        
+        Returns:
+            Success boolean
+        """
+        topic = alert_data.get('topic', 'AI News')
+        emoji = alert_data.get('emoji', '🤖')
+        urgency = alert_data.get('urgency', 'MEDIUM')
+        articles = alert_data.get('articles', [])
+        article_count = alert_data.get('article_count', len(articles))
+        
+        # Build embed
+        title = f"{emoji} {topic} Update"
+        
+        description = f"**{article_count} new article{'s' if article_count != 1 else ''}**\n\n"
+        
+        # Add articles
+        for i, article in enumerate(articles[:5], 1):
+            article_title = article.get('title', 'No title')
+            article_url = article.get('url', '')
+            
+            if article_url:
+                description += f"{i}. [{article_title}]({article_url})\n"
+            else:
+                description += f"{i}. {article_title}\n"
+        
+        # Color based on urgency
+        color_map = {
+            'CRITICAL': 0xFF0000,  # Red
+            'HIGH': 0xFFA500,      # Orange
+            'MEDIUM': 0x00FF00,    # Green
+            'LOW': 0x808080        # Gray
+        }
+        color = color_map.get(urgency, 0x00FF00)
+        
+        payload = {
+            "embeds": [{
+                "title": title,
+                "description": description,
+                "color": color,
+                "footer": {
+                    "text": f"AI News Monitor • {datetime.now().strftime('%I:%M %p ET')}"
+                }
+            }]
+        }
+        
+        # Route to appropriate channel
+        # Try openai-specific channel first, fallback to news
+        channel = 'openai_news' if 'openai_news' in self.webhooks else 'news'
+        
+        return self._send_webhook(channel, payload)
+    
+    def send_macro_news_alert(self, alert_data: Dict) -> bool:
+        """
+        Send macro/critical news alert to #news-alerts channel
+        
+        Args:
+            alert_data: Dict with category, priority, title, url
+        
+        Returns:
+            Success boolean
+        """
+        category = alert_data.get('category', 'MACRO')
+        emoji = alert_data.get('emoji', '🔴')
+        priority = alert_data.get('priority', 'HIGH')
+        title = alert_data.get('title', '')
+        url = alert_data.get('url', '')
+        teaser = alert_data.get('teaser', '')
+        source = alert_data.get('source', 'News')
+        
+        # Build embed
+        embed_title = f"{emoji} CRITICAL - {category}"
+        
+        description = f"**{title}**\n\n"
+        
+        if teaser:
+            description += f"{teaser[:200]}...\n\n"
+        
+        if url:
+            description += f"[Read Full Article]({url})\n\n"
+        
+        # Add action items based on category
+        action_map = {
+            'FED': '📌 Check all positions\n📌 Monitor volatility\n📌 Adjust risk',
+            'TARIFFS': '📌 Review exposed positions\n📌 Check sector impact\n📌 Monitor USD',
+            'ECONOMIC_DATA': '📌 Check market reaction\n📌 Monitor sector rotation',
+            'MARKET_EVENTS': '📌 IMMEDIATE ACTION REQUIRED\n📌 Check stop losses\n📌 Reduce exposure',
+            'GEOPOLITICAL': '📌 Monitor safe havens\n📌 Check sector exposure'
+        }
+        
+        actions = action_map.get(category, '📌 Monitor market reaction')
+        description += f"**Action Items:**\n{actions}"
+        
+        # Color: Red for CRITICAL
+        color = 0xFF0000 if priority == 'CRITICAL' else 0xFFA500
+        
+        payload = {
+            "embeds": [{
+                "title": embed_title,
+                "description": description,
+                "color": color,
+                "footer": {
+                    "text": f"{source} • {datetime.now().strftime('%I:%M %p ET')}"
+                }
+            }]
+        }
+        
+        # Route to news_alerts or market_impact channel
+        channel = 'news_alerts' if 'news_alerts' in self.webhooks else 'market_impact'
+        
+        return self._send_webhook(channel, payload)
+    
+    def send_spillover_alert(self, alert_data: Dict) -> bool:
+        """
+        Send spillover opportunity alert to #news-alerts channel
+        
+        Args:
+            alert_data: Dict with primary_ticker, article, opportunities
+        
+        Returns:
+            Success boolean
+        """
+        primary_ticker = alert_data.get('primary_ticker', '')
+        article = alert_data.get('article', {})
+        opportunities = alert_data.get('opportunities', [])
+        
+        # Build embed
+        title = f"🔄 SPILLOVER OPPORTUNITY - {', '.join([o['ticker'] for o in opportunities])}"
+        
+        description = f"**Primary News: {primary_ticker}**\n"
+        description += f"{article.get('title', '')}\n\n"
+        
+        description += f"**Spillover Impact:**\n"
+        for opp in opportunities:
+            ticker = opp['ticker']
+            volume_data = opp.get('volume_data', {})
+            rvol = volume_data.get('rvol', 0)
+            price = volume_data.get('price', 0)
+            
+            description += f"• **{ticker}** - RVOL: {rvol}x"
+            if price:
+                description += f", Price: ${price:.2f}"
+            description += "\n"
+        
+        description += f"\n**Action:**\n"
+        description += f"✅ Check entry opportunities\n"
+        description += f"✅ Monitor for continuation\n"
+        description += f"✅ Consider adding to watchlist\n"
+        
+        article_url = article.get('url', '')
+        if article_url:
+            description += f"\n[Read Full Article]({article_url})"
+        
+        payload = {
+            "embeds": [{
+                "title": title,
+                "description": description,
+                "color": 0x00BFFF,  # Deep Sky Blue
+                "footer": {
+                    "text": f"Spillover Detector • {datetime.now().strftime('%I:%M %p ET')}"
+                }
+            }]
+        }
+        
+        # Route to news_alerts or market_impact
+        channel = 'news_alerts' if 'news_alerts' in self.webhooks else 'market_impact'
+        
+        return self._send_webhook(channel, payload)

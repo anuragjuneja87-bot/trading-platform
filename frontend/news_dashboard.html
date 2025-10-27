@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Feed Dashboard - Last 24 Hours</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            background: #000000;
+            color: #00ff00;
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        .header {
+            background: #0a0a0a;
+            padding: 20px;
+            border: 2px solid #00ff00;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #00ff00;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .refresh-btn {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            font-size: 13px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .filters {
+            background: #0a0a0a;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-group label {
+            color: #ffff00;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .filter-btn {
+            background: #1a1a1a;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 11px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            background: #003300;
+        }
+
+        .filter-btn.active {
+            background: #00ff00;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .stats {
+            background: #0a0a0a;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            color: #00ff00;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .news-grid {
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #001100;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 15px 12px;
+            text-align: left;
+            border-bottom: 2px solid #00ff00;
+            color: #ffff00;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #222;
+        }
+
+        tbody tr {
+            transition: background 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background: #001100;
+        }
+
+        .symbol-cell {
+            font-weight: bold;
+            font-size: 15px;
+            color: #00ffff;
+            width: 80px;
+        }
+
+        .sentiment-cell {
+            width: 120px;
+        }
+
+        .sentiment-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .sentiment-very-positive {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .sentiment-positive {
+            background: #006600;
+            color: #00ff00;
+        }
+
+        .sentiment-neutral {
+            background: #333;
+            color: #999;
+        }
+
+        .sentiment-negative {
+            background: #660000;
+            color: #ff0000;
+        }
+
+        .sentiment-very-negative {
+            background: #ff0000;
+            color: #fff;
+        }
+
+        .headlines-cell {
+            width: 60%;
+        }
+
+        .headline-item {
+            margin-bottom: 10px;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        .headline-item:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #00ff00;
+        }
+
+        .headline-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .headline-link {
+            color: #00ccff;
+            text-decoration: none;
+            transition: color 0.2s ease;
+            line-height: 1.5;
+        }
+
+        .headline-link:hover {
+            color: #00ffff;
+            text-decoration: underline;
+        }
+
+        .time-cell {
+            width: 100px;
+            color: #888;
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .time-recent {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        .no-news {
+            padding: 40px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #ffff00;
+            font-size: 14px;
+        }
+
+        .error {
+            background: #330000;
+            border: 1px solid #ff0000;
+            padding: 20px;
+            margin: 20px 0;
+            color: #ff0000;
+            border-radius: 4px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .updating {
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📰 News Feed - Last 24 Hours</h1>
+        <button class="refresh-btn" onclick="refreshNews()">🔄 Refresh</button>
+    </div>
+
+    <div class="filters">
+        <div class="filter-group">
+            <label>Sentiment:</label>
+            <button class="filter-btn active" data-filter="all" onclick="filterBySentiment('all')">All</button>
+            <button class="filter-btn" data-filter="positive" onclick="filterBySentiment('positive')">Positive</button>
+            <button class="filter-btn" data-filter="negative" onclick="filterBySentiment('negative')">Negative</button>
+            <button class="filter-btn" data-filter="neutral" onclick="filterBySentiment('neutral')">Neutral</button>
+        </div>
+        <div class="filter-group">
+            <label>Time:</label>
+            <button class="filter-btn active" data-time="24" onclick="filterByTime(24)">24h</button>
+            <button class="filter-btn" data-time="12" onclick="filterByTime(12)">12h</button>
+            <button class="filter-btn" data-time="6" onclick="filterByTime(6)">6h</button>
+            <button class="filter-btn" data-time="1" onclick="filterByTime(1)">1h</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <span class="stat-label">Total Symbols</span>
+            <span class="stat-value" id="stat-symbols">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Total Articles</span>
+            <span class="stat-value" id="stat-articles">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Positive</span>
+            <span class="stat-value" id="stat-positive" style="color: #00ff00;">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Negative</span>
+            <span class="stat-value" id="stat-negative" style="color: #ff0000;">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Last Update</span>
+            <span class="stat-value" id="stat-updated" style="font-size: 13px;">-</span>
+        </div>
+    </div>
+
+    <div class="news-grid">
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Sentiment</th>
+                    <th>Headlines (Last 24h)</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody id="news-tbody">
+                <tr>
+                    <td colspan="4" class="loading">Loading news feed...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let allNews = {};
+        let currentSentimentFilter = 'all';
+        let currentTimeFilter = 24;
+
+        async function loadNews() {
+            const tbody = document.getElementById('news-tbody');
+            tbody.innerHTML = '<tr><td colspan="4" class="loading updating">Loading news feed...</td></tr>';
+
+            try {
+                const response = await fetch('/api/news-feed/all');
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                allNews = data.news || {};
+                renderNews();
+                updateStats();
+
+            } catch (error) {
+                console.error('Error loading news:', error);
+                tbody.innerHTML = `<tr><td colspan="4" class="error">Error loading news: ${error.message}</td></tr>`;
+            }
+        }
+
+        function renderNews() {
+            const tbody = document.getElementById('news-tbody');
+            tbody.innerHTML = '';
+
+            const symbols = Object.keys(allNews).sort();
+
+            if (symbols.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-news">No news in the last 24 hours</td></tr>';
+                return;
+            }
+
+            let visibleCount = 0;
+
+            for (const symbol of symbols) {
+                const newsItems = filterNewsItems(allNews[symbol]);
+
+                if (newsItems.length === 0) continue;
+
+                const row = document.createElement('tr');
+
+                // Symbol
+                const symbolCell = document.createElement('td');
+                symbolCell.className = 'symbol-cell';
+                symbolCell.textContent = symbol;
+                row.appendChild(symbolCell);
+
+                // Sentiment (from first news item)
+                const sentimentCell = document.createElement('td');
+                sentimentCell.className = 'sentiment-cell';
+                const sentiment = newsItems[0].sentiment || 'NEUTRAL';
+                const sentimentClass = sentiment.toLowerCase().replace(/\s+/g, '-');
+                sentimentCell.innerHTML = `<span class="sentiment-badge sentiment-${sentimentClass}">${sentiment}</span>`;
+                row.appendChild(sentimentCell);
+
+                // Headlines
+                const headlinesCell = document.createElement('td');
+                headlinesCell.className = 'headlines-cell';
+                
+                const headlinesHtml = newsItems.map(item => {
+                    const url = item.url || '#';
+                    const headline = item.headline || 'No headline';
+                    return `<div class="headline-item"><a href="${url}" target="_blank" class="headline-link">${headline}</a></div>`;
+                }).join('');
+                
+                headlinesCell.innerHTML = headlinesHtml;
+                row.appendChild(headlinesCell);
+
+                // Time (most recent)
+                const timeCell = document.createElement('td');
+                timeCell.className = 'time-cell';
+                const timeStr = newsItems[0].time_str || '';
+                const isRecent = isRecentTime(newsItems[0].timestamp);
+                timeCell.className = isRecent ? 'time-cell time-recent' : 'time-cell';
+                timeCell.textContent = timeStr;
+                row.appendChild(timeCell);
+
+                tbody.appendChild(row);
+                visibleCount++;
+            }
+
+            if (visibleCount === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-news">No news matching current filters</td></tr>';
+            }
+        }
+
+        function filterNewsItems(items) {
+            let filtered = items;
+
+            // Filter by time
+            if (currentTimeFilter < 24) {
+                const cutoffTime = new Date(Date.now() - currentTimeFilter * 60 * 60 * 1000);
+                filtered = filtered.filter(item => {
+                    const itemTime = new Date(item.timestamp);
+                    return itemTime > cutoffTime;
+                });
+            }
+
+            // Filter by sentiment
+            if (currentSentimentFilter !== 'all') {
+                filtered = filtered.filter(item => {
+                    const sentiment = (item.sentiment || 'NEUTRAL').toLowerCase();
+                    if (currentSentimentFilter === 'positive') {
+                        return sentiment.includes('positive');
+                    } else if (currentSentimentFilter === 'negative') {
+                        return sentiment.includes('negative');
+                    } else if (currentSentimentFilter === 'neutral') {
+                        return sentiment === 'neutral';
+                    }
+                    return true;
+                });
+            }
+
+            return filtered;
+        }
+
+        function isRecentTime(timestamp) {
+            const itemTime = new Date(timestamp);
+            const now = new Date();
+            const hoursDiff = (now - itemTime) / (1000 * 60 * 60);
+            return hoursDiff < 1;
+        }
+
+        function updateStats() {
+            const symbols = Object.keys(allNews);
+            let totalArticles = 0;
+            let positiveCount = 0;
+            let negativeCount = 0;
+
+            for (const symbol of symbols) {
+                const items = filterNewsItems(allNews[symbol]);
+                totalArticles += items.length;
+
+                for (const item of items) {
+                    const sentiment = (item.sentiment || 'NEUTRAL').toLowerCase();
+                    if (sentiment.includes('positive')) {
+                        positiveCount++;
+                    } else if (sentiment.includes('negative')) {
+                        negativeCount++;
+                    }
+                }
+            }
+
+            document.getElementById('stat-symbols').textContent = symbols.length;
+            document.getElementById('stat-articles').textContent = totalArticles;
+            document.getElementById('stat-positive').textContent = positiveCount;
+            document.getElementById('stat-negative').textContent = negativeCount;
+            document.getElementById('stat-updated').textContent = new Date().toLocaleTimeString();
+        }
+
+        function filterBySentiment(sentiment) {
+            currentSentimentFilter = sentiment;
+
+            // Update button states
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.filter === sentiment) {
+                    btn.classList.add('active');
+                }
+            });
+
+            renderNews();
+            updateStats();
+        }
+
+        function filterByTime(hours) {
+            currentTimeFilter = hours;
+
+            // Update button states
+            document.querySelectorAll('[data-time]').forEach(btn => {
+                btn.classList.remove('active');
+                if (parseInt(btn.dataset.time) === hours) {
+                    btn.classList.add('active');
+                }
+            });
+
+            renderNews();
+            updateStats();
+        }
+
+        function refreshNews() {
+            loadNews();
+        }
+
+        // Auto-refresh every 5 minutes
+        setInterval(loadNews, 5 * 60 * 1000);
+
+        // Initial load
+        loadNews();
+    </script>
+</body>
+</html>

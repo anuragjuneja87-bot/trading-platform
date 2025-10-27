@@ -50,6 +50,8 @@ discord:
   webhook_volume_spike: ${DISCORD_VOLUME_SPIKE}
   webhook_momentum_signals: ${DISCORD_MOMENTUM_SIGNALS}
   webhook_odte_levels: ${DISCORD_ODTE_LEVELS}
+  webhook_news_alerts: ${DISCORD_NEWS_ALERTS}
+  webhook_openai_news: ${DISCORD_OPENAI_NEWS}
   
   # Legacy single webhook (for backward compatibility)
   webhook_url: ${DISCORD_WEBHOOK_URL}

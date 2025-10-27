@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert Management Console</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            background: #000000;
+            color: #00ff00;
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        .header {
+            background: #0a0a0a;
+            padding: 20px;
+            border: 2px solid #00ff00;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #00ff00;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            background: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            border-radius: 3px;
+            font-size: 12px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #004400;
+            transform: translateY(-1px);
+        }
+
+        .btn.primary {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .btn.primary:hover {
+            background: #00cc00;
+        }
+
+        .btn.danger {
+            background: #330000;
+            color: #ff0000;
+            border-color: #ff0000;
+        }
+
+        .btn.danger:hover {
+            background: #440000;
+        }
+
+        .btn.warning {
+            background: #333300;
+            color: #ffff00;
+            border-color: #ffff00;
+        }
+
+        .btn.warning:hover {
+            background: #444400;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #00ff00;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            background: #0a0a0a;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-bottom: none;
+            padding: 12px 25px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            font-size: 12px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            background: #001a00;
+        }
+
+        .tab.active {
+            background: #00ff00;
+            color: #000;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .monitor-card {
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .monitor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #003300;
+        }
+
+        .monitor-title {
+            font-size: 16px;
+            color: #00ff00;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .monitor-status {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #330000;
+            border: 1px solid #ff0000;
+            transition: .3s;
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 3px;
+            background-color: #ff0000;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #003300;
+            border-color: #00ff00;
+        }
+
+        input:checked + .slider:before {
+            background-color: #00ff00;
+            transform: translateX(30px);
+        }
+
+        .discord-channel {
+            font-size: 11px;
+            color: #5865F2;
+            background: #0a0a0a;
+            padding: 5px 10px;
+            border-radius: 3px;
+            border: 1px solid #5865F2;
+        }
+
+        .stats-badge {
+            font-size: 10px;
+            color: #ffff00;
+            background: #333300;
+            padding: 4px 8px;
+            border-radius: 3px;
+            border: 1px solid #ffff00;
+        }
+
+        .control-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-label {
+            color: #00ff00;
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .control-input {
+            background: #000000;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 13px;
+            border-radius: 3px;
+        }
+
+        .control-input:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 5px #00ff00;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-input {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #003300;
+            border: 1px solid #00ff00;
+            outline: none;
+            border-radius: 5px;
+        }
+
+        .slider-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00ff00;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .slider-input::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #00ff00;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .slider-value {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #00ff00;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #003300;
+        }
+
+        .info-box {
+            background: #001a00;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            border-radius: 3px;
+            margin-bottom: 20px;
+        }
+
+        .info-box h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .info-box p {
+            color: #00cc00;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .global-actions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00ff00;
+            color: #000;
+            padding: 15px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            z-index: 2000;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .notification.error {
+            background: #ff0000;
+            color: #fff;
+        }
+
+        .notification.warning {
+            background: #ffff00;
+            color: #000;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .subsection {
+            background: #001100;
+            border-left: 3px solid #00ff00;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .subsection-title {
+            color: #00ff00;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        select.control-input {
+            cursor: pointer;
+        }
+
+        .help-text {
+            font-size: 10px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>⚙️ ALERT MANAGEMENT CONSOLE</h1>
+            <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                Real-time alert configuration and monitoring
+            </div>
+        </div>
+        <div class="header-controls">
+            <button class="btn" onclick="loadConfig()">🔄 RELOAD</button>
+            <button class="btn primary" onclick="saveAllConfig()">💾 SAVE ALL</button>
+            <button class="btn danger" onclick="resetToDefaults()">⚠️ RESET</button>
+        </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="info-box">
+        <h3>📋 Quick Guide</h3>
+        <p>
+            Toggle monitors ON/OFF, adjust thresholds with sliders, and test alerts in real-time.
+            Changes are saved to config.yaml and applied immediately. Discord channels show where alerts are routed.
+            Use SAVE ALL to persist changes or RESET to restore defaults.
+        </p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('volume')">📊 VOLUME</button>
+        <button class="tab" onclick="switchTab('news')">📰 NEWS</button>
+        <button class="tab" onclick="switchTab('gamma')">🎯 GAMMA</button>
+        <button class="tab" onclick="switchTab('momentum')">⚡ MOMENTUM</button>
+        <button class="tab" onclick="switchTab('global')">🌐 GLOBAL</button>
+    </div>
+
+    <!-- VOLUME TAB -->
+    <div id="volume-tab" class="tab-content active">
+        
+        <!-- Realtime Volume Spike Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🔴 Realtime Volume Spike Monitor</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#volume-spike</span>
+                    <span class="stats-badge" id="realtime-volume-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="realtime-volume-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (seconds)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="realtime-volume-interval" 
+                               min="5" max="60" value="10" step="5">
+                        <div class="slider-value">
+                            <span>5s (fastest)</span>
+                            <span id="realtime-volume-interval-val">10s</span>
+                            <span>60s (slowest)</span>
+                        </div>
+                    </div>
+                    <div class="help-text">How often to scan for volume spikes</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">RVOL Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="realtime-volume-rvol" 
+                               min="1.0" max="5.0" value="1.5" step="0.1">
+                        <div class="slider-value">
+                            <span>1.0x</span>
+                            <span id="realtime-volume-rvol-val">1.5x</span>
+                            <span>5.0x</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Minimum relative volume to trigger alert</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Price Change Filter (%)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="realtime-volume-price" 
+                               min="0" max="2.0" value="0.3" step="0.1">
+                        <div class="slider-value">
+                            <span>0%</span>
+                            <span id="realtime-volume-price-val">0.3%</span>
+                            <span>2.0%</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Minimum price movement required</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Cooldown (minutes)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="realtime-volume-cooldown" 
+                               min="1" max="15" value="2" step="1">
+                        <div class="slider-value">
+                            <span>1min</span>
+                            <span id="realtime-volume-cooldown-val">2min</span>
+                            <span>15min</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Time between alerts for same symbol</div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('realtime_volume')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('realtime_volume')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('realtime_volume')">📊 View Stats</button>
+            </div>
+        </div>
+
+        <!-- Extended Hours Volume Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🌙 Extended Hours Volume Monitor</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#volume-spike</span>
+                    <span class="stats-badge" id="extended-hours-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="extended-hours-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (seconds)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="extended-hours-interval" 
+                               min="60" max="300" value="180" step="30">
+                        <div class="slider-value">
+                            <span>60s</span>
+                            <span id="extended-hours-interval-val">180s</span>
+                            <span>300s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Spike Threshold (RVOL)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="extended-hours-threshold" 
+                               min="2.0" max="6.0" value="3.0" step="0.5">
+                        <div class="slider-value">
+                            <span>2.0x</span>
+                            <span id="extended-hours-threshold-val">3.0x</span>
+                            <span>6.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Cooldown (minutes)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="extended-hours-cooldown" 
+                               min="5" max="60" value="10" step="5">
+                        <div class="slider-value">
+                            <span>5min</span>
+                            <span id="extended-hours-cooldown-val">10min</span>
+                            <span>60min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="subsection">
+                <div class="subsection-title">Session Times (ET)</div>
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label">Pre-Market Start</label>
+                        <input type="time" class="control-input" id="premarket-start" value="04:00">
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Pre-Market End</label>
+                        <input type="time" class="control-input" id="premarket-end" value="09:30">
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">After-Hours Start</label>
+                        <input type="time" class="control-input" id="afterhours-start" value="16:00">
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">After-Hours End</label>
+                        <input type="time" class="control-input" id="afterhours-end" value="20:00">
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('extended_hours')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('extended_hours')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('extended_hours')">📊 View Stats</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- NEWS TAB -->
+    <div id="news-tab" class="tab-content">
+        
+        <!-- Market Impact Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🚨 Market Impact Monitor</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#news-alerts</span>
+                    <span class="stats-badge" id="market-impact-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="market-impact-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (seconds)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="market-impact-interval" 
+                               min="30" max="300" value="60" step="30">
+                        <div class="slider-value">
+                            <span>30s</span>
+                            <span id="market-impact-interval-val">60s</span>
+                            <span>300s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Min Impact Score (0-10)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="market-impact-score" 
+                               min="5.0" max="10.0" value="7.0" step="0.5">
+                        <div class="slider-value">
+                            <span>5.0</span>
+                            <span id="market-impact-score-val">7.0</span>
+                            <span>10.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Lookback Hours</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="market-impact-lookback" 
+                               min="1" max="6" value="2" step="1">
+                        <div class="slider-value">
+                            <span>1h</span>
+                            <span id="market-impact-lookback-val">2h</span>
+                            <span>6h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Max Alerts Per Hour</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="market-impact-max-alerts" 
+                               min="5" max="30" value="20" step="5">
+                        <div class="slider-value">
+                            <span>5</span>
+                            <span id="market-impact-max-alerts-val">20</span>
+                            <span>30</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="subsection">
+                <div class="subsection-title">Volume Confirmation</div>
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label">Enable Volume Confirmation</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="market-impact-vol-confirm" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Min RVOL</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider-input" id="market-impact-min-rvol" 
+                                   min="1.0" max="5.0" value="2.0" step="0.5">
+                            <div class="slider-value">
+                                <span>1.0x</span>
+                                <span id="market-impact-min-rvol-val">2.0x</span>
+                                <span>5.0x</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Critical RVOL</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider-input" id="market-impact-crit-rvol" 
+                                   min="2.0" max="6.0" value="3.0" step="0.5">
+                            <div class="slider-value">
+                                <span>2.0x</span>
+                                <span id="market-impact-crit-rvol-val">3.0x</span>
+                                <span>6.0x</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('market_impact')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('market_impact')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('market_impact')">📊 View Stats</button>
+            </div>
+        </div>
+
+        <!-- OpenAI News Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🤖 OpenAI News Monitor</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#openai-news</span>
+                    <span class="stats-badge" id="openai-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="openai-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (seconds)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="openai-interval" 
+                               min="30" max="300" value="60" step="30">
+                        <div class="slider-value">
+                            <span>30s</span>
+                            <span id="openai-interval-val">60s</span>
+                            <span>300s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Min RVOL for Alert</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="openai-min-rvol" 
+                               min="1.0" max="4.0" value="1.5" step="0.5">
+                        <div class="slider-value">
+                            <span>1.0x</span>
+                            <span id="openai-min-rvol-val">1.5x</span>
+                            <span>4.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Critical RVOL</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="openai-crit-rvol" 
+                               min="2.0" max="5.0" value="2.5" step="0.5">
+                        <div class="slider-value">
+                            <span>2.0x</span>
+                            <span id="openai-crit-rvol-val">2.5x</span>
+                            <span>5.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Max Alerts Per Hour</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="openai-max-alerts" 
+                               min="5" max="20" value="10" step="5">
+                        <div class="slider-value">
+                            <span>5</span>
+                            <span id="openai-max-alerts-val">10</span>
+                            <span>20</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('openai')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('openai')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('openai')">📊 View Stats</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- GAMMA TAB -->
+    <div id="gamma-tab" class="tab-content">
+        
+        <!-- 0DTE Gamma Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🎯 0DTE Gamma Level Monitor</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#odte-levels</span>
+                    <span class="stats-badge" id="odte-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="odte-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Alert Time (ET)</label>
+                    <input type="time" class="control-input" id="odte-alert-time" value="08:45">
+                    <div class="help-text">When to send gamma wall proximity alerts</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Alert Window (minutes)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="odte-window" 
+                               min="15" max="90" value="50" step="5">
+                        <div class="slider-value">
+                            <span>15min</span>
+                            <span id="odte-window-val">50min</span>
+                            <span>90min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Min Proximity (%)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="odte-min-prox" 
+                               min="0.1" max="2.0" value="0.5" step="0.1">
+                        <div class="slider-value">
+                            <span>0.1%</span>
+                            <span id="odte-min-prox-val">0.5%</span>
+                            <span>2.0%</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Minimum distance from gamma wall to alert</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Max Proximity (%)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="odte-max-prox" 
+                               min="1.0" max="5.0" value="3.0" step="0.5">
+                        <div class="slider-value">
+                            <span>1.0%</span>
+                            <span id="odte-max-prox-val">3.0%</span>
+                            <span>5.0%</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Maximum distance from gamma wall to alert</div>
+                </div>
+            </div>
+
+            <div class="subsection">
+                <div class="subsection-title">Filters</div>
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label">Weekdays Only</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="odte-weekdays" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Watchlist Only</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="odte-watchlist" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Require 0DTE Options</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="odte-require" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('odte')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('odte')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('odte')">📊 View Stats</button>
+            </div>
+        </div>
+
+        <!-- Wall Strength Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">📊 Wall Strength Tracker</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#odte-levels</span>
+                    <span class="stats-badge" id="wall-strength-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wall-strength-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (minutes)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="wall-strength-interval" 
+                               min="1" max="15" value="5" step="1">
+                        <div class="slider-value">
+                            <span>1min</span>
+                            <span id="wall-strength-interval-val">5min</span>
+                            <span>15min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Building Cooldown (min)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="wall-strength-building" 
+                               min="5" max="30" value="10" step="5">
+                        <div class="slider-value">
+                            <span>5min</span>
+                            <span id="wall-strength-building-val">10min</span>
+                            <span>30min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Weakening Cooldown (min)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="wall-strength-weakening" 
+                               min="3" max="20" value="7" step="1">
+                        <div class="slider-value">
+                            <span>3min</span>
+                            <span id="wall-strength-weakening-val">7min</span>
+                            <span>20min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Broken Cooldown (min)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="wall-strength-broken" 
+                               min="1" max="10" value="3" step="1">
+                        <div class="slider-value">
+                            <span>1min</span>
+                            <span id="wall-strength-broken-val">3min</span>
+                            <span>10min</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Urgent alerts - shortest cooldown</div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('wall_strength')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('wall_strength')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('wall_strength')">📊 View Stats</button>
+            </div>
+        </div>
+
+        <!-- Unusual Activity Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🔍 Unusual Activity Detector</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#unusual-activity</span>
+                    <span class="stats-badge" id="unusual-activity-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="unusual-activity-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (seconds)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="unusual-activity-interval" 
+                               min="60" max="600" value="300" step="60">
+                        <div class="slider-value">
+                            <span>60s</span>
+                            <span id="unusual-activity-interval-val">300s</span>
+                            <span>600s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">OI Spike Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="unusual-activity-oi" 
+                               min="2.0" max="6.0" value="3.0" step="0.5">
+                        <div class="slider-value">
+                            <span>2.0x</span>
+                            <span id="unusual-activity-oi-val">3.0x</span>
+                            <span>6.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Volume Spike Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="unusual-activity-vol" 
+                               min="3.0" max="8.0" value="5.0" step="0.5">
+                        <div class="slider-value">
+                            <span>3.0x</span>
+                            <span id="unusual-activity-vol-val">5.0x</span>
+                            <span>8.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Cooldown (minutes)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="unusual-activity-cooldown" 
+                               min="5" max="60" value="15" step="5">
+                        <div class="slider-value">
+                            <span>5min</span>
+                            <span id="unusual-activity-cooldown-val">15min</span>
+                            <span>60min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('unusual_activity')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('unusual_activity')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('unusual_activity')">📊 View Stats</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MOMENTUM TAB -->
+    <div id="momentum-tab" class="tab-content">
+        
+        <!-- Momentum Signal Monitor -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">⚡ Momentum Signal Monitor</div>
+                <div class="monitor-status">
+                    <span class="discord-channel">#momentum-signals</span>
+                    <span class="stats-badge" id="momentum-stats">0 alerts today</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="momentum-enabled" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Check Interval (seconds)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="momentum-interval" 
+                               min="30" max="300" value="60" step="30">
+                        <div class="slider-value">
+                            <span>30s</span>
+                            <span id="momentum-interval-val">60s</span>
+                            <span>300s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Min RVOL</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="momentum-min-rvol" 
+                               min="1.5" max="4.0" value="2.5" step="0.5">
+                        <div class="slider-value">
+                            <span>1.5x</span>
+                            <span id="momentum-min-rvol-val">2.5x</span>
+                            <span>4.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Extreme RVOL</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="momentum-extreme-rvol" 
+                               min="3.0" max="6.0" value="4.0" step="0.5">
+                        <div class="slider-value">
+                            <span>3.0x</span>
+                            <span id="momentum-extreme-rvol-val">4.0x</span>
+                            <span>6.0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Min Dark Pool Strength (0-6)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="momentum-dp-strength" 
+                               min="0" max="6" value="4" step="1">
+                        <div class="slider-value">
+                            <span>0</span>
+                            <span id="momentum-dp-strength-val">4</span>
+                            <span>6</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="subsection">
+                <div class="subsection-title">Cooldowns (minutes)</div>
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label">Momentum Signal</label>
+                        <input type="number" class="control-input" id="momentum-cooldown-signal" 
+                               value="15" min="5" max="60">
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Gamma Approach</label>
+                        <input type="number" class="control-input" id="momentum-cooldown-gamma" 
+                               value="10" min="3" max="30">
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Dark Pool Flip</label>
+                        <input type="number" class="control-input" id="momentum-cooldown-flip" 
+                               value="5" min="1" max="20">
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Extreme Setup</label>
+                        <input type="number" class="control-input" id="momentum-cooldown-extreme" 
+                               value="30" min="15" max="60">
+                    </div>
+                </div>
+            </div>
+
+            <div class="subsection">
+                <div class="subsection-title">Advanced Thresholds</div>
+                <div class="control-group">
+                    <div class="control-item">
+                        <label class="control-label">Gamma Wall Distance (%)</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider-input" id="momentum-gamma-dist" 
+                                   min="0.5" max="3.0" value="1.0" step="0.1">
+                            <div class="slider-value">
+                                <span>0.5%</span>
+                                <span id="momentum-gamma-dist-val">1.0%</span>
+                                <span>3.0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-item">
+                        <label class="control-label">Min Confluence Score</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider-input" id="momentum-confluence" 
+                                   min="5" max="10" value="7" step="1">
+                            <div class="slider-value">
+                                <span>5</span>
+                                <span id="momentum-confluence-val">7</span>
+                                <span>10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn primary" onclick="saveMonitor('momentum')">💾 Save</button>
+                <button class="btn warning" onclick="testAlert('momentum')">🧪 Test Alert</button>
+                <button class="btn" onclick="viewStats('momentum')">📊 View Stats</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- GLOBAL TAB -->
+    <div id="global-tab" class="tab-content">
+        
+        <!-- Signal Thresholds -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🎯 Global Signal Thresholds</div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Default Signal Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="global-default-threshold" 
+                               min="5" max="15" value="8" step="1">
+                        <div class="slider-value">
+                            <span>5</span>
+                            <span id="global-default-threshold-val">8</span>
+                            <span>15</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Minimum factors required for regular signals</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Strong Signal Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="global-strong-threshold" 
+                               min="10" max="20" value="12" step="1">
+                        <div class="slider-value">
+                            <span>10</span>
+                            <span id="global-strong-threshold-val">12</span>
+                            <span>20</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Minimum factors required for STRONG signals</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">News-Driven Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="global-news-threshold" 
+                               min="4" max="10" value="6" step="1">
+                        <div class="slider-value">
+                            <span>4</span>
+                            <span id="global-news-threshold-val">6</span>
+                            <span>10</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Lower threshold for high-impact news events</div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Gap-Driven Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="global-gap-threshold" 
+                               min="4" max="10" value="6" step="1">
+                        <div class="slider-value">
+                            <span>4</span>
+                            <span id="global-gap-threshold-val">6</span>
+                            <span>10</span>
+                        </div>
+                    </div>
+                    <div class="help-text">Lower threshold for large gap moves</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limits -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">⏱️ Rate Limits & Cooldowns</div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Max Alerts Per Symbol Per Hour</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="global-max-alerts-hour" 
+                               min="1" max="10" value="3" step="1">
+                        <div class="slider-value">
+                            <span>1</span>
+                            <span id="global-max-alerts-hour-val">3</span>
+                            <span>10</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Cooldown Between Same Alerts (sec)</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider-input" id="global-cooldown-same" 
+                               min="60" max="900" value="300" step="60">
+                        <div class="slider-value">
+                            <span>60s</span>
+                            <span id="global-cooldown-same-val">300s</span>
+                            <span>900s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Market Hours -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">🕐 Market Hours Configuration</div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Pre-Market Start (ET)</label>
+                    <input type="time" class="control-input" id="global-premarket-start" value="04:00">
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Market Open (ET)</label>
+                    <input type="time" class="control-input" id="global-market-open" value="09:30">
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Market Close (ET)</label>
+                    <input type="time" class="control-input" id="global-market-close" value="16:00">
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">After-Hours End (ET)</label>
+                    <input type="time" class="control-input" id="global-afterhours-end" value="20:00">
+                </div>
+            </div>
+        </div>
+
+        <!-- Scan Intervals -->
+        <div class="monitor-card">
+            <div class="monitor-header">
+                <div class="monitor-title">⏲️ Scan Intervals (seconds)</div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">Pre-Market</label>
+                    <input type="number" class="control-input" id="global-scan-premarket" 
+                           value="300" min="60" max="600" step="60">
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">First Hour (9:30-10:30)</label>
+                    <input type="number" class="control-input" id="global-scan-first-hour" 
+                           value="60" min="30" max="300" step="30">
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">Market Hours</label>
+                    <input type="number" class="control-input" id="global-scan-market" 
+                           value="60" min="30" max="300" step="30">
+                </div>
+
+                <div class="control-item">
+                    <label class="control-label">After-Hours</label>
+                    <input type="number" class="control-input" id="global-scan-afterhours" 
+                           value="300" min="60" max="600" step="60">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Global Action Buttons (Fixed Position) -->
+    <div class="global-actions">
+        <button class="btn warning" onclick="restartMonitors()">🔄 RESTART MONITORS</button>
+        <button class="btn primary" onclick="saveAllConfig()">💾 SAVE ALL</button>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:5001/api';
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Initialize slider value displays
+        function initSliders() {
+            document.querySelectorAll('.slider-input').forEach(slider => {
+                const id = slider.id;
+                const valueSpan = document.getElementById(`${id}-val`);
+                
+                if (valueSpan) {
+                    slider.addEventListener('input', function() {
+                        let value = this.value;
+                        
+                        // Format based on slider type
+                        if (id.includes('rvol') || id.includes('threshold')) {
+                            value = parseFloat(value).toFixed(1) + 'x';
+                        } else if (id.includes('price') || id.includes('prox') || id.includes('pct')) {
+                            value = parseFloat(value).toFixed(1) + '%';
+                        } else if (id.includes('interval')) {
+                            value = Math.round(value) + 's';
+                        } else if (id.includes('cooldown') || id.includes('window')) {
+                            value = Math.round(value) + 'min';
+                        } else if (id.includes('score')) {
+                            value = parseFloat(value).toFixed(1);
+                        } else {
+                            value = Math.round(value);
+                        }
+                        
+                        valueSpan.textContent = value;
+                    });
+                    
+                    // Trigger initial update
+                    slider.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        // Load configuration from backend
+        async function loadConfig() {
+            try {
+                showNotification('Loading configuration...', 'info');
+                
+                const response = await fetch(`${API_BASE}/config`);
+                const config = await response.json();
+                
+                // Populate all fields from config
+                populateConfigFields(config);
+                
+                showNotification('✅ Configuration loaded', 'success');
+            } catch (error) {
+                console.error('Error loading config:', error);
+                showNotification('❌ Failed to load configuration', 'error');
+            }
+        }
+
+        // Populate form fields from config object
+        function populateConfigFields(config) {
+            // Realtime Volume
+            if (config.realtime_volume) {
+                document.getElementById('realtime-volume-enabled').checked = config.realtime_volume.enabled;
+                document.getElementById('realtime-volume-interval').value = config.realtime_volume.check_interval;
+                document.getElementById('realtime-volume-rvol').value = config.realtime_volume.rvol_threshold;
+                document.getElementById('realtime-volume-price').value = config.realtime_volume.price_filter;
+                document.getElementById('realtime-volume-cooldown').value = config.realtime_volume.cooldown;
+            }
+
+            // Extended Hours
+            if (config.extended_hours) {
+                document.getElementById('extended-hours-enabled').checked = config.extended_hours.enabled;
+                document.getElementById('extended-hours-interval').value = config.extended_hours.check_interval;
+                document.getElementById('extended-hours-threshold').value = config.extended_hours.threshold;
+                document.getElementById('extended-hours-cooldown').value = config.extended_hours.cooldown;
+            }
+
+            // Market Impact
+            if (config.market_impact) {
+                document.getElementById('market-impact-enabled').checked = config.market_impact.enabled;
+                document.getElementById('market-impact-interval').value = config.market_impact.check_interval;
+                document.getElementById('market-impact-score').value = config.market_impact.min_impact_score;
+                document.getElementById('market-impact-lookback').value = config.market_impact.lookback_hours;
+            }
+
+            // OpenAI
+            if (config.openai) {
+                document.getElementById('openai-enabled').checked = config.openai.enabled;
+                document.getElementById('openai-interval').value = config.openai.check_interval;
+            }
+
+            // 0DTE
+            if (config.odte) {
+                document.getElementById('odte-enabled').checked = config.odte.enabled;
+                document.getElementById('odte-alert-time').value = config.odte.alert_time;
+                document.getElementById('odte-window').value = config.odte.alert_window;
+            }
+
+            // Wall Strength
+            if (config.wall_strength) {
+                document.getElementById('wall-strength-enabled').checked = config.wall_strength.enabled;
+                document.getElementById('wall-strength-interval').value = config.wall_strength.check_interval;
+            }
+
+            // Unusual Activity
+            if (config.unusual_activity) {
+                document.getElementById('unusual-activity-enabled').checked = config.unusual_activity.enabled;
+                document.getElementById('unusual-activity-interval').value = config.unusual_activity.check_interval;
+            }
+
+            // Momentum
+            if (config.momentum) {
+                document.getElementById('momentum-enabled').checked = config.momentum.enabled;
+                document.getElementById('momentum-interval').value = config.momentum.check_interval;
+            }
+
+            // Trigger slider updates
+            document.querySelectorAll('.slider-input').forEach(s => s.dispatchEvent(new Event('input')));
+        }
+
+        // Save individual monitor config
+        async function saveMonitor(monitorName) {
+            try {
+                showNotification(`Saving ${monitorName}...`, 'info');
+                
+                const config = gatherMonitorConfig(monitorName);
+                
+                const response = await fetch(`${API_BASE}/config/${monitorName}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    showNotification(`✅ ${monitorName} saved successfully`, 'success');
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (error) {
+                console.error('Error saving monitor:', error);
+                showNotification(`❌ Failed to save ${monitorName}`, 'error');
+            }
+        }
+
+        // Gather config for specific monitor
+        function gatherMonitorConfig(monitorName) {
+            const config = {};
+            
+            // Add monitor-specific logic here based on monitorName
+            switch(monitorName) {
+                case 'realtime_volume':
+                    config.enabled = document.getElementById('realtime-volume-enabled').checked;
+                    config.check_interval = parseInt(document.getElementById('realtime-volume-interval').value);
+                    config.rvol_threshold = parseFloat(document.getElementById('realtime-volume-rvol').value);
+                    config.price_filter = parseFloat(document.getElementById('realtime-volume-price').value);
+                    config.cooldown = parseInt(document.getElementById('realtime-volume-cooldown').value);
+                    break;
+                
+                // Add other monitors...
+            }
+            
+            return config;
+        }
+
+        // Save all configuration
+        async function saveAllConfig() {
+            try {
+                showNotification('Saving all configuration...', 'info');
+                
+                const config = gatherAllConfig();
+                
+                const response = await fetch(`${API_BASE}/config/save-all`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    showNotification('✅ All configuration saved', 'success');
+                } else {
+                    throw new Error('Save failed');
+                }
+            } catch (error) {
+                console.error('Error saving config:', error);
+                showNotification('❌ Failed to save configuration', 'error');
+            }
+        }
+
+        // Gather all configuration
+        function gatherAllConfig() {
+            // Collect all monitor configs
+            const config = {
+                realtime_volume: gatherMonitorConfig('realtime_volume'),
+                // Add other monitors...
+            };
+            
+            return config;
+        }
+
+        // Test alert
+        async function testAlert(monitorName) {
+            try {
+                showNotification(`Sending test alert for ${monitorName}...`, 'info');
+                
+                const response = await fetch(`${API_BASE}/test-alert/${monitorName}`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showNotification(`✅ Test alert sent to Discord`, 'success');
+                } else {
+                    throw new Error('Test failed');
+                }
+            } catch (error) {
+                console.error('Error testing alert:', error);
+                showNotification(`❌ Failed to send test alert`, 'error');
+            }
+        }
+
+        // View stats
+        async function viewStats(monitorName) {
+            try {
+                const response = await fetch(`${API_BASE}/stats/${monitorName}`);
+                const stats = await response.json();
+                
+                // Display stats in modal or alert
+                alert(JSON.stringify(stats, null, 2));
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                showNotification('❌ Failed to load stats', 'error');
+            }
+        }
+
+        // Reset to defaults
+        function resetToDefaults() {
+            if (confirm('Reset all settings to defaults? This cannot be undone.')) {
+                fetch(`${API_BASE}/config/reset`, {method: 'POST'})
+                    .then(() => {
+                        showNotification('✅ Reset to defaults', 'success');
+                        loadConfig();
+                    })
+                    .catch(err => {
+                        showNotification('❌ Reset failed', 'error');
+                    });
+            }
+        }
+
+        // Restart monitors
+        async function restartMonitors() {
+            if (confirm('Restart all monitors? This will briefly interrupt alerts.')) {
+                try {
+                    showNotification('Restarting monitors...', 'info');
+                    
+                    const response = await fetch(`${API_BASE}/restart-monitors`, {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        showNotification('✅ Monitors restarted successfully', 'success');
+                    } else {
+                        throw new Error('Restart failed');
+                    }
+                } catch (error) {
+                    console.error('Error restarting monitors:', error);
+                    showNotification('❌ Failed to restart monitors', 'error');
+                }
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initSliders();
+            loadConfig();
+            
+            // Auto-refresh stats every 30 seconds
+            setInterval(() => {
+                // Update stats badges
+                fetch(`${API_BASE}/stats/all`)
+                    .then(r => r.json())
+                    .then(stats => {
+                        // Update each monitor's stats badge
+                        Object.keys(stats).forEach(monitor => {
+                            const badge = document.getElementById(`${monitor}-stats`);
+                            if (badge) {
+                                badge.textContent = `${stats[monitor].alerts_today} alerts today`;
+                            }
+                        });
+                    })
+                    .catch(err => console.error('Stats update failed:', err));
+            }, 30000);
+        });
+    </script>
+</body>
+</html>
