@@ -1,6 +1,6 @@
 """
-backend/app.py - COMPLETE VERSION v4.5
-WITH ALERT CONSOLE + WALL STRENGTH + UNUSUAL ACTIVITY
+backend/app.py - COMPLETE VERSION v4.5.1
+WITH ALERT CONSOLE + WALL STRENGTH + UNUSUAL ACTIVITY + EARNINGS MONITOR
 
 COMPLETE REPLACEMENT FILE
 Copy this entire file to replace your existing app.py
@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logging
 import threading
+import time
 import yaml
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -26,6 +27,7 @@ from analyzers.enhanced_professional_analyzer import EnhancedProfessionalAnalyze
 from utils.watchlist_manager import WatchlistManager
 from utils.earnings_state_manager import EarningsStateManager
 from alerts.alert_manager import AlertManager
+from database.news_database import get_news_database
 
 # ALERT CONSOLE: Import Config Manager and Routes
 try:
@@ -107,6 +109,15 @@ try:
 except ImportError:
     ODTE_MONITOR_AVAILABLE = False
     logging.warning("0DTE Gamma Monitor not available")
+
+
+# Earnings Monitor
+try:
+    from monitors.earnings_monitor import EarningsMonitor
+    EARNINGS_MONITOR_AVAILABLE = True
+except ImportError:
+    EARNINGS_MONITOR_AVAILABLE = False
+    logging.warning("Earnings Monitor not available")
 
 # Wall Strength Monitor
 try:
@@ -204,6 +215,14 @@ try:
     logger.info("✅ Alert Manager initialized")
 except Exception as e:
     logger.error(f"❌ Failed to initialize Alert Manager: {str(e)}")
+
+# Initialize News Database
+news_db = None
+try:
+    news_db = get_news_database()
+    logger.info("✅ News Database initialized")
+except Exception as e:
+    logger.error(f"❌ News Database failed: {str(e)}")
 
 # ALERT CONSOLE: Initialize Config Manager
 config_manager = None
@@ -405,6 +424,35 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
 
+# CHANGE #2: Initialize Earnings Monitor
+earnings_monitor = None
+if EARNINGS_MONITOR_AVAILABLE:
+    try:
+        earnings_config = config_yaml.get('earnings_monitor', {})
+        if earnings_config.get('enabled', False):
+            
+            if unified_news_engine and alert_manager and alert_manager.discord:
+                earnings_monitor = EarningsMonitor(
+                    polygon_api_key=POLYGON_API_KEY,
+                    unified_news_engine=unified_news_engine,
+                    discord_alerter=alert_manager.discord,
+                    check_interval_premarket=earnings_config.get('premarket_window', {}).get('check_interval', 20),
+                    check_interval_postmarket=earnings_config.get('postmarket_window', {}).get('check_interval', 10)
+                )
+                
+                # Set up database callback if news_db is available
+                if news_db:
+                    def save_earnings_to_db(ticker, headline, article, channel):
+                        news_db.save_news(ticker, headline, article, channel)
+                    earnings_monitor.save_to_db_callback = save_earnings_to_db
+                
+                logger.info("✅ Earnings Monitor initialized")
+            else:
+                logger.warning("⚠️  Earnings Monitor disabled - missing dependencies")
+    except Exception as e:
+        logger.error(f"❌ Earnings Monitor initialization failed: {str(e)}")
+
+
 # ALERT CONSOLE: Register Blueprint
 if CONFIG_MANAGER_AVAILABLE and config_manager:
     app.register_blueprint(config_bp)
@@ -438,6 +486,16 @@ def run_unusual_activity_monitor():
         except Exception as e:
             logger.error(f"Unusual activity monitor error: {str(e)}")
 
+def run_earnings_monitor():
+    """Run earnings monitor in background"""
+    if earnings_monitor:
+        try:
+            earnings_monitor.start()
+            while True:
+                time.sleep(60)
+        except Exception as e:
+            logger.error(f"Earnings monitor crashed: {{str(e)}}")
+
 # ============================================================================
 # EARNINGS MONITORING
 # ============================================================================
@@ -448,13 +506,13 @@ def run_sunday_earnings_scan():
     """Run Sunday earnings scan"""
     logger.info("🗓️ Running Sunday earnings scan...")
     try:
-        if openai_monitor:
-            openai_monitor.run_weekly_earnings_scan()
+        earnings_manager.run_sunday_scan()
+        logger.info("✅ Sunday earnings scan complete")
     except Exception as e:
-        logger.error(f"Sunday earnings scan failed: {str(e)}")
+        logger.error(f"❌ Sunday earnings scan failed: {str(e)}")
 
 def schedule_sunday_routine():
-    """Schedule Sunday earnings scan"""
+    """Schedule Sunday 7 AM ET earnings scan"""
     trigger = CronTrigger(
         day_of_week='sun',
         hour=7,
@@ -464,6 +522,38 @@ def schedule_sunday_routine():
     scheduler.add_job(run_sunday_earnings_scan, trigger)
     scheduler.start()
     logger.info("📅 Sunday earnings scan scheduled (7:00 AM ET)")
+
+# ============================================================================
+# DATABASE HELPER FUNCTION
+# ============================================================================
+
+def save_news_to_db(ticker: str, headline: str, article: dict, channel: str):
+    """Save news article to database"""
+    if not news_db:
+        return
+    
+    try:
+        published_str = article.get('published', datetime.now().isoformat())
+        published_at = datetime.fromisoformat(published_str.replace('Z', ''))
+        
+        news_db.add_news(
+            ticker=ticker,
+            headline=headline,
+            article_id=article.get('id') or article.get('url'),
+            summary=article.get('teaser') or article.get('description', '')[:500],
+            url=article.get('url'),
+            source=article.get('source', 'Benzinga'),
+            channel=channel,
+            sentiment='NEUTRAL',
+            published_at=published_at,
+            metadata={
+                'tags': article.get('tags', []),
+                'tickers': article.get('tickers', [])
+            }
+        )
+        logger.debug(f"💾 Saved to DB: {ticker} - {headline[:50]}")
+    except Exception as e:
+        logger.error(f"Error saving news to DB: {str(e)}")
 
 # ============================================================================
 # FRONTEND ROUTES
@@ -533,7 +623,10 @@ def analyze_all():
                 results.append(result)
             except Exception as e:
                 logger.error(f"Error analyzing {symbol}: {str(e)}")
-                results.append({'symbol': symbol, 'error': str(e)})
+                results.append({
+                    'symbol': symbol,
+                    'error': str(e)
+                })
         
         return jsonify({
             'results': results,
@@ -541,160 +634,101 @@ def analyze_all():
         })
     
     except Exception as e:
-        logger.error(f"Error in analyze-all: {str(e)}")
+        logger.error(f"Error analyzing watchlist: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/gamma/<symbol>')
-def get_gamma_analysis(symbol):
+def get_gamma(symbol):
     """Get gamma analysis for symbol"""
     try:
         symbol = symbol.upper()
-        logger.info(f"🎯 Gamma analysis for {symbol}")
-        
-        quote = analyzer.get_real_time_quote(symbol)
-        current_price = quote.get('price', 0)
-        
-        if current_price == 0:
-            return jsonify({'error': 'Unable to get current price'}), 400
-        
-        result = analyzer.analyze_open_interest(symbol, current_price)
+        result = analyzer.calculate_gamma_walls(symbol)
         return jsonify(result)
-    
     except Exception as e:
-        logger.error(f"Error in gamma analysis: {str(e)}")
+        logger.error(f"Error getting gamma for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/gex/<symbol>')
-def get_gex_analysis(symbol):
-    """Get GEX analysis for symbol"""
+def get_gex(symbol):
+    """Get GEX data for symbol"""
     try:
         symbol = symbol.upper()
-        logger.info(f"💰 GEX analysis for {symbol}")
-        
-        quote = analyzer.get_real_time_quote(symbol)
-        current_price = quote.get('price', 0)
-        
-        if current_price == 0:
-            return jsonify({'error': 'Unable to get current price'}), 400
-        
-        result = analyzer.analyze_full_gex(symbol, current_price)
+        result = analyzer.calculate_gex(symbol)
         return jsonify(result)
-    
     except Exception as e:
-        logger.error(f"Error in GEX analysis: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/earnings/status')
-def get_earnings_status():
-    """Get earnings monitoring status"""
-    try:
-        status = earnings_manager.get_status()
-        return jsonify(status)
-    except Exception as e:
+        logger.error(f"Error getting GEX for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/earnings/toggle', methods=['POST'])
 def toggle_earnings():
     """Toggle earnings monitoring"""
     try:
-        data = request.json
-        enabled = data.get('enabled', False)
-        
-        earnings_manager.set_enabled(enabled)
-        
+        enabled = earnings_manager.toggle()
         return jsonify({
             'success': True,
-            'enabled': enabled,
-            'status': earnings_manager.get_status()
+            'enabled': enabled
         })
     except Exception as e:
+        logger.error(f"Error toggling earnings: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/wall-strength/check', methods=['POST'])
-def check_wall_strength():
-    """Manual wall strength check"""
-    if not wall_strength_monitor:
-        return jsonify({'error': 'Wall strength monitor not available'}), 503
-    
+@app.route('/api/earnings/status')
+def earnings_status():
+    """Get earnings monitoring status"""
     try:
-        watchlist = watchlist_manager.load_symbols()
-        alerts_sent = wall_strength_monitor.run_single_check(watchlist)
-        return jsonify({
-            'success': True,
-            'alerts_sent': alerts_sent,
-            'stats': wall_strength_monitor.stats
-        })
+        status = earnings_manager.get_status()
+        return jsonify(status)
     except Exception as e:
+        logger.error(f"Error getting earnings status: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/unusual-activity/check', methods=['POST'])
-def check_unusual_activity():
-    """Manual unusual activity check"""
-    if not unusual_activity_monitor:
-        return jsonify({'error': 'Unusual activity monitor not available'}), 503
-    
+@app.route('/api/earnings/symbols')
+def get_earnings_symbols():
+    """Get list of symbols with earnings"""
     try:
-        watchlist = watchlist_manager.load_symbols()
-        alerts_sent = unusual_activity_monitor.run_single_check(watchlist)
+        symbols = earnings_manager.get_earnings_symbols()
         return jsonify({
-            'success': True,
-            'alerts_sent': alerts_sent,
-            'stats': unusual_activity_monitor.stats
+            'symbols': symbols,
+            'count': len(symbols)
         })
     except Exception as e:
+        logger.error(f"Error getting earnings symbols: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/signal-metrics/<symbol>')
+def get_signal_metrics(symbol):
+    """Get signal metrics for symbol"""
+    try:
+        symbol = symbol.upper()
+        
+        if not metrics_tracker:
+            return jsonify({'error': 'Metrics tracker not available'}), 503
+        
+        metrics = metrics_tracker.get_metrics(symbol)
+        return jsonify(metrics)
+    
+    except Exception as e:
+        logger.error(f"Error getting metrics for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/pin-probability/<symbol>')
 def get_pin_probability(symbol):
-    """Get 0DTE pin probability analysis"""
+    """Get pin probability analysis"""
     try:
         symbol = symbol.upper()
-        logger.info(f"📍 Pin probability requested for {symbol}")
         
         if not pin_calculator:
             return jsonify({
                 'symbol': symbol,
                 'available': False,
-                'reason': 'Pin calculator not initialized'
-            }), 503
-        
-        quote = analyzer.get_real_time_quote(symbol)
-        current_price = quote.get('price', 0)
-        
-        if current_price == 0:
-            return jsonify({
-                'symbol': symbol,
-                'available': False,
-                'reason': 'Unable to get current price'
-            }), 400
-        
-        gamma_data = analyzer.analyze_full_gex(symbol, current_price)
-        
-        if not gamma_data.get('available'):
-            return jsonify({
-                'symbol': symbol,
-                'available': False,
-                'reason': 'No options data available'
+                'message': 'Pin probability calculator not available'
             })
         
-        options_data = analyzer.get_options_chain(symbol)
+        # Get current analysis data
+        analysis_data = analyzer.generate_professional_signal(symbol)
         
-        if not options_data:
-            return jsonify({
-                'symbol': symbol,
-                'available': False,
-                'reason': 'No options chain available'
-            })
-        
-        expiration = gamma_data.get('expiration', datetime.now().strftime('%Y%m%d'))
-        
-        result = pin_calculator.analyze_pin_probability(
-            symbol,
-            current_price,
-            options_data,
-            gamma_data,
-            expiration
-        )
+        # Calculate pin probability
+        result = pin_calculator.calculate_pin_probability(symbol, analysis_data)
         
         return jsonify(result)
         
@@ -708,27 +742,21 @@ def get_pin_probability(symbol):
 
 @app.route('/api/confluence/<symbol>')
 def get_confluence_analysis(symbol):
-    """Get confluence analysis combining all signals"""
+    """Get confluence analysis for symbol"""
     try:
         symbol = symbol.upper()
-        logger.info(f"🎯 Confluence analysis requested for {symbol}")
         
         if not confluence_system:
             return jsonify({
                 'symbol': symbol,
                 'available': False,
-                'reason': 'Confluence system not initialized'
-            }), 503
+                'message': 'Confluence alert system not available'
+            })
         
+        # Get current analysis data
         analysis_data = analyzer.generate_professional_signal(symbol)
         
-        if not analysis_data:
-            return jsonify({
-                'symbol': symbol,
-                'available': False,
-                'reason': 'Unable to analyze symbol'
-            }), 400
-        
+        # Analyze confluence
         result = confluence_system.analyze_confluence(symbol, analysis_data)
         
         return jsonify(result)
@@ -743,19 +771,13 @@ def get_confluence_analysis(symbol):
 
 @app.route('/api/news-feed/all')
 def get_all_news():
-    """Get all news from cache (for news dashboard)"""
+    """Get all news from database (for news dashboard)"""
     try:
-        if not alert_manager:
-            return jsonify({'error': 'Alert manager not available'}), 503
+        if not news_db:
+            return jsonify({'error': 'Database not available'}), 503
         
-        # Get all symbols from watchlist
-        watchlist = watchlist_manager.load_symbols()
-        
-        news_data = {}
-        for symbol in watchlist:
-            news_list = alert_manager.get_symbol_news_history(symbol, hours=24)
-            if news_list:
-                news_data[symbol] = news_list
+        hours = request.args.get('hours', 24, type=int)
+        news_data = news_db.get_all_news(hours=hours)
         
         return jsonify({
             'success': True,
@@ -763,7 +785,6 @@ def get_all_news():
             'symbols_count': len(news_data),
             'total_articles': sum(len(items) for items in news_data.values())
         })
-    
     except Exception as e:
         logger.error(f"Error getting news feed: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -803,7 +824,7 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '4.5-alert-console',
+        'version': '4.5.1-earnings-monitor',
         'polygon_enabled': bool(POLYGON_API_KEY),
         'alerts_enabled': alert_manager is not None,
         'config_manager_enabled': config_manager is not None,
@@ -832,6 +853,11 @@ def health_check():
         'odte_gamma_monitor': {
             'enabled': odte_monitor is not None,
             'stats': odte_monitor.stats if odte_monitor else {}
+        },
+        'earnings_monitor': {
+            'enabled': earnings_monitor is not None,
+            'stats': earnings_monitor.stats if earnings_monitor else {},
+            'current_session': earnings_monitor.stats.get('current_session') if earnings_monitor else None
         }
     })
 
@@ -866,7 +892,8 @@ if __name__ == '__main__':
             'odte': odte_monitor,
             'wall_strength': wall_strength_monitor,
             'unusual_activity': unusual_activity_monitor,
-            'momentum': momentum_monitor
+            'momentum': momentum_monitor,
+            'earnings': earnings_monitor
         }
         
         init_config_routes(config_manager, alert_manager, monitor_instances)
@@ -903,6 +930,20 @@ if __name__ == '__main__':
         print(f"   ✅ Unusual activity monitor started")
         print(f"   🕐 Scans every {unusual_activity_monitor.check_interval} seconds")
         print(f"   📡 Routes to: DISCORD_UNUSUAL_ACTIVITY")
+    
+    # Start Earnings Monitor
+    if earnings_monitor:
+        print(f"\n📊 Starting Earnings Monitor...")
+        earnings_thread = threading.Thread(
+            target=run_earnings_monitor,
+            daemon=True
+        )
+        earnings_thread.start()
+        print(f"   ✅ Earnings monitor started")
+        print(f"   🌅 Pre-market: 5:00 AM - 8:00 AM ET (20s checks)")
+        print(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (10s checks) ⚡ FASTEST")
+        print(f"   📡 Routes to: DISCORD_REALTIME_EARNINGS")
+
     
     # Start News Monitors
     if openai_monitor:

@@ -3,6 +3,7 @@ backend/monitors/market_impact_monitor.py
 Market Impact News Monitor - Real-time high-impact news alerts
 Monitors: Macro events, M&A, analyst upgrades, spillover effects
 Routes to: DISCORD_NEWS_ALERTS channel
+WITH DATABASE PERSISTENCE
 """
 
 import sys
@@ -223,16 +224,9 @@ class MarketImpactMonitor:
         analyst_match = self._check_keyword_match(full_text, self.analyst_keywords)
         if analyst_match:
             classification['type'] = 'ANALYST'
-            classification['priority'] = 'HIGH' if 'price target' in full_text.lower() else 'MEDIUM'
+            classification['priority'] = 'HIGH'
             classification['matched_keyword'] = analyst_match
             self.stats['analyst_events'] += 1
-            
-            # Try to extract price target change
-            if 'raises target' in full_text.lower() or 'price target' in full_text.lower():
-                # This is where we'd parse the price target increase
-                # For now, we'll flag it as significant
-                classification['details']['has_price_target'] = True
-            
             return classification
         
         # Check earnings events
@@ -246,232 +240,149 @@ class MarketImpactMonitor:
         
         return classification
     
-    def _check_spillover_opportunities(self, trigger_symbol: str, article: Dict) -> List[Dict]:
-        """Check for spillover opportunities when a major stock has news"""
-        if trigger_symbol not in self.spillover_map:
-            return []
-        
-        related_stocks = self.spillover_map[trigger_symbol]
-        spillover_opportunities = []
-        
-        self.logger.info(f"🔍 Checking spillover: {trigger_symbol} → {len(related_stocks)} related stocks")
-        
-        for related_symbol in related_stocks:
-            try:
-                # Check if related stock has volume spike
-                if not self.volume_analyzer:
-                    continue
-                
-                volume_data = self.volume_analyzer.calculate_rvol(related_symbol)
-                rvol = volume_data.get('rvol', 0)
-                classification = volume_data.get('classification', 'UNKNOWN')
-                
-                # Only alert if volume confirms (2.0x+)
-                if rvol >= self.min_rvol:
-                    # Get current price for % change
-                    quote = self._get_quick_quote(related_symbol)
-                    
-                    spillover_opportunities.append({
-                        'symbol': related_symbol,
-                        'rvol': rvol,
-                        'classification': classification,
-                        'current_price': quote.get('price', 0),
-                        'change_percent': quote.get('change_percent', 0),
-                        'critical': rvol >= self.critical_rvol
-                    })
-                    
-                    self.logger.info(f"  ⚡ {related_symbol}: RVOL {rvol:.1f}x ({classification})")
-                
-            except Exception as e:
-                self.logger.error(f"Error checking spillover for {related_symbol}: {str(e)}")
-                continue
-        
-        if spillover_opportunities:
-            self.stats['spillover_events'] += 1
-        
-        return spillover_opportunities
-    
-    def _get_quick_quote(self, symbol: str) -> Dict:
-        """Get quick quote for price/change"""
-        try:
-            endpoint = f"/v2/last/trade/{symbol}"
-            data = self._make_request(endpoint)
-            
-            if 'results' in data:
-                current_price = data['results'].get('p', 0)
-                
-                # Get previous close for % change
-                yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-                endpoint2 = f"/v2/aggs/ticker/{symbol}/range/1/day/{yesterday}/{yesterday}"
-                prev_data = self._make_request(endpoint2, {'adjusted': 'true'})
-                
-                if 'results' in prev_data and prev_data['results']:
-                    prev_close = prev_data['results'][0]['c']
-                    change_percent = ((current_price - prev_close) / prev_close) * 100
-                else:
-                    change_percent = 0
-                
-                return {
-                    'price': current_price,
-                    'change_percent': round(change_percent, 2)
-                }
-        except:
-            pass
-        
-        return {'price': 0, 'change_percent': 0}
-    
-    def _calculate_impact_score(self, article: Dict, classification: Dict, 
-                                 volume_data: Dict = None, spillover_count: int = 0) -> float:
-        """
-        Calculate impact score (0-10)
-        
-        Components:
-        - Event priority: 0-4 points (CRITICAL=4, HIGH=3, MEDIUM=2)
-        - News freshness: 0-2 points (<5min=2, <30min=1)
-        - Volume confirmation: 0-3 points (>3x=3, >2x=2, >1.5x=1)
-        - Spillover effect: 0-1 point (spillover detected=1)
-        """
+    def _calculate_impact_score(self, 
+                                classification: Dict,
+                                volume_data: Optional[Dict] = None,
+                                spillover_count: int = 0) -> float:
+        """Calculate impact score (0-10)"""
         score = 0.0
         
-        # Event priority
-        priority = classification.get('priority', 'MEDIUM')
-        if priority == 'CRITICAL':
-            score += 4.0
-        elif priority == 'HIGH':
-            score += 3.0
-        elif priority == 'MEDIUM':
-            score += 2.0
+        # Base score from event type
+        type_scores = {
+            'MACRO': 9.0,
+            'M&A': 8.0,
+            'ANALYST': 7.0,
+            'EARNINGS': 7.5,
+            'GENERAL': 5.0
+        }
         
-        # News freshness
-        published = article.get('published_utc', '')
-        try:
-            pub_time = datetime.strptime(published, '%Y-%m-%dT%H:%M:%SZ')
-            age_minutes = (datetime.utcnow() - pub_time).total_seconds() / 60
-            
-            if age_minutes < 5:
-                score += 2.0
-            elif age_minutes < 30:
-                score += 1.0
-        except:
-            pass
+        score = type_scores.get(classification['type'], 5.0)
         
-        # Volume confirmation
+        # Volume boost
         if volume_data:
             rvol = volume_data.get('rvol', 0)
-            if rvol >= 3.0:
-                score += 3.0
-            elif rvol >= 2.0:
-                score += 2.0
-            elif rvol >= 1.5:
+            if rvol >= self.critical_rvol:
                 score += 1.0
+            elif rvol >= self.min_rvol:
+                score += 0.5
         
-        # Spillover effect
+        # Spillover boost
         if spillover_count > 0:
-            score += 1.0
+            score += min(spillover_count * 0.2, 1.0)
         
-        return score
+        return min(score, 10.0)
     
     def check_for_market_impact_news(self) -> List[Dict]:
-        """Check for high-impact market news"""
+        """Check for high-impact news"""
         try:
-            # Reset hourly counters
-            if (datetime.now() - self.last_alert_reset).seconds >= 3600:
+            # Reset alert counter hourly
+            current_hour = datetime.now().hour
+            if (datetime.now() - self.last_alert_reset).total_seconds() > 3600:
                 self.alert_counts.clear()
                 self.last_alert_reset = datetime.now()
             
             # Check rate limit
-            if sum(self.alert_counts.values()) >= self.max_alerts_per_hour:
-                self.logger.debug("Rate limit reached")
+            if self.alert_counts[current_hour] >= self.max_alerts_per_hour:
+                self.logger.warning(f"Alert rate limit reached for hour {current_hour}")
                 return []
             
-            # Query Polygon News API
-            endpoint = "/v2/reference/news"
-            cutoff_time = datetime.utcnow() - timedelta(hours=self.lookback_hours)
+            # Build list of tickers to check
+            tickers_to_check = self.watchlist.copy() if self.watchlist else []
             
+            # Add major spillover tickers
+            tickers_to_check.extend(self.spillover_map.keys())
+            
+            # Remove duplicates
+            tickers_to_check = list(set(tickers_to_check))
+            
+            if not tickers_to_check:
+                self.logger.warning("No tickers to monitor")
+                return []
+            
+            # Get news for all tickers
+            from_date = (datetime.now() - timedelta(hours=self.lookback_hours)).strftime('%Y-%m-%d')
+            to_date = datetime.now().strftime('%Y-%m-%d')
+            
+            endpoint = '/v2/reference/news'
             params = {
-                'limit': 30,
+                'ticker': ','.join(tickers_to_check[:50]),  # API limit
+                'published_utc.gte': from_date,
                 'order': 'desc',
-                'published_utc.gte': cutoff_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+                'limit': 100
             }
             
-            data = self._make_request(endpoint, params)
+            response = self._make_request(endpoint, params)
             
-            if not data or 'results' not in data:
+            if not response or 'results' not in response:
+                self.logger.warning("No news results from Polygon")
                 return []
             
-            articles = data['results']
+            articles = response['results']
+            self.logger.info(f"Found {len(articles)} news articles")
+            
+            # Filter and process
             matched_articles = []
             
             for article in articles:
-                # Check if recent enough
-                published = article.get('published_utc', '')
-                try:
-                    pub_time = datetime.strptime(published, '%Y-%m-%dT%H:%M:%SZ')
-                    age_hours = (datetime.utcnow() - pub_time).total_seconds() / 3600
-                    
-                    if age_hours > self.lookback_hours:
-                        continue
-                except:
-                    continue
+                news_hash = self._create_news_hash(
+                    article.get('title', ''),
+                    article.get('published_utc', '')
+                )
                 
-                # Check if already alerted
-                news_hash = self._create_news_hash(article.get('title', ''), published)
                 if news_hash in self.seen_news_hashes:
                     continue
                 
-                # Classify the news event
+                # Classify the event
                 classification = self._classify_news_event(article)
                 
-                # Skip general news
                 if classification['type'] == 'GENERAL':
+                    self.stats['filtered'] += 1
                     continue
                 
-                # Extract tickers
+                # Get affected tickers
                 tickers = article.get('tickers', [])
-                
-                # For macro events, we monitor all watchlist stocks
-                if classification['type'] == 'MACRO':
-                    tickers = ['SPY', 'QQQ']  # Use indices as markers
-                
-                # Filter to watchlist stocks (except macro events)
-                if classification['type'] != 'MACRO':
-                    tickers = [t for t in tickers if t in self.watchlist or t in ['SPY', 'QQQ']]
-                
                 if not tickers:
                     continue
                 
-                # Volume confirmation
-                volume_confirmations = {}
+                # Check for spillover opportunities
                 spillover_opportunities = []
-                
-                for ticker in tickers[:3]:  # Check top 3 tickers
-                    if self.volume_analyzer and ticker not in ['SPY', 'QQQ']:
-                        try:
-                            vol_data = self.volume_analyzer.calculate_rvol(ticker)
-                            rvol = vol_data.get('rvol', 0)
-                            
-                            if rvol >= self.min_rvol:
-                                volume_confirmations[ticker] = vol_data
-                                self.stats['volume_confirmed'] += 1
-                            
-                            # Check spillover
-                            spillover = self._check_spillover_opportunities(ticker, article)
-                            if spillover:
-                                spillover_opportunities.extend(spillover)
+                for ticker in tickers:
+                    if ticker in self.spillover_map:
+                        related = self.spillover_map[ticker]
                         
-                        except Exception as e:
-                            self.logger.error(f"Volume check failed for {ticker}: {str(e)}")
+                        # Check volume on related tickers
+                        if self.volume_analyzer:
+                            for related_ticker in related:
+                                vol_data = self.volume_analyzer.check_volume_spike(related_ticker)
+                                if vol_data and vol_data.get('rvol', 0) >= self.min_rvol:
+                                    spillover_opportunities.append({
+                                        'symbol': related_ticker,
+                                        'rvol': vol_data['rvol'],
+                                        'change_percent': vol_data.get('change_percent', 0),
+                                        'classification': vol_data.get('classification', 'Normal'),
+                                        'critical': vol_data.get('rvol', 0) >= self.critical_rvol
+                                    })
+                        
+                        if spillover_opportunities:
+                            self.stats['spillover_events'] += 1
+                
+                # Get volume confirmation for primary tickers
+                volume_confirmations = {}
+                if self.volume_analyzer:
+                    for ticker in tickers[:3]:  # Check first 3 tickers
+                        vol_data = self.volume_analyzer.check_volume_spike(ticker)
+                        if vol_data and vol_data.get('rvol', 0) >= self.min_rvol:
+                            volume_confirmations[ticker] = vol_data
+                            self.stats['volume_confirmed'] += 1
                 
                 # Calculate impact score
-                primary_volume = volume_confirmations.get(tickers[0], {}) if tickers else {}
                 impact_score = self._calculate_impact_score(
-                    article, 
                     classification,
-                    primary_volume,
-                    len(spillover_opportunities)
+                    volume_data=list(volume_confirmations.values())[0] if volume_confirmations else None,
+                    spillover_count=len(spillover_opportunities)
                 )
                 
-                # Filter by impact score
+                # Filter by minimum impact score
                 if impact_score < self.min_impact_score:
                     self.stats['filtered'] += 1
                     continue
@@ -480,15 +391,16 @@ class MarketImpactMonitor:
                 self.seen_news_hashes.add(news_hash)
                 
                 # Build alert data
-                matched_articles.append({
+                alert_data = {
                     'article': article,
-                    'tickers': tickers,
                     'classification': classification,
+                    'tickers': tickers,
                     'volume_confirmations': volume_confirmations,
                     'spillover_opportunities': spillover_opportunities,
-                    'impact_score': impact_score,
-                    'news_hash': news_hash
-                })
+                    'impact_score': impact_score
+                }
+                
+                matched_articles.append(alert_data)
             
             return matched_articles
             
@@ -506,83 +418,79 @@ class MarketImpactMonitor:
         
         try:
             article = alert_data['article']
-            tickers = alert_data['tickers']
             classification = alert_data['classification']
+            tickers = alert_data['tickers']
             volume_confirmations = alert_data['volume_confirmations']
             spillover_opportunities = alert_data['spillover_opportunities']
             impact_score = alert_data['impact_score']
             
-            # Determine alert styling
             event_type = classification['type']
             priority = classification['priority']
+            matched_keyword = classification['matched_keyword']
             
-            if priority == 'CRITICAL':
-                emoji = '🔴'
-                color = 0xff0000
-            elif priority == 'HIGH':
-                emoji = '🟡'
-                color = 0xffaa00
-            else:
-                emoji = '🟢'
-                color = 0x00ff00
+            # Color by priority
+            color_map = {
+                'CRITICAL': 0xFF0000,  # Red
+                'HIGH': 0xFF6600,      # Orange
+                'MEDIUM': 0xFFCC00     # Yellow
+            }
             
-            # Event type emojis
-            type_emoji = {
-                'MACRO': '🌍',
+            # Emoji by type
+            emoji_map = {
+                'MACRO': '🚨',
                 'M&A': '🤝',
-                'ANALYST': '📊',
+                'ANALYST': '📈',
                 'EARNINGS': '💰',
-                'GENERAL': '📰'
-            }.get(event_type, '📰')
-            
-            # Calculate time since publication
-            published = article.get('published_utc', '')
-            try:
-                pub_time = datetime.strptime(published, '%Y-%m-%dT%H:%M:%SZ')
-                age_minutes = int((datetime.utcnow() - pub_time).total_seconds() / 60)
-                time_str = f"{age_minutes} min ago" if age_minutes < 60 else f"{age_minutes // 60}h ago"
-            except:
-                time_str = "Unknown"
+                'GENERAL': 'ℹ️'
+            }
             
             # Build embed
-            title = f"{emoji} {type_emoji} {event_type} ALERT"
-            if spillover_opportunities:
-                title += " + SPILLOVER"
+            title = f"{emoji_map.get(event_type, 'ℹ️')} {event_type} EVENT | Impact: {impact_score:.1f}/10"
+            
+            # Format tickers (bold first 3)
+            ticker_str = ', '.join([f"**{t}**" for t in tickers[:3]])
+            if len(tickers) > 3:
+                ticker_str += f" +{len(tickers) - 3} more"
+            
+            # Published time
+            published = article.get('published_utc', '')
+            time_str = published.split('T')[1][:5] if 'T' in published else 'N/A'
             
             embed = {
                 'title': title,
-                'description': article.get('title', 'No title'),
-                'color': color,
-                'timestamp': datetime.utcnow().isoformat(),
-                'fields': []
+                'description': f"**{article.get('title', 'No title')}**",
+                'color': color_map.get(priority, 0xFFCC00),
+                'fields': [],
+                'timestamp': datetime.utcnow().isoformat()
             }
             
-            # Source and timing
+            # Tickers field
             embed['fields'].append({
-                'name': '📰 Source',
-                'value': f"{article.get('publisher', {}).get('name', 'Unknown')} • {time_str}",
-                'inline': False
-            })
-            
-            # Tickers (for non-spillover)
-            if event_type != 'MACRO' and not spillover_opportunities:
-                embed['fields'].append({
-                    'name': '🎯 Affected Tickers',
-                    'value': ', '.join(tickers[:5]),
-                    'inline': True
-                })
-            
-            # Impact score
-            embed['fields'].append({
-                'name': '💥 Impact Score',
-                'value': f'{impact_score:.1f}/10',
+                'name': '🎯 Affected Tickers',
+                'value': ticker_str,
                 'inline': True
             })
             
-            # Volume confirmation
+            # Priority & keyword
+            embed['fields'].append({
+                'name': '⚡ Priority',
+                'value': f"**{priority}** | {matched_keyword or 'N/A'}",
+                'inline': True
+            })
+            
+            # Summary
+            summary = article.get('description', '')[:300]
+            if summary:
+                embed['fields'].append({
+                    'name': '📰 Summary',
+                    'value': summary,
+                    'inline': False
+                })
+            
+            # Volume confirmations
             if volume_confirmations:
                 vol_text = []
-                for ticker, vol_data in volume_confirmations.items():
+                for ticker, vol_data in list(volume_confirmations.items())[:5]:
                     rvol = vol_data.get('rvol', 0)
                     classification_str = vol_data.get('classification', 'N/A')
                     emoji_str = '⚡⚡⚡' if rvol >= 3.0 else '⚡⚡' if rvol >= 2.5 else '⚡'
@@ -663,6 +571,24 @@ class MarketImpactMonitor:
                 f"Tickers: {', '.join(tickers[:3])} | "
                 f"Impact: {impact_score:.1f}/10"
             )
+            
+            # ==================== DATABASE SAVE ====================
+            # Save to database after successful Discord alert
+            if hasattr(self, 'save_to_db_callback') and self.save_to_db_callback:
+                try:
+                    # Save for each ticker mentioned (limit to first 5 to avoid spam)
+                    for ticker in tickers[:5]:
+                        self.save_to_db_callback(
+                            ticker=ticker,
+                            headline=article.get('title', 'Market News'),
+                            article=article,
+                            channel='watchlist'
+                        )
+                    
+                    self.logger.debug(f"💾 Saved market impact news to database for {len(tickers[:5])} tickers")
+                except Exception as e:
+                    self.logger.error(f"Error saving to database: {str(e)}")
+            # =====================================================
             
             return True
             

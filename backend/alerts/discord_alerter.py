@@ -978,7 +978,7 @@ class DiscordAlerter:
         # Route to news_alerts or market_impact channel
         channel = 'news_alerts' if 'news_alerts' in self.webhooks else 'market_impact'
         
-        return self._send_webhook(channel, payload)
+        return self._send_webhook('market_impact', payload)
     
     def send_spillover_alert(self, alert_data: Dict) -> bool:
         """

@@ -1,13 +1,17 @@
 """
 backend/monitors/realtime_volume_spike_monitor.py
-Real-Time Volume Spike Monitor - Market Hours Edition
+OPTIMIZED Real-Time Volume Spike Monitor v2.0
+Professional day trader configuration
 
-Monitors watchlist for volume spikes during regular market hours (9:30 AM - 4:00 PM ET)
-- 30-second check interval for catching rapid moves like ORCL +$14
-- RVOL-based detection with price movement filter (±0.5% minimum)
-- 5-minute cooldown per symbol (catches follow-up spikes quickly)
-- Live data only - no caching, real-time prices/VWAP
-- Routes to: DISCORD_VOLUME_SPIKE channel
+NEW FEATURES:
+- Session-aware thresholds (market/pre-market/after-hours)
+- Dynamic check intervals (first hour: 20s, power hour: 20s, mid-day: 30s)
+- VWAP proximity filtering (alert when price near VWAP)
+- Configurable via config.yaml (no code edits needed)
+- All original features preserved
+
+Monitors watchlist for volume spikes with professional-grade filtering
+Routes to: DISCORD_VOLUME_SPIKE channel
 """
 
 import requests
@@ -28,11 +32,11 @@ from analyzers.volume_analyzer import VolumeAnalyzer
 class RealtimeVolumeSpikeMonitor:
     def __init__(self, polygon_api_key: str, config: dict = None, watchlist_manager=None):
         """
-        Initialize Real-Time Volume Spike Monitor
+        Initialize OPTIMIZED Real-Time Volume Spike Monitor
         
         Args:
             polygon_api_key: Polygon.io API key
-            config: Optional config dictionary
+            config: Configuration dictionary from config.yaml
             watchlist_manager: Watchlist manager instance
         """
         self.polygon_api_key = polygon_api_key
@@ -43,19 +47,8 @@ class RealtimeVolumeSpikeMonitor:
         # Initialize Volume Analyzer
         self.volume_analyzer = VolumeAnalyzer(polygon_api_key)
         
-        # Configuration - REAL-TIME focused
-        self.check_interval = 30  # Check every 30 seconds
-        self.cooldown_minutes = 5  # 5-minute cooldown
-        
-        # Thresholds - RVOL based
-        self.thresholds = {
-            'ELEVATED': 2.0,   # Alert at 2.0x RVOL
-            'HIGH': 3.0,       # Alert at 3.0x RVOL
-            'EXTREME': 5.0     # Alert at 5.0x RVOL
-        }
-        
-        # Price movement filter - only alert if price moved
-        self.min_price_change_pct = 0.5  # Minimum 0.5% price move
+        # Load configuration from config.yaml
+        self._load_configuration()
         
         # Discord webhook
         self.discord_webhook = None
@@ -75,20 +68,162 @@ class RealtimeVolumeSpikeMonitor:
             'alerts_sent': 0,
             'filtered_by_price': 0,
             'filtered_by_cooldown': 0,
+            'filtered_by_vwap': 0,
             'last_check': None,
             'api_calls': 0
         }
         
-        self.logger.info("🚀 Real-Time Volume Spike Monitor initialized")
-        self.logger.info(f"   Check interval: {self.check_interval}s")
-        self.logger.info(f"   Thresholds: ELEVATED ≥{self.thresholds['ELEVATED']}x, HIGH ≥{self.thresholds['HIGH']}x, EXTREME ≥{self.thresholds['EXTREME']}x")
-        self.logger.info(f"   Price filter: ±{self.min_price_change_pct}% minimum")
-        self.logger.info(f"   Cooldown: {self.cooldown_minutes} minutes")
+        self.logger.info("🚀 OPTIMIZED Real-Time Volume Spike Monitor v2.0 initialized")
+        self._log_configuration()
+    
+    def _load_configuration(self):
+        """Load configuration from config.yaml"""
+        realtime_config = self.config.get('realtime_volume_spike', {})
+        
+        # Market hours configuration
+        market_config = realtime_config.get('market_hours', {})
+        self.market_thresholds = market_config.get('thresholds', {
+            'elevated': 2.5,
+            'high': 4.0,
+            'extreme': 6.0
+        })
+        self.market_min_price_change = market_config.get('min_price_change_pct', 1.0)
+        self.market_check_intervals = market_config.get('check_intervals', {
+            'first_hour': 20,
+            'power_hour': 20,
+            'mid_day': 30
+        })
+        self.market_cooldown = market_config.get('cooldown_minutes', 8)
+        self.market_vwap_config = market_config.get('vwap_filter', {
+            'enabled': True,
+            'proximity_pct': 0.5,
+            'require_proximity': False
+        })
+        
+        # Pre-market configuration
+        premarket_config = realtime_config.get('pre_market', {})
+        self.premarket_thresholds = premarket_config.get('thresholds', {
+            'elevated': 3.5,
+            'high': 5.0,
+            'extreme': 8.0
+        })
+        self.premarket_min_price_change = premarket_config.get('min_price_change_pct', 1.5)
+        self.premarket_check_interval = premarket_config.get('check_interval', 45)
+        self.premarket_cooldown = premarket_config.get('cooldown_minutes', 15)
+        self.premarket_vwap_config = premarket_config.get('vwap_filter', {
+            'enabled': True,
+            'proximity_pct': 0.75,
+            'require_proximity': False
+        })
+        
+        # After hours configuration
+        afterhours_config = realtime_config.get('after_hours', {})
+        self.afterhours_thresholds = afterhours_config.get('thresholds', {
+            'elevated': 3.5,
+            'high': 5.0,
+            'extreme': 8.0
+        })
+        self.afterhours_min_price_change = afterhours_config.get('min_price_change_pct', 1.5)
+        self.afterhours_check_interval = afterhours_config.get('check_interval', 60)
+        self.afterhours_cooldown = afterhours_config.get('cooldown_minutes', 15)
+        self.afterhours_vwap_config = afterhours_config.get('vwap_filter', {
+            'enabled': False
+        })
+    
+    def _log_configuration(self):
+        """Log current configuration"""
+        self.logger.info("📋 Configuration:")
+        self.logger.info(f"   Market Hours Thresholds: {self.market_thresholds}")
+        self.logger.info(f"   Market Price Filter: ±{self.market_min_price_change}%")
+        self.logger.info(f"   Market Check Intervals: First Hour={self.market_check_intervals['first_hour']}s, Power Hour={self.market_check_intervals['power_hour']}s, Mid-Day={self.market_check_intervals['mid_day']}s")
+        self.logger.info(f"   Market Cooldown: {self.market_cooldown} min")
+        self.logger.info(f"   Market VWAP Filter: {self.market_vwap_config}")
+        self.logger.info(f"   Pre-Market Thresholds: {self.premarket_thresholds}")
+        self.logger.info(f"   Pre-Market Price Filter: ±{self.premarket_min_price_change}%")
+        self.logger.info(f"   Pre-Market Check Interval: {self.premarket_check_interval}s")
+    
+    def get_current_session(self) -> str:
+        """
+        Determine current trading session
+        Returns: 'PRE_MARKET', 'FIRST_HOUR', 'MID_DAY', 'POWER_HOUR', 'AFTER_HOURS', 'CLOSED'
+        """
+        now = datetime.now()
+        hour = now.hour
+        minute = now.minute
+        current_minutes = hour * 60 + minute
+        day_of_week = now.weekday()
+        
+        # Only weekdays
+        if day_of_week >= 5:
+            return 'CLOSED'
+        
+        # Define session times (in minutes from midnight)
+        premarket_start = 4 * 60  # 4:00 AM
+        market_open = 9 * 60 + 30  # 9:30 AM
+        first_hour_end = 10 * 60 + 30  # 10:30 AM
+        power_hour_start = 15 * 60  # 3:00 PM
+        market_close = 16 * 60  # 4:00 PM
+        afterhours_end = 20 * 60  # 8:00 PM
+        
+        if current_minutes < premarket_start:
+            return 'CLOSED'
+        elif current_minutes < market_open:
+            return 'PRE_MARKET'
+        elif current_minutes < first_hour_end:
+            return 'FIRST_HOUR'
+        elif current_minutes < power_hour_start:
+            return 'MID_DAY'
+        elif current_minutes < market_close:
+            return 'POWER_HOUR'
+        elif current_minutes < afterhours_end:
+            return 'AFTER_HOURS'
+        else:
+            return 'CLOSED'
+    
+    def get_session_config(self, session: str) -> Dict:
+        """
+        Get configuration for current session
+        
+        Returns:
+            Dict with thresholds, check_interval, cooldown, price_filter, vwap_config
+        """
+        if session == 'PRE_MARKET':
+            return {
+                'thresholds': self.premarket_thresholds,
+                'check_interval': self.premarket_check_interval,
+                'cooldown_minutes': self.premarket_cooldown,
+                'min_price_change': self.premarket_min_price_change,
+                'vwap_config': self.premarket_vwap_config
+            }
+        elif session == 'AFTER_HOURS':
+            return {
+                'thresholds': self.afterhours_thresholds,
+                'check_interval': self.afterhours_check_interval,
+                'cooldown_minutes': self.afterhours_cooldown,
+                'min_price_change': self.afterhours_min_price_change,
+                'vwap_config': self.afterhours_vwap_config
+            }
+        elif session in ['FIRST_HOUR', 'POWER_HOUR']:
+            return {
+                'thresholds': self.market_thresholds,
+                'check_interval': self.market_check_intervals.get(session.lower(), 20),
+                'cooldown_minutes': self.market_cooldown,
+                'min_price_change': self.market_min_price_change,
+                'vwap_config': self.market_vwap_config
+            }
+        else:  # MID_DAY
+            return {
+                'thresholds': self.market_thresholds,
+                'check_interval': self.market_check_intervals.get('mid_day', 30),
+                'cooldown_minutes': self.market_cooldown,
+                'min_price_change': self.market_min_price_change,
+                'vwap_config': self.market_vwap_config
+            }
     
     def set_discord_webhook(self, webhook_url: str):
         """Set Discord webhook URL"""
         self.discord_webhook = webhook_url
-        self.logger.info("✅ Discord webhook configured for real-time volume spikes")
+        self.logger.info("✅ Discord webhook configured for volume spikes")
     
     def load_watchlist(self) -> List[str]:
         """Load watchlist from manager"""
@@ -103,24 +238,7 @@ class RealtimeVolumeSpikeMonitor:
                 return []
         return []
     
-    def is_market_hours(self) -> bool:
-        """Check if currently in market hours (9:30 AM - 4:00 PM ET)"""
-        now = datetime.now()
-        hour = now.hour
-        minute = now.minute
-        current_minutes = hour * 60 + minute
-        day_of_week = now.weekday()
-        
-        # Only weekdays
-        if day_of_week >= 5:  # Saturday or Sunday
-            return False
-        
-        market_open = 9 * 60 + 30   # 9:30 AM
-        market_close = 16 * 60       # 4:00 PM
-        
-        return market_open <= current_minutes < market_close
-    
-    def is_cooldown_active(self, symbol: str) -> bool:
+    def is_cooldown_active(self, symbol: str, cooldown_minutes: int) -> bool:
         """Check if symbol is in cooldown period"""
         if symbol not in self.alert_cooldowns:
             return False
@@ -128,12 +246,11 @@ class RealtimeVolumeSpikeMonitor:
         last_alert = self.alert_cooldowns[symbol]
         elapsed = (datetime.now() - last_alert).total_seconds() / 60
         
-        return elapsed < self.cooldown_minutes
+        return elapsed < cooldown_minutes
     
     def set_cooldown(self, symbol: str):
         """Set cooldown for symbol"""
         self.alert_cooldowns[symbol] = datetime.now()
-        self.logger.debug(f"{symbol}: Cooldown set for {self.cooldown_minutes} minutes")
     
     def get_live_price(self, symbol: str) -> Optional[Dict]:
         """
@@ -141,7 +258,6 @@ class RealtimeVolumeSpikeMonitor:
         Returns: {'price': float, 'change_pct': float, 'timestamp': datetime}
         """
         try:
-            # Get real-time quote from Polygon
             url = f"https://api.polygon.io/v2/last/trade/{symbol}"
             params = {'apiKey': self.polygon_api_key}
             
@@ -180,39 +296,7 @@ class RealtimeVolumeSpikeMonitor:
             return None
     
     def get_live_vwap(self, symbol: str) -> Optional[float]:
-        """
-        Get LIVE VWAP (today's VWAP, no caching)
-        """
-        try:
-            today = datetime.now().strftime('%Y-%m-%d')
-            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/1/minute/{today}/{today}"
-            params = {
-                'apiKey': self.polygon_api_key,
-                'adjusted': 'true',
-                'sort': 'desc',
-                'limit': 1  # Just get the most recent bar
-            }
-            
-            response = requests.get(url, params=params, timeout=5)
-            response.raise_for_status()
-            data = response.json()
-            
-            self.stats['api_calls'] += 1
-            
-            if 'results' in data and data['results']:
-                # For real VWAP, we'd need to calculate cumulative
-                # For now, use the close as approximation or get from snapshot
-                # Better approach: use snapshot endpoint
-                return self.get_vwap_from_snapshot(symbol)
-            
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Error getting VWAP for {symbol}: {str(e)}")
-            return None
-    
-    def get_vwap_from_snapshot(self, symbol: str) -> Optional[float]:
-        """Get VWAP from snapshot endpoint (most accurate for real-time)"""
+        """Get LIVE VWAP from snapshot endpoint"""
         try:
             url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}"
             params = {'apiKey': self.polygon_api_key}
@@ -230,12 +314,35 @@ class RealtimeVolumeSpikeMonitor:
             return None
             
         except Exception as e:
-            self.logger.error(f"Error getting VWAP snapshot for {symbol}: {str(e)}")
+            self.logger.error(f"Error getting VWAP for {symbol}: {str(e)}")
             return None
     
-    def check_volume_spike(self, symbol: str) -> Optional[Dict]:
+    def check_vwap_proximity(self, price: float, vwap: float, proximity_pct: float) -> bool:
         """
-        Check if symbol has volume spike with LIVE data
+        Check if price is within proximity % of VWAP
+        
+        Args:
+            price: Current price
+            vwap: VWAP value
+            proximity_pct: Proximity threshold (e.g., 0.5 = within 0.5%)
+        
+        Returns:
+            True if within proximity, False otherwise
+        """
+        if not vwap or vwap == 0:
+            return False
+        
+        distance_pct = abs((price - vwap) / vwap) * 100
+        return distance_pct <= proximity_pct
+    
+    def check_volume_spike(self, symbol: str, session: str, session_config: Dict) -> Optional[Dict]:
+        """
+        Check if symbol has volume spike with session-specific thresholds
+        
+        Args:
+            symbol: Stock symbol
+            session: Current session
+            session_config: Configuration for current session
         
         Returns:
             Volume spike data if detected, None otherwise
@@ -248,13 +355,14 @@ class RealtimeVolumeSpikeMonitor:
                 return None
             
             rvol = rvol_data.get('rvol', 0)
+            thresholds = session_config['thresholds']
             
-            # Determine classification based on thresholds
-            if rvol >= self.thresholds['EXTREME']:
+            # Determine classification based on session thresholds
+            if rvol >= thresholds['extreme']:
                 classification = 'EXTREME'
-            elif rvol >= self.thresholds['HIGH']:
+            elif rvol >= thresholds['high']:
                 classification = 'HIGH'
-            elif rvol >= self.thresholds['ELEVATED']:
+            elif rvol >= thresholds['elevated']:
                 classification = 'ELEVATED'
             else:
                 classification = 'NORMAL'
@@ -284,7 +392,8 @@ class RealtimeVolumeSpikeMonitor:
                 'current_price': price_data['price'],
                 'price_change_pct': price_data['change_pct'],
                 'vwap': vwap,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'session': session
             }
             
         except Exception as e:
@@ -300,12 +409,13 @@ class RealtimeVolumeSpikeMonitor:
         else:
             return str(volume)
     
-    def send_discord_alert(self, spike_data: Dict) -> bool:
+    def send_discord_alert(self, spike_data: Dict, session: str) -> bool:
         """
-        Send Discord alert for volume spike with LIVE detailed data
+        Send Discord alert for volume spike with session context
         
         Args:
-            spike_data: Volume spike information (ALL LIVE DATA)
+            spike_data: Volume spike information
+            session: Current session (for display)
         
         Returns:
             True if sent successfully
@@ -349,13 +459,25 @@ class RealtimeVolumeSpikeMonitor:
                 price_emoji = '⚪'
                 price_text = '0.00%'
             
+            # VWAP proximity indicator
+            vwap_indicator = ''
+            if vwap and current_price:
+                distance_pct = abs((current_price - vwap) / vwap) * 100
+                if distance_pct <= 0.5:
+                    vwap_indicator = ' 🎯 **AT VWAP**'
+                elif distance_pct <= 1.0:
+                    vwap_indicator = ' 📍 **NEAR VWAP**'
+            
+            # Session display
+            session_display = session.replace('_', ' ').title()
+            
             # Calculate volume vs expected
             vol_vs_expected = ((current_vol - expected_vol) / expected_vol * 100) if expected_vol > 0 else 0
             
-            # Build embed with LIVE data
+            # Build embed
             embed = {
                 'title': f'{emoji} {symbol} - {urgency_text}',
-                'description': f'**{classification}** volume detected during market hours',
+                'description': f'**{classification}** volume detected{vwap_indicator}',
                 'color': color,
                 'timestamp': datetime.utcnow().isoformat(),
                 'fields': [
@@ -385,12 +507,12 @@ class RealtimeVolumeSpikeMonitor:
                     },
                     {
                         'name': '🎯 Session',
-                        'value': 'MARKET HOURS',
+                        'value': session_display,
                         'inline': True
                     }
                 ],
                 'footer': {
-                    'text': f'Real-Time Monitor • 30s checks • {self.cooldown_minutes}min cooldown'
+                    'text': f'Real-Time Monitor v2.0 • Session-aware detection'
                 }
             }
             
@@ -408,9 +530,7 @@ class RealtimeVolumeSpikeMonitor:
                     'inline': False
                 })
             
-            payload = {
-                'embeds': [embed]
-            }
+            payload = {'embeds': [embed]}
             
             response = requests.post(
                 self.discord_webhook,
@@ -421,8 +541,8 @@ class RealtimeVolumeSpikeMonitor:
             
             self.stats['alerts_sent'] += 1
             self.logger.info(
-                f"✅ Real-time volume spike alert sent: {symbol} "
-                f"({rvol:.2f}x, {price_text}, ${current_price:.2f})"
+                f"✅ Volume spike alert sent: {symbol} "
+                f"({rvol:.2f}x, {price_text}, ${current_price:.2f}) [{session_display}]"
             )
             
             return True
@@ -433,17 +553,22 @@ class RealtimeVolumeSpikeMonitor:
     
     def run_single_check(self) -> int:
         """
-        Run a single check cycle (30 seconds)
+        Run a single check cycle with session-aware configuration
         
         Returns:
             Number of alerts sent
         """
         alerts_sent = 0
         
-        # Check if we're in market hours
-        if not self.is_market_hours():
-            self.logger.debug("Outside market hours, skipping check")
+        # Get current session
+        session = self.get_current_session()
+        
+        if session == 'CLOSED':
+            self.logger.debug("Market closed, skipping check")
             return 0
+        
+        # Get session configuration
+        session_config = self.get_session_config(session)
         
         # Load watchlist
         if not self.watchlist:
@@ -453,28 +578,55 @@ class RealtimeVolumeSpikeMonitor:
             self.logger.warning("Empty watchlist, nothing to monitor")
             return 0
         
-        self.logger.info(f"🔍 Real-time check: {len(self.watchlist)} symbols...")
+        self.logger.info(
+            f"🔍 {session.replace('_', ' ')} check: {len(self.watchlist)} symbols "
+            f"(Interval: {session_config['check_interval']}s, "
+            f"RVOL≥{session_config['thresholds']['elevated']}x, "
+            f"Price≥{session_config['min_price_change']}%)"
+        )
         
         for symbol in self.watchlist:
             try:
                 # Skip if in cooldown
-                if self.is_cooldown_active(symbol):
+                if self.is_cooldown_active(symbol, session_config['cooldown_minutes']):
                     continue
                 
-                # Check for volume spike with LIVE data
-                spike_data = self.check_volume_spike(symbol)
+                # Check for volume spike with session config
+                spike_data = self.check_volume_spike(symbol, session, session_config)
                 
                 if spike_data:
                     # Apply price movement filter
                     price_change = abs(spike_data['price_change_pct'])
                     
-                    if price_change < self.min_price_change_pct:
+                    if price_change < session_config['min_price_change']:
                         self.logger.debug(
                             f"{symbol}: Volume spike detected but price change "
-                            f"({price_change:.2f}%) below minimum ({self.min_price_change_pct}%)"
+                            f"({price_change:.2f}%) below minimum ({session_config['min_price_change']}%)"
                         )
                         self.stats['filtered_by_price'] += 1
                         continue
+                    
+                    # Apply VWAP filter if enabled
+                    vwap_config = session_config['vwap_config']
+                    if vwap_config.get('enabled', False):
+                        vwap = spike_data.get('vwap')
+                        price = spike_data['current_price']
+                        
+                        if vwap and price:
+                            near_vwap = self.check_vwap_proximity(
+                                price, 
+                                vwap, 
+                                vwap_config.get('proximity_pct', 0.5)
+                            )
+                            
+                            # If require_proximity is True, only alert if near VWAP
+                            if vwap_config.get('require_proximity', False) and not near_vwap:
+                                self.logger.debug(
+                                    f"{symbol}: Not near VWAP "
+                                    f"(Price: ${price:.2f}, VWAP: ${vwap:.2f})"
+                                )
+                                self.stats['filtered_by_vwap'] += 1
+                                continue
                     
                     self.logger.info(
                         f"🚨 {symbol}: Volume spike detected! "
@@ -483,13 +635,13 @@ class RealtimeVolumeSpikeMonitor:
                     )
                     
                     # Send alert
-                    if self.send_discord_alert(spike_data):
+                    if self.send_discord_alert(spike_data, session):
                         alerts_sent += 1
                         self.set_cooldown(symbol)
                     else:
                         self.stats['filtered_by_cooldown'] += 1
                 
-                # Small delay to avoid rate limits (but should be fine with $200 plan)
+                # Small delay to avoid rate limits
                 time.sleep(0.1)
                 
             except Exception as e:
@@ -500,29 +652,32 @@ class RealtimeVolumeSpikeMonitor:
         self.stats['last_check'] = datetime.now().isoformat()
         
         if alerts_sent > 0:
-            self.logger.info(f"✅ Sent {alerts_sent} real-time volume spike alerts")
+            self.logger.info(f"✅ Sent {alerts_sent} volume spike alerts")
         
         return alerts_sent
     
     def run_continuous(self):
-        """Run monitor continuously during market hours"""
-        self.logger.info("🚀 Starting Real-Time Volume Spike Monitor (continuous mode)")
-        self.logger.info(f"   Active: Market hours only (9:30 AM - 4:00 PM ET)")
-        self.logger.info(f"   Check interval: {self.check_interval}s")
-        self.logger.info(f"   Price filter: ±{self.min_price_change_pct}% minimum")
+        """Run monitor continuously with dynamic intervals"""
+        self.logger.info("🚀 Starting OPTIMIZED Real-Time Volume Spike Monitor (continuous mode)")
+        self.logger.info("   Session-aware: Pre-market, First Hour, Mid-Day, Power Hour, After Hours")
         
         # Load watchlist initially
         self.load_watchlist()
         
         while self.enabled:
             try:
-                if self.is_market_hours():
+                session = self.get_current_session()
+                
+                if session != 'CLOSED':
                     self.run_single_check()
+                    session_config = self.get_session_config(session)
+                    check_interval = session_config['check_interval']
                 else:
                     self.logger.debug("Market closed, waiting...")
+                    check_interval = 60
                 
                 # Wait before next check
-                time.sleep(self.check_interval)
+                time.sleep(check_interval)
                 
                 # Reload watchlist every 20 checks (~10 minutes)
                 if self.stats['total_checks'] % 20 == 0:
@@ -533,7 +688,7 @@ class RealtimeVolumeSpikeMonitor:
                 break
             except Exception as e:
                 self.logger.error(f"Error in monitor loop: {str(e)}")
-                time.sleep(self.check_interval)
+                time.sleep(30)
     
     def stop(self):
         """Stop the monitor"""
@@ -544,12 +699,13 @@ class RealtimeVolumeSpikeMonitor:
     def print_stats(self):
         """Print monitor statistics"""
         print("\n" + "=" * 60)
-        print("REAL-TIME VOLUME SPIKE MONITOR STATISTICS")
+        print("OPTIMIZED REAL-TIME VOLUME SPIKE MONITOR STATISTICS")
         print("=" * 60)
         print(f"Total Checks: {self.stats['total_checks']}")
         print(f"Spikes Detected: {self.stats['spikes_detected']}")
         print(f"Alerts Sent: {self.stats['alerts_sent']}")
         print(f"Filtered by Price: {self.stats['filtered_by_price']}")
+        print(f"Filtered by VWAP: {self.stats['filtered_by_vwap']}")
         print(f"Filtered by Cooldown: {self.stats['filtered_by_cooldown']}")
         print(f"API Calls: {self.stats['api_calls']}")
         print(f"Last Check: {self.stats['last_check']}")
@@ -560,6 +716,7 @@ class RealtimeVolumeSpikeMonitor:
 if __name__ == '__main__':
     import os
     from dotenv import load_dotenv
+    import yaml
     
     load_dotenv()
     
@@ -575,16 +732,19 @@ if __name__ == '__main__':
         print("❌ Error: POLYGON_API_KEY not found")
         exit(1)
     
-    if not WEBHOOK:
-        print("⚠️ Warning: DISCORD_VOLUME_SPIKE not configured")
+    # Load config
+    config_path = Path(__file__).parent.parent / 'config' / 'config.yaml'
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
     
     # Create simple watchlist manager mock
     class MockWatchlist:
         def load_symbols(self):
-            return ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'ORCL', 'PLTR']
+            return ['SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL']
     
     monitor = RealtimeVolumeSpikeMonitor(
         polygon_api_key=API_KEY,
+        config=config,
         watchlist_manager=MockWatchlist()
     )
     
@@ -592,9 +752,9 @@ if __name__ == '__main__':
         monitor.set_discord_webhook(WEBHOOK)
     
     print("=" * 80)
-    print("REAL-TIME VOLUME SPIKE MONITOR - TEST MODE")
+    print("OPTIMIZED REAL-TIME VOLUME SPIKE MONITOR v2.0 - TEST MODE")
     print("=" * 80)
-    print(f"\nMarket hours active: {monitor.is_market_hours()}")
+    print(f"\nCurrent session: {monitor.get_current_session()}")
     print("\nRunning single check...\n")
     
     alerts = monitor.run_single_check()

@@ -2,6 +2,7 @@
 backend/monitors/spillover_detector.py
 Spillover Detection System - Detects related ticker opportunities
 Example: NVDA news → Alert on NVTS, SMCI, ARM (related stocks)
+WITH DATABASE PERSISTENCE
 """
 
 import sys
@@ -67,7 +68,7 @@ class SpilloverDetector:
         self.running = True
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.thread.start()
-        self.logger.info(f"🔔 Spillover detector started (check every {self.check_interval}s)")
+        self.logger.info(f"🔗 Spillover detector started (check every {self.check_interval}s)")
         self.logger.info(f"   Monitoring {len(self.major_tickers)} major tickers: {', '.join(self.major_tickers)}")
     
     def stop(self):
@@ -120,11 +121,14 @@ class SpilloverDetector:
             
             # Check each article
             for article in articles:
+                # FIX 1: Verify this is ACTUALLY about the primary ticker
+                if not self._is_primary_ticker_news(article, primary_ticker):
+                    continue
+                
                 article_id = article.get('id', '') or article.get('url', '')
                 
-                # Skip if already processed
-                opportunity_key = f"{primary_ticker}:{article_id}"
-                if opportunity_key in self.seen_opportunities:
+                # FIX 2: Global deduplication (not just per-primary ticker)
+                if article_id in self.seen_opportunities:
                     continue
                 
                 # Check if news is significant
@@ -141,22 +145,72 @@ class SpilloverDetector:
                             'volume_data': volume_data
                         })
                 
-                # If we found opportunities with volume confirmation
-                if opportunities:
-                    self.seen_opportunities.add(opportunity_key)
+                # FIX 3: Only alert if we have REAL opportunities (not fake RVOL)
+                if opportunities and len(opportunities) >= 1:
+                    # Verify at least one opportunity has real volume data
+                    real_opportunities = [
+                        opp for opp in opportunities 
+                        if opp['volume_data'].get('volume', 0) > 0
+                    ]
+                    
+                    if not real_opportunities:
+                        continue
+                    
+                    self.seen_opportunities.add(article_id)  # Mark as seen globally
                     self.stats['opportunities_found'] += 1
                     self.stats['by_primary_ticker'][primary_ticker] += 1
                     
                     self.logger.info(
-                        f"🔔 Spillover opportunity: {primary_ticker} → "
-                        f"{', '.join([o['ticker'] for o in opportunities])}"
+                        f"🔗 Spillover opportunity: {primary_ticker} → "
+                        f"{', '.join([o['ticker'] for o in real_opportunities])}"
                     )
                     
-                    # Send alert
-                    self._send_spillover_alert(primary_ticker, article, opportunities)
+                    # Send alert with real opportunities only
+                    self._send_spillover_alert(primary_ticker, article, real_opportunities)
         
         except Exception as e:
             self.logger.error(f"Error checking spillover for {primary_ticker}: {str(e)}")
+    
+    def _is_primary_ticker_news(self, article: Dict, ticker: str) -> bool:
+        """
+        Verify article is ACTUALLY about the primary ticker
+        Not just mentioning it in passing
+        """
+        title = article.get('title', '').upper()
+        teaser = article.get('teaser', '').upper()
+        
+        # Must appear in title OR be the first ticker mentioned
+        tickers = article.get('tickers', [])
+        
+        # Check 1: Ticker in title (strong signal)
+        if ticker in title:
+            return True
+        
+        # Check 2: Ticker is the FIRST/PRIMARY ticker in article
+        if tickers and len(tickers) > 0:
+            # Primary ticker should be in first 2 tickers
+            if ticker in tickers[:2]:
+                return True
+        
+        # Check 3: Company name in title (for major companies)
+        company_names = {
+            'NVDA': 'NVIDIA',
+            'TSLA': 'TESLA',
+            'AAPL': 'APPLE',
+            'MSFT': 'MICROSOFT',
+            'GOOGL': 'GOOGLE',
+            'AMZN': 'AMAZON',
+            'META': 'META',
+            'CRM': 'SALESFORCE'
+        }
+        
+        company_name = company_names.get(ticker, '')
+        if company_name and company_name in title:
+            return True
+        
+        # Otherwise, not primary news
+        return False
+    
     
     def _is_significant_news(self, article: Dict) -> bool:
         """Check if news is significant enough for spillover"""
@@ -216,7 +270,8 @@ class SpilloverDetector:
                 'current_volume': current_volume,
                 'avg_volume': avg_volume,
                 'rvol': round(rvol, 2),
-                'price': result.get('c', 0)
+                'price': result.get('c', 0),
+                'volume': current_volume  # Include volume for verification
             }
             
         except Exception as e:
@@ -250,6 +305,37 @@ class SpilloverDetector:
                 self.stats['alerts_sent'] += 1
                 tickers = ', '.join([o['ticker'] for o in opportunities])
                 self.logger.info(f"✅ Sent spillover alert: {primary_ticker} → {tickers}")
+                
+                # ==================== DATABASE SAVE ====================
+                # Save to database after successful Discord alert
+                if hasattr(self, 'save_to_db_callback') and self.save_to_db_callback:
+                    try:
+                        # Save for primary ticker
+                        self.save_to_db_callback(
+                            ticker=primary_ticker,
+                            headline=f"Spillover: {article.get('title', 'Market News')}",
+                            article=article,
+                            channel='spillover'
+                        )
+                        
+                        # Save for related tickers with volume confirmation
+                        for opportunity in opportunities:
+                            related_ticker = opportunity['ticker']
+                            self.save_to_db_callback(
+                                ticker=related_ticker,
+                                headline=f"Spillover from {primary_ticker}: {article.get('title', 'Market News')}",
+                                article=article,
+                                channel='spillover'
+                            )
+                        
+                        self.logger.debug(
+                            f"💾 Saved spillover news to database: {primary_ticker} + "
+                            f"{len(opportunities)} related tickers"
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Error saving to database: {str(e)}")
+                # =====================================================
+                
         except AttributeError:
             self.logger.warning("send_spillover_alert not implemented yet")
     

@@ -2,6 +2,7 @@
 backend/monitors/openai_news_monitor_v2.py
 OpenAI News Monitor using Benzinga + Unified News Engine
 Fixes the empty #openai-news channel issue
+WITH DATABASE PERSISTENCE
 """
 
 import sys
@@ -203,6 +204,29 @@ class OpenAINewsMonitor:
             if success:
                 self.stats['alerts_sent'] += 1
                 self.logger.info(f"✅ Sent AI news alert: {topic} ({len(articles)} articles)")
+                
+                # ==================== DATABASE SAVE ====================
+                # Save to database after successful Discord alert
+                if hasattr(self, 'save_to_db_callback') and self.save_to_db_callback:
+                    try:
+                        # AI tickers that benefit from AI sector news
+                        ai_tickers = ['NVDA', 'AMD', 'MSFT', 'GOOGL', 'META']
+                        
+                        # Save for each article (limit to top 5 to avoid spam)
+                        for article in articles[:5]:
+                            for ticker in ai_tickers:
+                                self.save_to_db_callback(
+                                    ticker=ticker,
+                                    headline=article.get('title', f'{topic} AI Sector News'),
+                                    article=article,
+                                    channel='ai'
+                                )
+                        
+                        self.logger.debug(f"💾 Saved {len(articles[:5])} AI news articles to database")
+                    except Exception as e:
+                        self.logger.error(f"Error saving to database: {str(e)}")
+                # =====================================================
+                
         except AttributeError:
             # Fallback if send_ai_news_alert doesn't exist yet
             self.logger.warning(f"send_ai_news_alert not implemented, using generic alert")

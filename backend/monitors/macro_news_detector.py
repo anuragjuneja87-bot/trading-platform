@@ -2,6 +2,7 @@
 backend/monitors/macro_news_detector.py
 Macro/Critical News Detector - Fed, Tariffs, Economic Data
 Routes to #news-alerts with CRITICAL priority
+WITH DATABASE PERSISTENCE
 """
 
 import sys
@@ -202,6 +203,23 @@ class MacroNewsDetector:
             if success:
                 self.stats['alerts_sent'] += 1
                 self.logger.warning(f"🚨 Sent CRITICAL macro alert: {category} - {article.get('title', '')[:50]}...")
+                
+                # ==================== DATABASE SAVE ====================
+                # Save to database after successful Discord alert
+                # Macro news affects entire market, so save for SPY
+                if hasattr(self, 'save_to_db_callback') and self.save_to_db_callback:
+                    try:
+                        self.save_to_db_callback(
+                            ticker='SPY',
+                            headline=article.get('title', 'Macro News'),
+                            article=article,
+                            channel='critical'
+                        )
+                        self.logger.debug(f"💾 Saved macro news to database: {category}")
+                    except Exception as e:
+                        self.logger.error(f"Error saving to database: {str(e)}")
+                # =====================================================
+                
         except AttributeError:
             # Fallback
             self.logger.warning(f"send_macro_news_alert not implemented yet")

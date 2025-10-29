@@ -1,6 +1,6 @@
 # ========================================
-# ALWAYS-ON-TRADER Configuration v4.1
-# Enhanced with Multi-Channel Discord + News + Earnings + PHASE 1 + MARKET IMPACT + MOMENTUM SIGNALS + 0DTE GAMMA
+# ALWAYS-ON-TRADER Configuration v4.2
+# Enhanced with OPTIMIZED VOLUME SPIKE DETECTION
 # ========================================
 
 # API Keys
@@ -46,7 +46,7 @@ discord:
   webhook_news: ${DISCORD_NEWS_ONLY}
   webhook_earnings_weekly: ${DISCORD_WEEKLY_EARNINGS}
   webhook_earnings_realtime: ${DISCORD_REALTIME_EARNINGS}
-  webhook_market_impact: ${DISCORD_NEWS_ALERTS}
+  webhook_market_impact: ${DISCORD_CRITICAL_SIGNALS}
   webhook_volume_spike: ${DISCORD_VOLUME_SPIKE}
   webhook_momentum_signals: ${DISCORD_MOMENTUM_SIGNALS}
   webhook_odte_levels: ${DISCORD_ODTE_LEVELS}
@@ -86,6 +86,84 @@ discord:
       sell: 0xcc0000
       momentum_shift: 0xffff00
       monitor: 0x888888
+
+# ========================================
+# 🚀 REAL-TIME VOLUME SPIKE MONITOR (OPTIMIZED FOR 7-FIGURE DAY TRADING)
+# AGGRESSIVE configuration - Speed & early detection prioritized
+# ========================================
+realtime_volume_spike:
+  enabled: true
+  
+  # Market Hours Configuration (9:30 AM - 4:00 PM ET)
+  market_hours:
+    # RVOL Thresholds - OPTIMIZED for early institutional flow detection
+    thresholds:
+      elevated: 2.0    # Early institutional activity - catch building momentum
+      high: 3.5        # Strong conviction move - significant volume
+      extreme: 5.5     # Parabolic setup - rare but actionable
+    
+    # Price movement filter - LOWERED to catch moves at inception
+    min_price_change_pct: 0.6    # Don't miss small price starts with big volume
+    
+    # Check intervals by session - ALL AGGRESSIVE
+    check_intervals:
+      first_hour: 15        # 9:30-10:30 AM - FASTEST (was 20s)
+      power_hour: 15        # 3:00-4:00 PM - FASTEST (was 20s)
+      mid_day: 20           # 10:30 AM-3:00 PM - FASTER (was 30s)
+    
+    # Cooldown between alerts - REDUCED for evolving setups
+    cooldown_minutes: 5     # Quick re-alerts on continuation (was 8)
+    
+    # VWAP proximity filter - INFORMATIONAL ONLY
+    vwap_filter:
+      enabled: true
+      proximity_pct: 0.5    # Alert if within 0.5% of VWAP
+      require_proximity: false  # Never filter out - just inform
+  
+  # Pre-Market Configuration (4:00 AM - 9:30 AM ET)
+  # CRITICAL: This is where big moves start - BE EARLY
+  pre_market:
+    # AGGRESSIVE thresholds - catch pre-market runners EARLY
+    thresholds:
+      elevated: 2.0    # Early pre-market activity (was 3.5)
+      high: 3.5        # Significant pre-market move (was 5.0)
+      extreme: 5.5     # Major pre-market event (was 8.0)
+    
+    # RELAXED price filter - volume matters more pre-market
+    min_price_change_pct: 0.75    # Catch starts before 2%+ moves (was 1.5)
+    
+    # FASTER check interval - speed is everything
+    check_interval: 25           # Much faster scanning (was 45s)
+    
+    # REDUCED cooldown - don't miss continuation
+    cooldown_minutes: 8          # Allow re-alerts on building momentum (was 15)
+    
+    # VWAP filter - WIDER for pre-market volatility
+    vwap_filter:
+      enabled: true
+      proximity_pct: 1.0        # Wider range for pre-market (was 0.75)
+      require_proximity: false  # Never filter out
+  
+  # After Hours Configuration (4:00 PM - 8:00 PM ET)
+  # CRITICAL: Earnings, news, continuation plays
+  after_hours:
+    # AGGRESSIVE thresholds - same as pre-market
+    thresholds:
+      elevated: 2.0    # Early after-hours activity (was 3.5)
+      high: 3.5        # Significant move (was 5.0)
+      extreme: 5.5     # Major event (was 8.0)
+    
+    # RELAXED price filter
+    min_price_change_pct: 0.75    # Early detection (was 1.5)
+    
+    # FASTER scanning
+    check_interval: 30           # Much faster (was 60s)
+    
+    # REDUCED cooldown
+    cooldown_minutes: 8          # Allow re-alerts (was 15)
+    
+    vwap_filter:
+      enabled: false  # VWAP less relevant after hours
 
 # ========================================
 # NEWS MONITORING (Legacy - for watchlist stocks)
@@ -307,49 +385,17 @@ openai_monitor:
     - NVDA
     - AMD
     - AVGO
-    - TSM
-    - INTC
-    - QCOM
-    - ASML
-    - MU
     - MSFT
     - GOOGL
-    - AMZN
     - META
+    - AMZN
     - ORCL
-  
-  min_impact_score: 6.0
-  include_unconfirmed: false
-  
-  tier1_sources:
-    - "bloomberg"
-    - "reuters"
-    - "wsj"
-    - "wall street journal"
-    - "financial times"
-  
-  tier2_sources:
-    - "cnbc"
-    - "yahoo finance"
-    - "marketwatch"
-    - "seeking alpha"
-    - "benzinga"
-  
-  discord_mentions:
-    critical_alerts: ""
-    high_alerts: ""
-  
-  log_all_checks: false
-  log_filtered_news: true
-  log_volume_data: true
 
 # ========================================
-# 📊 PRE-MARKET VOLUME SPIKE MONITOR
-# Routes to: DISCORD_VOLUME_SPIKE
+# 📊 EXTENDED HOURS VOLUME MONITOR (Legacy)
 # ========================================
-premarket_volume_monitor:
+extended_hours_volume_monitor:
   enabled: true
-  check_interval: 180                   # Check every 3 minutes
   
   # Spike detection
   spike_threshold: 3.0                  # 3.0x RVOL = spike
@@ -406,6 +452,49 @@ momentum_signal_monitor:
     min_price: 5.0                      # Ignore penny stocks
     max_alert_per_symbol_per_day: 5     # Max 5 alerts per symbol per day
 
+# ========================================
+# 📊 REAL-TIME EARNINGS MONITOR
+# Calendar-based approach (all stocks with earnings this week)
+# Routes to: DISCORD_REALTIME_EARNINGS
+# ========================================
+earnings_monitor:
+  enabled: true
+  
+  # Scan windows (ONLY during pre/post market)
+  premarket_window:
+    start_time: "05:00"              # 5:00 AM ET
+    end_time: "08:00"                # 8:00 AM ET
+    check_interval: 20               # Check every 20 seconds
+  
+  postmarket_window:
+    start_time: "15:50"              # 3:50 PM ET (10 min before close)
+    end_time: "19:00"                # 7:00 PM ET
+    check_interval: 10               # Check every 10 seconds (FASTEST - critical window)
+  
+  # Calendar refresh
+  calendar_refresh: "daily"          # Refresh earnings calendar daily at market close
+  
+  # Detection settings
+  lookback_minutes: 30               # Check news from last 30 minutes (fast detection)
+  
+  # Earnings keywords
+  earnings_keywords:
+    - "earnings"
+    - "reports q"
+    - "quarterly results"
+    - "beats"
+    - "misses"
+    - "eps"
+    - "guidance"
+    - "blowout"
+    - "disappointing earnings"
+    - "earnings surprise"
+    - "beats estimates"
+    - "misses estimates"
+  
+  # Alert settings
+  alert_all_earnings: true           # Alert on ALL earnings (not just watchlist)
+  deduplicate: true                  # Prevent duplicate alerts for same earnings
 # ========================================
 # 🎯 0DTE GAMMA LEVEL MONITOR
 # Alert at 9:00 AM EST when price near gamma walls
@@ -642,10 +731,11 @@ persistence:
   metrics_directory: "data/metrics"
 
 # ========================================
-# 🚀 SYSTEM SUMMARY v4.1
+# 🚀 SYSTEM SUMMARY v4.2
 # ========================================
 # Features Active:
 # ✅ Trading Signals (26 factors, Phase 1)
+# ✅ OPTIMIZED Real-Time Volume Spike Monitor
 # ✅ Market Impact Monitor (macro, M&A, analyst, spillover)
 # ✅ OpenAI News Monitor (AI-specific news)
 # ✅ Pre-Market Volume Monitor (extended hours spikes)
@@ -656,5 +746,6 @@ persistence:
 # ✅ Earnings Monitoring (weekly + realtime)
 # ✅ Signal Metrics Tracking (win rate, performance)
 # ✅ Multi-Channel Discord Routing
-# ✅ Option A: Open Interest + Enhanced Dark Pool
+# ✅ Session-Aware Volume Detection (first hour/power hour)
+# ✅ VWAP Proximity Filtering
 # ========================================
