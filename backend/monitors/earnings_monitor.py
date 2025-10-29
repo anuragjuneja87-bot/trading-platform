@@ -4,7 +4,6 @@ Pre-market: 5:00 AM - 8:00 AM ET (20 sec checks)
 Post-market: 3:50 PM - 7:00 PM ET (5 sec checks) ⚡ ULTRA-FAST
 Routes to: DISCORD_REALTIME_EARNINGS
 WITH DATABASE PERSISTENCE
-WITH FORTUNE 500 MARKET CAP FILTER ($5B+)
 """
 
 import sys
@@ -45,10 +44,6 @@ class EarningsMonitor:
         self.running = False
         self.thread = None
         
-        # ✨ NEW: MARKET CAP FILTER - Fortune 500 companies
-        # Fortune 500: $5B+ | Fortune 100: $50B+ | Top 200: $10B+
-        self.MIN_MARKET_CAP = 5_000_000_000  # $5 billion
-        
         # Track seen earnings (to prevent duplicates)
         self.seen_earnings = set()  # Set of (symbol, date, benzinga_id) tuples
         
@@ -60,7 +55,6 @@ class EarningsMonitor:
             'checks_performed': 0,
             'earnings_detected': 0,
             'alerts_sent': 0,
-            'filtered_smallcap': 0,  # ✨ NEW: Track filtered companies
             'last_check': None,
             'calendar_symbols': 0,
             'calendar_last_updated': None,
@@ -88,7 +82,6 @@ class EarningsMonitor:
         self.logger.info(f"   🌅 Pre-market: 5:00 AM - 8:00 AM ET (check every {self.check_interval_premarket}s)")
         self.logger.info(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (check every {self.check_interval_postmarket}s) ⚡ ULTRA-FAST")
         self.logger.info(f"   📅 Monitoring {len(self.today_earnings)} stocks with earnings today")
-        self.logger.info(f"   💎 Market cap filter: ${self.MIN_MARKET_CAP:,.0f}+ (Fortune 500)")
     
     def stop(self):
         """Stop monitoring"""
@@ -190,32 +183,6 @@ class EarningsMonitor:
             self.logger.error(f"Error refreshing earnings calendar: {str(e)}")
             self.today_earnings = []
     
-    def _get_market_cap(self, ticker: str) -> float:
-        """
-        ✨ NEW: Get market cap for a ticker using Polygon API
-        
-        Args:
-            ticker: Stock ticker symbol
-        
-        Returns:
-            Market cap in dollars (0 if unavailable)
-        """
-        try:
-            url = f"https://api.polygon.io/v3/reference/tickers/{ticker}"
-            params = {'apiKey': self.polygon_api_key}
-            
-            response = requests.get(url, params=params, timeout=5)
-            response.raise_for_status()
-            
-            data = response.json()
-            market_cap = data.get('results', {}).get('market_cap', 0)
-            
-            return market_cap if market_cap else 0
-            
-        except Exception as e:
-            self.logger.debug(f"Could not fetch market cap for {ticker}: {str(e)}")
-            return 0  # Default to 0 if unavailable (will be filtered out)
-    
     def check_earnings(self):
         """Check for earnings that have been released (actual_eps populated)"""
         try:
@@ -261,16 +228,6 @@ class EarningsMonitor:
                 self.seen_earnings.add(key)
                 self.stats['earnings_detected'] += 1
                 
-                # ✨ NEW: MARKET CAP FILTER - Skip small cap companies
-                market_cap = self._get_market_cap(ticker)
-                if market_cap < self.MIN_MARKET_CAP:
-                    self.stats['filtered_smallcap'] += 1
-                    self.logger.info(
-                        f"⏭️  Skipping {ticker} - Market cap ${market_cap:,.0f} "
-                        f"below ${self.MIN_MARKET_CAP:,.0f} threshold"
-                    )
-                    continue
-                
                 # Analyze beat/miss
                 sentiment = self._analyze_earnings_sentiment(earning)
                 
@@ -283,7 +240,7 @@ class EarningsMonitor:
                     self.stats['inline'] += 1
                 
                 self.logger.warning(
-                    f"🚨 EARNINGS DETECTED: {ticker} (${market_cap/1e9:.1f}B) - {sentiment} | "
+                    f"🚨 EARNINGS DETECTED: {ticker} - {sentiment} | "
                     f"EPS: {earning.get('actual_eps')} vs {earning.get('estimated_eps')}"
                 )
                 
