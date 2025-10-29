@@ -1,9 +1,12 @@
 """
-Real-Time Earnings Monitor - BENZINGA API VERSION
+Real-Time Earnings Monitor - BENZINGA API VERSION v2.1
 Pre-market: 5:00 AM - 8:00 AM ET (20 sec checks)
 Post-market: 3:50 PM - 7:00 PM ET (5 sec checks) ⚡ ULTRA-FAST
 Routes to: DISCORD_REALTIME_EARNINGS
 WITH DATABASE PERSISTENCE
+WITH RATE LIMIT PROTECTION
+WITH FORTUNE 500 MARKET CAP FILTER ($5B+)
+EXPERIMENTAL VERSION - TEST BEFORE PRODUCTION
 """
 
 import sys
@@ -25,21 +28,29 @@ class EarningsMonitor:
                  polygon_api_key: str,
                  discord_alerter,
                  check_interval_premarket: int = 20,
-                 check_interval_postmarket: int = 5):  # 5 SECONDS!
+                 check_interval_postmarket: int = 5,
+                 min_market_cap: int = 5_000_000_000,  # $5B default
+                 allow_unknown_market_cap: bool = True):  # Allow if market cap unavailable
         """
-        Initialize Earnings Monitor - Benzinga API version
+        Initialize Earnings Monitor - Benzinga API version with Market Cap Filter
         
         Args:
             polygon_api_key: Polygon API key (with Benzinga earnings access)
             discord_alerter: DiscordAlerter instance
             check_interval_premarket: Pre-market check interval (default 20s)
             check_interval_postmarket: Post-market check interval (default 5s) ⚡
+            min_market_cap: Minimum market cap for alerts (default $5B for Fortune 500)
+            allow_unknown_market_cap: If True, send alerts even if market cap unavailable
         """
         self.polygon_api_key = polygon_api_key
         self.discord = discord_alerter
         self.check_interval_premarket = check_interval_premarket
         self.check_interval_postmarket = check_interval_postmarket
         self.logger = logging.getLogger(__name__)
+        
+        # MARKET CAP FILTER CONFIGURATION
+        self.MIN_MARKET_CAP = min_market_cap
+        self.ALLOW_UNKNOWN_MARKET_CAP = allow_unknown_market_cap
         
         self.running = False
         self.thread = None
@@ -55,6 +66,8 @@ class EarningsMonitor:
             'checks_performed': 0,
             'earnings_detected': 0,
             'alerts_sent': 0,
+            'filtered_smallcap': 0,  # NEW: Track filtered companies
+            'market_cap_unknown': 0,  # NEW: Track unknown market caps
             'last_check': None,
             'calendar_symbols': 0,
             'calendar_last_updated': None,
@@ -78,10 +91,15 @@ class EarningsMonitor:
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.thread.start()
         
-        self.logger.info(f"📊 Earnings monitor started (Benzinga API)")
+        self.logger.info(f"📊 Earnings monitor started (Benzinga API v2.1)")
         self.logger.info(f"   🌅 Pre-market: 5:00 AM - 8:00 AM ET (check every {self.check_interval_premarket}s)")
         self.logger.info(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (check every {self.check_interval_postmarket}s) ⚡ ULTRA-FAST")
         self.logger.info(f"   📅 Monitoring {len(self.today_earnings)} stocks with earnings today")
+        self.logger.info(f"   💎 Market cap filter: ${self.MIN_MARKET_CAP:,.0f}+ (Fortune 500)")
+        if self.ALLOW_UNKNOWN_MARKET_CAP:
+            self.logger.info(f"   ⚠️  Unknown market caps: ALLOWED (will send alerts)")
+        else:
+            self.logger.info(f"   🚫 Unknown market caps: BLOCKED (will skip alerts)")
     
     def stop(self):
         """Stop monitoring"""
@@ -183,6 +201,53 @@ class EarningsMonitor:
             self.logger.error(f"Error refreshing earnings calendar: {str(e)}")
             self.today_earnings = []
     
+    def _get_market_cap(self, ticker: str) -> Optional[float]:
+        """
+        Get market cap for a ticker using Polygon API
+        
+        Args:
+            ticker: Stock ticker symbol
+        
+        Returns:
+            Market cap in dollars, or None if unavailable
+        """
+        try:
+            url = f"https://api.polygon.io/v3/reference/tickers/{ticker}"
+            params = {'apiKey': self.polygon_api_key}
+            
+            response = requests.get(url, params=params, timeout=5)
+            
+            # Handle specific HTTP errors
+            if response.status_code == 404:
+                self.logger.info(f"⚠️  {ticker}: Ticker not found in Polygon database")
+                return None
+            elif response.status_code == 429:
+                self.logger.warning(f"⚠️  {ticker}: Rate limited on market cap API")
+                return None
+            
+            response.raise_for_status()
+            
+            data = response.json()
+            market_cap = data.get('results', {}).get('market_cap', 0)
+            
+            if market_cap and market_cap > 0:
+                # Log market cap in billions for readability
+                self.logger.info(f"💰 {ticker}: ${market_cap/1e9:.2f}B market cap")
+                return market_cap
+            else:
+                self.logger.info(f"⚠️  {ticker}: No market cap data available")
+                return None
+            
+        except requests.exceptions.Timeout:
+            self.logger.warning(f"⚠️  {ticker}: Timeout fetching market cap")
+            return None
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"⚠️  {ticker}: Error fetching market cap - {str(e)}")
+            return None
+        except Exception as e:
+            self.logger.warning(f"⚠️  {ticker}: Unexpected error - {str(e)}")
+            return None
+    
     def check_earnings(self):
         """Check for earnings that have been released (actual_eps populated)"""
         try:
@@ -228,7 +293,33 @@ class EarningsMonitor:
                 self.seen_earnings.add(key)
                 self.stats['earnings_detected'] += 1
                 
-                # Analyze beat/miss
+                # 🔍 MARKET CAP FILTER - Check if company meets threshold
+                market_cap = self._get_market_cap(ticker)
+                
+                if market_cap is None:
+                    # Market cap unavailable
+                    self.stats['market_cap_unknown'] += 1
+                    
+                    if not self.ALLOW_UNKNOWN_MARKET_CAP:
+                        self.logger.info(
+                            f"⏭️  Skipping {ticker} - Market cap unknown and filtering enabled"
+                        )
+                        continue
+                    else:
+                        self.logger.info(
+                            f"✅ Allowing {ticker} - Market cap unknown but filter is permissive"
+                        )
+                
+                elif market_cap < self.MIN_MARKET_CAP:
+                    # Market cap below threshold
+                    self.stats['filtered_smallcap'] += 1
+                    self.logger.info(
+                        f"⏭️  Skipping {ticker} - Market cap ${market_cap:,.0f} "
+                        f"below ${self.MIN_MARKET_CAP:,.0f} threshold"
+                    )
+                    continue
+                
+                # Passed filter - proceed with alert
                 sentiment = self._analyze_earnings_sentiment(earning)
                 
                 # Track stats
@@ -239,13 +330,17 @@ class EarningsMonitor:
                 else:
                     self.stats['inline'] += 1
                 
+                market_cap_str = f"(${market_cap/1e9:.1f}B)" if market_cap else "(Unknown cap)"
                 self.logger.warning(
-                    f"🚨 EARNINGS DETECTED: {ticker} - {sentiment} | "
+                    f"🚨 EARNINGS DETECTED: {ticker} {market_cap_str} - {sentiment} | "
                     f"EPS: {earning.get('actual_eps')} vs {earning.get('estimated_eps')}"
                 )
                 
                 # Send alert
                 self._send_earnings_alert(earning, sentiment)
+                
+                # Add delay to avoid Discord rate limits (max 5 per 2 seconds)
+                time.sleep(0.5)
         
         except Exception as e:
             self.logger.error(f"Error checking earnings: {str(e)}")
@@ -332,15 +427,15 @@ class EarningsMonitor:
         }
         
         try:
-            # Use existing Discord alerter method (we'll update this)
+            # Use existing Discord alerter method
             success = self._send_to_discord(alert_data)
             
             if success:
                 self.stats['alerts_sent'] += 1
                 self.logger.info(f"✅ Earnings alert sent: {ticker} - {sentiment}")
                 
-                # Save to database if callback exists
-                if hasattr(self, 'save_to_db_callback') and self.save_to_db_callback:
+                # Save to database if callback exists and is callable
+                if hasattr(self, 'save_to_db_callback') and callable(self.save_to_db_callback):
                     try:
                         headline = f"{ticker} {sentiment} - {fiscal_period} {fiscal_year} Earnings"
                         self.save_to_db_callback(
@@ -350,14 +445,25 @@ class EarningsMonitor:
                             channel='earnings'
                         )
                     except Exception as e:
-                        self.logger.error(f"Error saving to database: {str(e)}")
+                        self.logger.debug(f"Database save skipped: {str(e)}")
         
         except Exception as e:
             self.logger.error(f"Error sending earnings alert: {str(e)}")
     
     def _send_to_discord(self, alert_data: Dict) -> bool:
         """Send formatted earnings alert to Discord webhook"""
-        webhook_url = self.discord.config.get('webhook_earnings_realtime')
+        # Try different ways to access the webhook based on DiscordAlerter structure
+        webhook_url = None
+        
+        if hasattr(self.discord, 'webhooks'):
+            # Method 1: webhooks dictionary
+            webhook_url = self.discord.webhooks.get('earnings_realtime')
+        elif hasattr(self.discord, 'config'):
+            # Method 2: config dictionary
+            webhook_url = self.discord.config.get('webhook_earnings_realtime')
+        elif hasattr(self.discord, 'webhook_earnings_realtime'):
+            # Method 3: direct attribute
+            webhook_url = self.discord.webhook_earnings_realtime
         
         if not webhook_url:
             self.logger.warning("Discord webhook for earnings not configured")
@@ -442,20 +548,40 @@ class EarningsMonitor:
                 }
             ],
             'footer': {
-                'text': f"Detected at {alert_data['time']} ET • Earnings Monitor v2"
+                'text': f"Detected at {alert_data['time']} ET • Earnings Monitor v2.1"
             },
             'timestamp': alert_data['timestamp']
         }
         
         payload = {'embeds': [embed]}
         
-        try:
-            response = requests.post(webhook_url, json=payload, timeout=10)
-            response.raise_for_status()
-            return True
-        except Exception as e:
-            self.logger.error(f"Discord webhook error: {str(e)}")
-            return False
+        # Retry logic for rate limits
+        max_retries = 3
+        retry_delay = 2  # Start with 2 seconds
+        
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(webhook_url, json=payload, timeout=10)
+                response.raise_for_status()
+                return True
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:  # Rate limited
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Discord rate limited, retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        self.logger.error(f"Discord rate limit exceeded after {max_retries} attempts")
+                        return False
+                else:
+                    self.logger.error(f"Discord webhook error: {e}")
+                    return False
+            except Exception as e:
+                self.logger.error(f"Discord webhook error: {str(e)}")
+                return False
+        
+        return False
     
     def get_daily_preview(self, date: str = None) -> List[Dict]:
         """
@@ -522,7 +648,11 @@ class EarningsMonitor:
         others = [e for e in earnings_list if e.get('importance', 0) < 4]
         
         # Build Discord message
-        webhook_url = self.discord.config.get('webhook_earnings_realtime')
+        webhook_url = None
+        if hasattr(self.discord, 'webhooks'):
+            webhook_url = self.discord.webhooks.get('earnings_realtime')
+        elif hasattr(self.discord, 'config'):
+            webhook_url = self.discord.config.get('webhook_earnings_realtime')
         
         if not webhook_url:
             self.logger.warning("Discord webhook not configured")
@@ -544,7 +674,7 @@ class EarningsMonitor:
         
         embed = {
             'title': f'📅 EARNINGS PREVIEW - {date}',
-            'description': f'**{len(earnings_list)} companies reporting earnings**',
+            'description': f'**{len(earnings_list)} companies reporting earnings**\n💎 *Filtered: Fortune 500 only ($5B+ market cap)*',
             'color': 0x5865F2,  # Discord blurple
             'fields': [
                 {
@@ -554,7 +684,7 @@ class EarningsMonitor:
                 }
             ],
             'footer': {
-                'text': f'Daily Preview • Monitor active 3:50-7 PM ET'
+                'text': f'Daily Preview • Monitor active 3:50-7 PM ET • v2.1'
             },
             'timestamp': datetime.now().isoformat()
         }
@@ -584,7 +714,14 @@ class EarningsMonitor:
     
     def get_statistics(self) -> Dict:
         """Get monitor statistics"""
-        return self.stats.copy()
+        stats = self.stats.copy()
+        stats['market_cap_filter'] = {
+            'threshold': self.MIN_MARKET_CAP,
+            'allow_unknown': self.ALLOW_UNKNOWN_MARKET_CAP,
+            'filtered_count': self.stats['filtered_smallcap'],
+            'unknown_count': self.stats['market_cap_unknown']
+        }
+        return stats
 
 
 if __name__ == '__main__':
@@ -599,7 +736,9 @@ if __name__ == '__main__':
         polygon_api_key=API_KEY,
         discord_alerter=None,
         check_interval_premarket=20,
-        check_interval_postmarket=5
+        check_interval_postmarket=5,
+        min_market_cap=5_000_000_000,  # $5B
+        allow_unknown_market_cap=True  # Allow if market cap unavailable
     )
     
     # Test daily preview
