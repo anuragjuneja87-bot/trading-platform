@@ -1,9 +1,9 @@
 """
 backend/monitors/earnings_monitor.py
-Real-Time Earnings Monitor - CALENDAR-BASED APPROACH
+Real-Time Earnings Monitor - BENZINGA API VERSION
 Pre-market: 5:00 AM - 8:00 AM ET (20 sec checks)
-Post-market: 3:50 PM - 7:00 PM ET (10 sec checks) ← FASTEST FOR CRITICAL EARNINGS
-Routes to: DISCORD_EARNINGS_REALTIME
+Post-market: 3:50 PM - 7:00 PM ET (5 sec checks) ⚡ ULTRA-FAST
+Routes to: DISCORD_REALTIME_EARNINGS
 WITH DATABASE PERSISTENCE
 """
 
@@ -24,22 +24,19 @@ import pytz
 class EarningsMonitor:
     def __init__(self, 
                  polygon_api_key: str,
-                 unified_news_engine,
                  discord_alerter,
                  check_interval_premarket: int = 20,
-                 check_interval_postmarket: int = 10):
+                 check_interval_postmarket: int = 5):  # 5 SECONDS!
         """
-        Initialize Earnings Monitor - Calendar-based approach
+        Initialize Earnings Monitor - Benzinga API version
         
         Args:
-            polygon_api_key: Polygon API key
-            unified_news_engine: UnifiedNewsEngine instance
+            polygon_api_key: Polygon API key (with Benzinga earnings access)
             discord_alerter: DiscordAlerter instance
             check_interval_premarket: Pre-market check interval (default 20s)
-            check_interval_postmarket: Post-market check interval (default 10s)
+            check_interval_postmarket: Post-market check interval (default 5s) ⚡
         """
         self.polygon_api_key = polygon_api_key
-        self.unified_news = unified_news_engine
         self.discord = discord_alerter
         self.check_interval_premarket = check_interval_premarket
         self.check_interval_postmarket = check_interval_postmarket
@@ -48,22 +45,12 @@ class EarningsMonitor:
         self.running = False
         self.thread = None
         
-        # Track seen earnings
-        self.seen_earnings = set()  # Set of (symbol, date) tuples
+        # Track seen earnings (to prevent duplicates)
+        self.seen_earnings = set()  # Set of (symbol, date, benzinga_id) tuples
         
-        # Earnings calendar cache (refreshed weekly)
-        self.earnings_calendar = []
+        # Earnings calendar cache
+        self.today_earnings = []
         self.calendar_last_updated = None
-        
-        # Earnings keywords for news detection
-        self.earnings_keywords = [
-            'earnings', 'reports q', 'quarterly results', 'reports third quarter',
-            'beats', 'misses', 'eps', 'revenue', 'guidance', 'blowout',
-            'disappointing earnings', 'earnings surprise', 'beats estimates',
-            'misses estimates', 'raises guidance', 'lowers guidance',
-            'beats expectations', 'misses expectations', 'q1 earnings',
-            'q2 earnings', 'q3 earnings', 'q4 earnings', 'reports results'
-        ]
         
         self.stats = {
             'checks_performed': 0,
@@ -74,7 +61,8 @@ class EarningsMonitor:
             'calendar_last_updated': None,
             'current_session': None,
             'beats': 0,
-            'misses': 0
+            'misses': 0,
+            'inline': 0
         }
     
     def start(self):
@@ -85,16 +73,16 @@ class EarningsMonitor:
         
         self.running = True
         
-        # Load initial earnings calendar
+        # Load today's earnings calendar
         self._refresh_earnings_calendar()
         
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.thread.start()
         
-        self.logger.info(f"📊 Earnings monitor started")
+        self.logger.info(f"📊 Earnings monitor started (Benzinga API)")
         self.logger.info(f"   🌅 Pre-market: 5:00 AM - 8:00 AM ET (check every {self.check_interval_premarket}s)")
-        self.logger.info(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (check every {self.check_interval_postmarket}s) ⚡ FASTEST")
-        self.logger.info(f"   📅 Monitoring {len(self.earnings_calendar)} stocks with earnings this week")
+        self.logger.info(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (check every {self.check_interval_postmarket}s) ⚡ ULTRA-FAST")
+        self.logger.info(f"   📅 Monitoring {len(self.today_earnings)} stocks with earnings today")
     
     def stop(self):
         """Stop monitoring"""
@@ -107,7 +95,6 @@ class EarningsMonitor:
         """Main monitoring loop - only runs during pre/post market windows"""
         while self.running:
             try:
-                # Check if we're in a monitoring window
                 session = self._get_current_session()
                 
                 if session == 'PREMARKET':
@@ -118,14 +105,13 @@ class EarningsMonitor:
                 elif session == 'POSTMARKET':
                     self.stats['current_session'] = 'POSTMARKET'
                     self.check_earnings()
-                    time.sleep(self.check_interval_postmarket)
+                    time.sleep(self.check_interval_postmarket)  # 5 SECONDS!
                     
                 else:
-                    # Outside monitoring window - sleep for 1 minute
                     self.stats['current_session'] = 'IDLE'
                     time.sleep(60)
                     
-                    # Refresh calendar if needed (once per day at market close)
+                    # Refresh calendar at market close
                     if session == 'MARKET_CLOSE':
                         self._refresh_earnings_calendar()
                 
@@ -134,23 +120,15 @@ class EarningsMonitor:
                 time.sleep(30)
     
     def _get_current_session(self) -> str:
-        """
-        Determine current session
-        Returns: 'PREMARKET', 'POSTMARKET', 'MARKET_HOURS', 'MARKET_CLOSE', 'IDLE'
-        """
+        """Determine current session"""
         et_tz = pytz.timezone('America/New_York')
         now_et = datetime.now(et_tz)
         current_time = now_et.time()
         
-        # Pre-market: 5:00 AM - 8:00 AM ET
         premarket_start = dt_time(5, 0)
         premarket_end = dt_time(8, 0)
-        
-        # Post-market: 3:50 PM - 7:00 PM ET
         postmarket_start = dt_time(15, 50)  # 3:50 PM
         postmarket_end = dt_time(19, 0)     # 7:00 PM
-        
-        # Market close window for calendar refresh: 4:00 PM - 4:05 PM
         market_close_start = dt_time(16, 0)
         market_close_end = dt_time(16, 5)
         
@@ -166,197 +144,444 @@ class EarningsMonitor:
             return 'IDLE'
     
     def _refresh_earnings_calendar(self):
-        """Fetch earnings calendar for the current week from Polygon"""
+        """Fetch today's earnings calendar from Polygon/Benzinga"""
         try:
             self.logger.info("📅 Refreshing earnings calendar...")
             
-            # Get date range: today through next 7 days
-            today = datetime.now().date()
-            end_date = today + timedelta(days=7)
+            today = datetime.now().date().isoformat()
             
-            # Polygon earnings calendar endpoint
-            url = "https://api.polygon.io/v2/reference/financials"
+            url = "https://api.polygon.io/benzinga/v1/earnings"
+            params = {
+                'apiKey': self.polygon_api_key,
+                'date.gte': today,
+                'date.lte': today,
+                'limit': 250
+            }
             
-            # Alternative: Use simpler approach - get earnings from news
-            # For speed, we'll monitor news for ALL stocks, not just a pre-filtered list
-            # This ensures we catch EVERYTHING
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
             
-            # For now, we'll use a hybrid approach:
-            # 1. Monitor major indices for earnings
-            # 2. Rely on news scanning to catch earnings as they're released
+            data = response.json()
             
-            # Major stocks to always monitor (can be expanded)
-            self.earnings_calendar = self._get_major_watchlist()
-            
-            self.calendar_last_updated = datetime.now().isoformat()
-            self.stats['calendar_symbols'] = len(self.earnings_calendar)
-            self.stats['calendar_last_updated'] = self.calendar_last_updated
-            
-            self.logger.info(f"✅ Earnings calendar updated: {len(self.earnings_calendar)} symbols")
+            if 'results' in data and data['results']:
+                self.today_earnings = data['results']
+                self.calendar_last_updated = datetime.now().isoformat()
+                self.stats['calendar_symbols'] = len(self.today_earnings)
+                self.stats['calendar_last_updated'] = self.calendar_last_updated
+                
+                self.logger.info(f"✅ Earnings calendar updated: {len(self.today_earnings)} stocks reporting today")
+                
+                # Log major earnings
+                major_tickers = [e for e in self.today_earnings if e.get('importance', 0) >= 4]
+                if major_tickers:
+                    tickers = ', '.join([e['ticker'] for e in major_tickers[:10]])
+                    self.logger.info(f"   📊 Major earnings today: {tickers}")
+            else:
+                self.logger.info("ℹ️  No earnings scheduled for today")
+                self.today_earnings = []
             
         except Exception as e:
             self.logger.error(f"Error refreshing earnings calendar: {str(e)}")
-            # Fallback to major indices if calendar fetch fails
-            self.earnings_calendar = self._get_major_watchlist()
-    
-    def _get_major_watchlist(self) -> List[str]:
-        """Get major symbols to monitor for earnings (fallback)"""
-        # Major tech and indices
-        return [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 
-            'AMD', 'INTC', 'NFLX', 'CRM', 'ORCL', 'ADBE', 'PYPL',
-            'SPY', 'QQQ', 'DIA', 'IWM',
-            # Add more as needed
-        ]
+            self.today_earnings = []
     
     def check_earnings(self):
-        """Check for earnings announcements via news"""
+        """Check for earnings that have been released (actual_eps populated)"""
         try:
             self.stats['checks_performed'] += 1
             self.stats['last_check'] = datetime.now().isoformat()
             
-            # Get recent news (last 30 minutes - we need FAST detection)
-            # For post-market, we check even more frequently
-            hours = 0.5  # 30 minutes
+            today = datetime.now().date().isoformat()
             
-            articles = self.unified_news.get_unified_news(
-                ticker=None,  # ALL news (calendar approach)
-                hours=hours,
-                limit=100  # Check more articles for comprehensive coverage
-            )
+            # Query for TODAY's earnings with actual results
+            url = "https://api.polygon.io/benzinga/v1/earnings"
+            params = {
+                'apiKey': self.polygon_api_key,
+                'date.gte': today,
+                'date.lte': today,
+                'limit': 250
+            }
             
-            if not articles:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'results' not in data or not data['results']:
                 return
             
-            # Filter for earnings-related news
-            earnings_articles = []
-            for article in articles:
-                if self._is_earnings_news(article):
-                    article_id = article.get('id', '') or article.get('url', '')
-                    
-                    # Get primary ticker
-                    tickers = article.get('tickers', [])
-                    if not tickers:
-                        continue
-                    
-                    primary_ticker = tickers[0]
-                    
-                    # Create unique key
-                    today = datetime.now().date().isoformat()
-                    earnings_key = f"{primary_ticker}_{today}"
-                    
-                    # Skip if already seen
-                    if earnings_key in self.seen_earnings:
-                        continue
-                    
-                    self.seen_earnings.add(earnings_key)
-                    earnings_articles.append(article)
+            # Filter for earnings that have been RELEASED (have actual_eps)
+            released_earnings = [
+                e for e in data['results'] 
+                if e.get('actual_eps') is not None
+            ]
             
-            if not earnings_articles:
-                return
-            
-            self.stats['earnings_detected'] += len(earnings_articles)
-            self.logger.info(f"📊 Found {len(earnings_articles)} EARNINGS announcements!")
-            
-            # Send alerts immediately (CRITICAL = no batching)
-            for article in earnings_articles:
-                self._send_earnings_alert(article)
-            
+            for earning in released_earnings:
+                benzinga_id = earning.get('benzinga_id')
+                ticker = earning.get('ticker')
+                date = earning.get('date')
+                
+                # Skip if already seen
+                key = (ticker, date, benzinga_id)
+                if key in self.seen_earnings:
+                    continue
+                
+                # Mark as seen
+                self.seen_earnings.add(key)
+                self.stats['earnings_detected'] += 1
+                
+                # Analyze beat/miss
+                sentiment = self._analyze_earnings_sentiment(earning)
+                
+                # Track stats
+                if sentiment == 'BEAT':
+                    self.stats['beats'] += 1
+                elif sentiment == 'MISS':
+                    self.stats['misses'] += 1
+                else:
+                    self.stats['inline'] += 1
+                
+                self.logger.warning(
+                    f"🚨 EARNINGS DETECTED: {ticker} - {sentiment} | "
+                    f"EPS: {earning.get('actual_eps')} vs {earning.get('estimated_eps')}"
+                )
+                
+                # Send alert
+                self._send_earnings_alert(earning, sentiment)
+        
         except Exception as e:
             self.logger.error(f"Error checking earnings: {str(e)}")
     
-    def _is_earnings_news(self, article: Dict) -> bool:
-        """Check if article is earnings-related"""
-        title = article.get('title', '').lower()
-        teaser = article.get('teaser', '').lower()
-        full_text = f"{title} {teaser}"
+    def _analyze_earnings_sentiment(self, earning: Dict) -> str:
+        """
+        Analyze if earnings beat, missed, or inline
         
-        # Must contain earnings keywords
-        return any(keyword in full_text for keyword in self.earnings_keywords)
-    
-    def _extract_earnings_sentiment(self, article: Dict) -> str:
-        """Extract if earnings BEAT or MISS from article text"""
-        title = article.get('title', '').lower()
-        teaser = article.get('teaser', '').lower()
-        full_text = f"{title} {teaser}"
+        Returns: 'BEAT', 'MISS', or 'INLINE'
+        """
+        actual_eps = earning.get('actual_eps')
+        estimated_eps = earning.get('estimated_eps')
+        eps_surprise_pct = earning.get('eps_surprise_percent', 0)
         
-        # BEAT indicators
-        beat_keywords = ['beats', 'beat', 'tops', 'exceeds', 'blowout', 'surprise',
-                         'better than expected', 'above expectations', 'strong results']
+        if actual_eps is None or estimated_eps is None:
+            return 'INLINE'
         
-        # MISS indicators
-        miss_keywords = ['misses', 'miss', 'disappoints', 'below expectations',
-                        'falls short', 'weaker than expected', 'disappointing']
+        # Use surprise percentage if available
+        if eps_surprise_pct:
+            if eps_surprise_pct > 0.02:  # >2% beat
+                return 'BEAT'
+            elif eps_surprise_pct < -0.02:  # >2% miss
+                return 'MISS'
+            else:
+                return 'INLINE'
         
-        # Check for BEAT
-        if any(keyword in full_text for keyword in beat_keywords):
-            self.stats['beats'] += 1
+        # Fallback: compare actual vs estimate
+        surprise = actual_eps - estimated_eps
+        surprise_pct = (surprise / abs(estimated_eps)) * 100 if estimated_eps != 0 else 0
+        
+        if surprise_pct > 2:
             return 'BEAT'
-        
-        # Check for MISS
-        elif any(keyword in full_text for keyword in miss_keywords):
-            self.stats['misses'] += 1
+        elif surprise_pct < -2:
             return 'MISS'
-        
-        # Neutral
-        return 'NEUTRAL'
+        else:
+            return 'INLINE'
     
-    def _send_earnings_alert(self, article: Dict):
+    def _send_earnings_alert(self, earning: Dict, sentiment: str):
         """Send earnings alert to Discord"""
         if not self.discord:
             return
         
-        # Get primary ticker
-        tickers = article.get('tickers', [])
-        symbol = tickers[0] if tickers else 'UNKNOWN'
+        ticker = earning.get('ticker', 'UNKNOWN')
+        company = earning.get('company_name', ticker)
         
-        # Extract sentiment
-        sentiment = self._extract_earnings_sentiment(article)
+        # EPS data
+        actual_eps = earning.get('actual_eps')
+        estimated_eps = earning.get('estimated_eps')
+        eps_surprise = earning.get('eps_surprise', 0)
+        eps_surprise_pct = earning.get('eps_surprise_percent', 0)
         
-        # Determine urgency based on session
-        session = self._get_current_session()
-        urgency = 'CRITICAL' if session == 'POSTMARKET' else 'HIGH'
+        # Revenue data
+        actual_revenue = earning.get('actual_revenue')
+        estimated_revenue = earning.get('estimated_revenue')
+        revenue_surprise_pct = earning.get('revenue_surprise_percent', 0)
         
-        # Build earnings data for Discord
-        earnings_data = {
-            'symbol': symbol,
+        # Fiscal period
+        fiscal_period = earning.get('fiscal_period', 'N/A')
+        fiscal_year = earning.get('fiscal_year', 'N/A')
+        
+        # Time
+        date = earning.get('date')
+        time = earning.get('time')
+        
+        alert_data = {
+            'ticker': ticker,
+            'company': company,
             'sentiment': sentiment,
-            'title': article.get('title', ''),
-            'url': article.get('url', ''),
-            'published': article.get('published_utc', ''),
-            'source': article.get('source', ''),
-            'teaser': article.get('teaser', ''),
-            'session': session,
-            'urgency': urgency,
+            'fiscal_period': f"{fiscal_period} {fiscal_year}",
+            'date': date,
+            'time': time,
+            'eps': {
+                'actual': actual_eps,
+                'estimate': estimated_eps,
+                'surprise': eps_surprise,
+                'surprise_pct': eps_surprise_pct * 100 if eps_surprise_pct else 0
+            },
+            'revenue': {
+                'actual': actual_revenue,
+                'estimate': estimated_revenue,
+                'surprise_pct': revenue_surprise_pct * 100 if revenue_surprise_pct else 0
+            },
             'timestamp': datetime.now().isoformat()
         }
         
         try:
-            success = self.discord.send_earnings_alert(symbol, earnings_data)
+            # Use existing Discord alerter method (we'll update this)
+            success = self._send_to_discord(alert_data)
+            
             if success:
                 self.stats['alerts_sent'] += 1
-                self.logger.info(
-                    f"🚨 EARNINGS ALERT: {symbol} - {sentiment} "
-                    f"({session}, {urgency})"
-                )
+                self.logger.info(f"✅ Earnings alert sent: {ticker} - {sentiment}")
                 
-                # ==================== DATABASE SAVE ====================
-                # Save to database after successful Discord alert
+                # Save to database if callback exists
                 if hasattr(self, 'save_to_db_callback') and self.save_to_db_callback:
                     try:
+                        headline = f"{ticker} {sentiment} - {fiscal_period} {fiscal_year} Earnings"
                         self.save_to_db_callback(
-                            ticker=symbol,
-                            headline=article.get('title', 'Earnings Report'),
-                            article=article,
+                            ticker=ticker,
+                            headline=headline,
+                            article=earning,
                             channel='earnings'
                         )
-                        self.logger.debug(f"💾 Saved earnings to database: {symbol}")
                     except Exception as e:
                         self.logger.error(f"Error saving to database: {str(e)}")
-                # =====================================================
-                
+        
         except Exception as e:
             self.logger.error(f"Error sending earnings alert: {str(e)}")
+    
+    def _send_to_discord(self, alert_data: Dict) -> bool:
+        """Send formatted earnings alert to Discord webhook"""
+        webhook_url = self.discord.config.get('webhook_earnings_realtime')
+        
+        if not webhook_url:
+            self.logger.warning("Discord webhook for earnings not configured")
+            return False
+        
+        ticker = alert_data['ticker']
+        sentiment = alert_data['sentiment']
+        eps = alert_data['eps']
+        revenue = alert_data['revenue']
+        
+        # Emoji and color based on sentiment
+        if sentiment == 'BEAT':
+            emoji = '🚀'
+            color = 0x00ff00  # Green
+        elif sentiment == 'MISS':
+            emoji = '📉'
+            color = 0xff0000  # Red
+        else:
+            emoji = '➡️'
+            color = 0xffff00  # Yellow
+        
+        # Format EPS
+        eps_str = f"**Actual:** ${eps['actual']:.2f}\n" if eps['actual'] else ""
+        eps_str += f"**Estimate:** ${eps['estimate']:.2f}\n" if eps['estimate'] else ""
+        eps_str += f"**Surprise:** {eps['surprise_pct']:+.1f}%" if eps['surprise_pct'] else ""
+        
+        # Format Revenue
+        rev_str = ""
+        if revenue['actual']:
+            rev_str += f"**Actual:** ${revenue['actual']/1e9:.2f}B\n"
+        if revenue['estimate']:
+            rev_str += f"**Estimate:** ${revenue['estimate']/1e9:.2f}B\n"
+        if revenue['surprise_pct']:
+            rev_str += f"**Surprise:** {revenue['surprise_pct']:+.1f}%"
+        
+        # Trading action
+        if sentiment == 'BEAT':
+            action = (
+                "✅ **Potential Long Setup**\n"
+                "• Watch for gap up continuation\n"
+                "• Monitor volume on breakout\n"
+                "• Set alerts near resistance"
+            )
+        elif sentiment == 'MISS':
+            action = (
+                "⚠️ **Potential Short Setup**\n"
+                "• Watch for gap down continuation\n"
+                "• Monitor panic selling\n"
+                "• Set alerts near support"
+            )
+        else:
+            action = (
+                "ℹ️ **Inline Results**\n"
+                "• Watch price action for direction\n"
+                "• May consolidate near current levels"
+            )
+        
+        embed = {
+            'title': f"{emoji} EARNINGS ALERT: {ticker}",
+            'description': f"**{alert_data['company']}** - {sentiment}",
+            'color': color,
+            'fields': [
+                {
+                    'name': '📊 EPS (Earnings Per Share)',
+                    'value': eps_str or 'N/A',
+                    'inline': True
+                },
+                {
+                    'name': '💰 Revenue',
+                    'value': rev_str or 'N/A',
+                    'inline': True
+                },
+                {
+                    'name': '📅 Period',
+                    'value': alert_data['fiscal_period'],
+                    'inline': False
+                },
+                {
+                    'name': '🎯 Trading Action',
+                    'value': action,
+                    'inline': False
+                }
+            ],
+            'footer': {
+                'text': f"Detected at {alert_data['time']} ET • Earnings Monitor v2"
+            },
+            'timestamp': alert_data['timestamp']
+        }
+        
+        payload = {'embeds': [embed]}
+        
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            self.logger.error(f"Discord webhook error: {str(e)}")
+            return False
+    
+    def get_daily_preview(self, date: str = None) -> List[Dict]:
+        """
+        Get earnings preview for specified date
+        
+        Args:
+            date: Date in YYYY-MM-DD format (default: tomorrow)
+        
+        Returns:
+            List of earnings scheduled for that date
+        """
+        if not date:
+            tomorrow = (datetime.now() + timedelta(days=1)).date()
+            date = tomorrow.isoformat()
+        
+        try:
+            url = "https://api.polygon.io/benzinga/v1/earnings"
+            params = {
+                'apiKey': self.polygon_api_key,
+                'date.gte': date,
+                'date.lte': date,
+                'limit': 250
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'results' in data and data['results']:
+                # Filter for confirmed earnings
+                confirmed = [
+                    e for e in data['results']
+                    if e.get('date_status') == 'confirmed'
+                ]
+                
+                # Sort by importance
+                confirmed.sort(key=lambda x: x.get('importance', 0), reverse=True)
+                
+                return confirmed
+            
+            return []
+        
+        except Exception as e:
+            self.logger.error(f"Error getting daily preview: {str(e)}")
+            return []
+    
+    def send_daily_preview(self, date: str = None):
+        """Send daily earnings preview to Discord (called at 6 PM)"""
+        if not date:
+            tomorrow = (datetime.now() + timedelta(days=1)).date()
+            date = tomorrow.isoformat()
+        
+        earnings_list = self.get_daily_preview(date)
+        
+        if not earnings_list:
+            self.logger.info(f"No earnings scheduled for {date}")
+            return
+        
+        self.logger.info(f"📅 Sending daily preview: {len(earnings_list)} earnings for {date}")
+        
+        # Group by importance
+        major = [e for e in earnings_list if e.get('importance', 0) >= 4]
+        others = [e for e in earnings_list if e.get('importance', 0) < 4]
+        
+        # Build Discord message
+        webhook_url = self.discord.config.get('webhook_earnings_realtime')
+        
+        if not webhook_url:
+            self.logger.warning("Discord webhook not configured")
+            return
+        
+        # Format major earnings
+        major_lines = []
+        for e in major[:15]:  # Top 15
+            ticker = e.get('ticker')
+            company = e.get('company_name', ticker)
+            time = e.get('time', 'N/A')[:5]  # HH:MM
+            eps_est = e.get('estimated_eps', 0)
+            rev_est = e.get('estimated_revenue', 0) / 1e9 if e.get('estimated_revenue') else 0
+            
+            major_lines.append(
+                f"**{ticker}** - {company}\n"
+                f"  ⏰ {time} ET | EPS Est: ${eps_est:.2f} | Rev Est: ${rev_est:.2f}B"
+            )
+        
+        embed = {
+            'title': f'📅 EARNINGS PREVIEW - {date}',
+            'description': f'**{len(earnings_list)} companies reporting earnings**',
+            'color': 0x5865F2,  # Discord blurple
+            'fields': [
+                {
+                    'name': f'🔥 Major Earnings ({len(major)} companies)',
+                    'value': '\n\n'.join(major_lines[:10]) if major_lines else 'None',
+                    'inline': False
+                }
+            ],
+            'footer': {
+                'text': f'Daily Preview • Monitor active 3:50-7 PM ET'
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        if len(major) > 10:
+            embed['fields'].append({
+                'name': '📊 More Major Earnings',
+                'value': '\n\n'.join(major_lines[10:15]),
+                'inline': False
+            })
+        
+        if others:
+            embed['fields'].append({
+                'name': f'ℹ️ Other Earnings ({len(others)} companies)',
+                'value': f'{", ".join([e["ticker"] for e in others[:20]])}...',
+                'inline': False
+            })
+        
+        payload = {'embeds': [embed]}
+        
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+            self.logger.info(f"✅ Daily preview sent: {len(earnings_list)} earnings for {date}")
+        except Exception as e:
+            self.logger.error(f"Error sending daily preview: {str(e)}")
     
     def get_statistics(self) -> Dict:
         """Get monitor statistics"""
@@ -368,32 +593,20 @@ if __name__ == '__main__':
     from dotenv import load_dotenv
     
     load_dotenv()
+    API_KEY = os.getenv('POLYGON_API_KEY')
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    
-    api_key = os.getenv('POLYGON_API_KEY')
-    if not api_key:
-        print("❌ Set POLYGON_API_KEY in .env")
-        exit(1)
-    
-    # Test earnings monitor
-    print("\n📊 Testing Earnings Monitor...")
-    print("This will check for recent earnings news")
-    
-    # You would normally import UnifiedNewsEngine here
-    # For testing, we'll simulate
+    # Test monitor
     monitor = EarningsMonitor(
-        polygon_api_key=api_key,
-        unified_news_engine=None,  # Would be real engine
+        polygon_api_key=API_KEY,
         discord_alerter=None,
         check_interval_premarket=20,
-        check_interval_postmarket=10
+        check_interval_postmarket=5
     )
     
-    print(f"\n✅ Monitor initialized")
-    print(f"Session: {monitor._get_current_session()}")
-    print(f"Calendar: {len(monitor.earnings_calendar)} symbols")
-    print(f"\nStatistics: {monitor.get_statistics()}")
+    # Test daily preview
+    print("Testing daily preview for tomorrow...")
+    preview = monitor.get_daily_preview()
+    
+    print(f"\n✅ Found {len(preview)} earnings scheduled for tomorrow:")
+    for e in preview[:10]:
+        print(f"  • {e['ticker']} - {e.get('company_name')} at {e.get('time')}")

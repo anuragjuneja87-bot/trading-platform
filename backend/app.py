@@ -424,29 +424,28 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
 
-# CHANGE #2: Initialize Earnings Monitor
+
+# Initialize Earnings Monitor with Benzinga API
 earnings_monitor = None
 if EARNINGS_MONITOR_AVAILABLE:
     try:
         earnings_config = config_yaml.get('earnings_monitor', {})
         if earnings_config.get('enabled', False):
             
-            if unified_news_engine and alert_manager and alert_manager.discord:
+            if alert_manager and alert_manager.discord:
                 earnings_monitor = EarningsMonitor(
                     polygon_api_key=POLYGON_API_KEY,
-                    unified_news_engine=unified_news_engine,
                     discord_alerter=alert_manager.discord,
-                    check_interval_premarket=earnings_config.get('premarket_window', {}).get('check_interval', 20),
-                    check_interval_postmarket=earnings_config.get('postmarket_window', {}).get('check_interval', 10)
+                    check_interval_premarket=20,
+                    check_interval_postmarket=5  # 5 SECONDS!
                 )
                 
-                # Set up database callback if news_db is available
                 if news_db:
                     def save_earnings_to_db(ticker, headline, article, channel):
                         news_db.save_news(ticker, headline, article, channel)
                     earnings_monitor.save_to_db_callback = save_earnings_to_db
                 
-                logger.info("✅ Earnings Monitor initialized")
+                logger.info("✅ Earnings Monitor initialized (Benzinga API)")
             else:
                 logger.warning("⚠️  Earnings Monitor disabled - missing dependencies")
     except Exception as e:
@@ -495,7 +494,23 @@ def run_earnings_monitor():
                 time.sleep(60)
         except Exception as e:
             logger.error(f"Earnings monitor crashed: {{str(e)}}")
-
+def schedule_daily_earnings_preview():
+    """Schedule daily earnings preview at 6 PM ET"""
+    if not earnings_monitor:
+        return
+    
+    scheduler = BackgroundScheduler(timezone='America/New_York')
+    
+    scheduler.add_job(
+        func=earnings_monitor.send_daily_preview,
+        trigger=CronTrigger(hour=18, minute=0, timezone='America/New_York'),
+        id='daily_earnings_preview',
+        name='Daily Earnings Preview (6 PM ET)',
+        replace_existing=True
+    )
+    
+    scheduler.start()
+    logger.info("✅ Daily earnings preview scheduled for 6:00 PM ET")
 # ============================================================================
 # EARNINGS MONITORING
 # ============================================================================
@@ -939,13 +954,14 @@ if __name__ == '__main__':
             daemon=True
         )
         earnings_thread.start()
-        print(f"   ✅ Earnings monitor started")
+        print(f"   ✅ Earnings monitor started (Benzinga API)")
         print(f"   🌅 Pre-market: 5:00 AM - 8:00 AM ET (20s checks)")
-        print(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (10s checks) ⚡ FASTEST")
+        print(f"   🌆 Post-market: 3:50 PM - 7:00 PM ET (5s checks) ⚡ ULTRA-FAST")
+        print(f"   📅 Daily preview: 6:00 PM ET")
         print(f"   📡 Routes to: DISCORD_REALTIME_EARNINGS")
-
-    
-    # Start News Monitors
+        
+        # Schedule daily preview
+        schedule_daily_earnings_preview()
     if openai_monitor:
         print(f"\n🤖 Starting OpenAI News Monitor...")
         openai_monitor.start()

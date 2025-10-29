@@ -5,9 +5,9 @@
 ###########################################
 
 # Set paths
-BACKEND_DIR="/Users/anushatradersllc/Desktop/trading-platform/trading-platform/backend"
-THETA_DIR="/Users/anushatradersllc/Desktop/trading-platform/trading-platform"
-LOG_DIR="/Users/anushatradersllc/Desktop/trading-platform/trading-platform/logs"
+BACKEND_DIR="~/Desktop/trading-platform/trading-platform/backend"
+THETA_DIR="~/Desktop/trading-platform/trading-platform"
+LOG_DIR="~Desktop/trading-platform/trading-platform/logs"
 
 # Create logs directory if it doesn't exist
 mkdir -p "$LOG_DIR"
