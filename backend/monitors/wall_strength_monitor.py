@@ -42,11 +42,11 @@ class WallStrengthMonitor:
         self.market_hours_only = True
         
         # Cooldown to prevent spam (per symbol per strike)
-        # REDUCED for 6-figure day trading speed
+        # OPTIMIZED for 7-figure day trading speed
         self.cooldown_minutes = {
-            'WALL_BUILDING': 10,     # 10 min (was 15)
-            'WALL_WEAKENING': 7,     # 7 min (was 10)
-            'WALL_BROKEN': 3         # 3 min (was 5) - URGENT
+            'WALL_BUILDING': 5,      # 5 min (was 10)
+            'WALL_WEAKENING': 5,     # 5 min (was 7)
+            'WALL_BROKEN': 3         # 3 min - URGENT (unchanged)
         }
         
         self.last_alert_time = {}  # {(symbol, strike, type): timestamp}
@@ -65,7 +65,7 @@ class WallStrengthMonitor:
         
         self.logger.info("✅ Wall Strength Monitor initialized")
         self.logger.info(f"   🕐 Check interval: {self.check_interval} seconds")
-        self.logger.info(f"   ⏱️ Cooldowns: Building={self.cooldown_minutes['WALL_BUILDING']}min, Weakening={self.cooldown_minutes['WALL_WEAKENING']}min")
+        self.logger.info(f"   ⏱️ Cooldowns: Building=5min, Weakening=5min, Broken=3min")
     
     def set_discord_webhook(self, webhook_url: str):
         """Set Discord webhook URL"""

@@ -351,7 +351,7 @@ class EnhancedProfessionalAnalyzer:
         """
         try:
             # Use ThetaData if available
-            if not self.thetadata_client or not True:
+            if not self.thetadata_client:
                 return {'available': False, 'error': 'ThetaData not available'}
             
             expirations = self.thetadata_client.get_expirations(symbol)
@@ -612,7 +612,7 @@ class EnhancedProfessionalAnalyzer:
                 
             
             # Use ThetaData for expirations
-            if not self.thetadata_client or not True:
+            if not self.thetadata_client:
                 return {
                     'symbol': symbol,
                     'available': False,
