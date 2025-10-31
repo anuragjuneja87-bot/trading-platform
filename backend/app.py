@@ -334,12 +334,10 @@ if EXTENDED_HOURS_MONITOR_AVAILABLE:
         extended_hours_monitor = ExtendedHoursVolumeMonitor(
             polygon_api_key=POLYGON_API_KEY,
             config=config_yaml,
-            watchlist_manager=watchlist_manager
+            watchlist_manager=watchlist_manager,
+            discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
         )
-        webhook = os.getenv('DISCORD_VOLUME_SPIKE')
-        if webhook:
-            extended_hours_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Extended Hours Volume Monitor initialized")
+        logger.info("✅ Extended Hours Volume Monitor initialized")
     except Exception as e:
         logger.error(f"❌ Extended Hours Volume Monitor failed: {str(e)}")
 
@@ -349,12 +347,10 @@ if REALTIME_MONITOR_AVAILABLE:
         realtime_monitor = RealtimeVolumeSpikeMonitor(
             polygon_api_key=POLYGON_API_KEY,
             config=config_yaml,
-            watchlist_manager=watchlist_manager
+            watchlist_manager=watchlist_manager,
+            discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
         )
-        webhook = os.getenv('DISCORD_VOLUME_SPIKE')
-        if webhook:
-            realtime_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Real-Time Volume Spike Monitor initialized")
+        logger.info("✅ Real-Time Volume Spike Monitor initialized")
     except Exception as e:
         logger.error(f"❌ Real-Time Volume Spike Monitor failed: {str(e)}")
 
@@ -364,12 +360,10 @@ if MOMENTUM_MONITOR_AVAILABLE:
         momentum_monitor = MomentumSignalMonitor(
             polygon_api_key=POLYGON_API_KEY,
             config=config_yaml,
-            watchlist_manager=watchlist_manager
+            watchlist_manager=watchlist_manager,
+            discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
         )
-        webhook = os.getenv('DISCORD_MOMENTUM_SIGNALS')
-        if webhook:
-            momentum_monitor.set_discord_webhook(webhook)
-            logger.info("✅ Momentum Signal Monitor initialized")
+        logger.info("✅ Momentum Signal Monitor initialized")
     except Exception as e:
         logger.error(f"❌ Momentum Signal Monitor failed: {str(e)}")
 
@@ -413,12 +407,10 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
             unusual_activity_monitor = UnusualActivityMonitor(
                 analyzer=analyzer,
                 detector=analyzer.unusual_activity_detector,
-                config=config_yaml
+                config=config_yaml,
+                discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
             )
-            webhook = os.getenv('DISCORD_UNUSUAL_ACTIVITY')
-            if webhook:
-                unusual_activity_monitor.set_discord_webhook(webhook)
-                logger.info("✅ Unusual Activity Monitor initialized")
+            logger.info("✅ Unusual Activity Monitor initialized")
         else:
             logger.warning("⚠️ Unusual activity detector not available in analyzer")
     except Exception as e:

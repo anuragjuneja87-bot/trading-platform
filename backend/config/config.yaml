@@ -428,29 +428,31 @@ momentum_signal_monitor:
   check_interval: 60                    # Check every 60 seconds
   market_hours_only: true               # Only alert during 9:30 AM - 4:00 PM ET
   
-  # Cooldowns (prevent spam)
+  # Cooldowns (OPTIMIZED for 7-figure scalping - faster re-alerts)
   cooldown_minutes:
-    momentum_signal: 15                 # Momentum buy/sell signals
-    gamma_approach: 10                  # Gamma wall approaches
-    dark_pool_flip: 5                   # Dark pool flips (urgent!)
-    extreme_setup: 30                   # Extreme setups (rare)
+    momentum_signal: 10                 # ⬇️ FROM 15 (faster momentum re-alerts)
+    gamma_approach: 5                   # ⬇️ FROM 10 (catch gamma wall interactions sooner)
+    dark_pool_flip: 2                   # ⬇️ FROM 5 (CRITICAL for scalping exits)
+    extreme_setup: 20                   # ⬇️ FROM 30 (rare but actionable)
+    confluence_alert: 10                # NEW: For 75%+ confluence setups
   
-  # Thresholds
+  # Thresholds (ALIGNED with VolumeAnalyzer v2.0 for 7-figure scalping)
   thresholds:
-    min_rvol: 2.5                       # Minimum RVOL for momentum signals
-    extreme_rvol: 4.0                   # RVOL for extreme setups
-    min_dark_pool_strength: 4           # Min signal strength (0-6 scale)
-    min_dark_pool_value: 1000000        # $1M minimum block trade value
-    gamma_wall_distance_pct: 1.0        # Alert if within 1% of wall
-    gamma_wall_urgent_pct: 0.5          # Urgent if within 0.5%
-    min_confluence: 7                   # Min confluence score for key levels
-    extreme_confluence: 8               # Confluence for extreme setups
+    min_rvol: 1.8                       # ⬇️ FROM 2.5 (39% MORE SENSITIVE - catch moves early)
+    high_rvol: 2.3                      # NEW: High volume tier (institutional flow)
+    extreme_rvol: 3.5                   # ⬇️ FROM 4.0 (13% MORE SENSITIVE - explosive moves)
+    min_dark_pool_strength: 4           # ✅ KEEP (filters noise, quality signals)
+    min_dark_pool_value: 1000000        # ✅ KEEP ($1M+ blocks = institutions)
+    gamma_wall_distance_pct: 1.5        # ⬆️ FROM 1.0 (alert EARLIER - 50% more warning)
+    gamma_wall_urgent_pct: 0.75         # ⬆️ FROM 0.5 (urgent zone expanded)
+    min_confluence: 7                   # ✅ KEEP (high-quality setups)
+    extreme_confluence: 8               # ✅ KEEP (best-of-best)
   
   # Filters
   filters:
     watchlist_only: true                # Only monitor watchlist symbols
     min_price: 5.0                      # Ignore penny stocks
-    max_alert_per_symbol_per_day: 5     # Max 5 alerts per symbol per day
+    max_alert_per_symbol_per_day: 8     # ⬆️ FROM 5 (more alerts for fast scalping)
 
 # ========================================
 # 📊 REAL-TIME EARNINGS MONITOR
