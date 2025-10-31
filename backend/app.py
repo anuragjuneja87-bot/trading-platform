@@ -137,6 +137,35 @@ except ImportError:
 
 load_dotenv()
 
+# JSON Sanitization Helper
+def sanitize_for_json(obj):
+    """
+    Recursively convert numpy/pandas types to native Python types for JSON serialization
+    """
+    import numpy as np
+    import pandas as pd
+    
+    if isinstance(obj, dict):
+        return {key: sanitize_for_json(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(sanitize_for_json(item) for item in obj)
+    elif isinstance(obj, (np.bool_, bool)):  # Fixed: removed np.bool8
+        return bool(obj)
+    elif isinstance(obj, (np.integer, np.int8, np.int16, np.int32, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float16, np.float32, np.float64)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return sanitize_for_json(obj.tolist())
+    elif isinstance(obj, (pd.Series, pd.DataFrame)):
+        return sanitize_for_json(obj.to_dict())
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
+
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
@@ -333,9 +362,9 @@ if EXTENDED_HOURS_MONITOR_AVAILABLE:
     try:
         extended_hours_monitor = ExtendedHoursVolumeMonitor(
             polygon_api_key=POLYGON_API_KEY,
+            discord_alerter=alert_manager.discord if alert_manager else None,
             config=config_yaml,
-            watchlist_manager=watchlist_manager,
-            discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
+            watchlist_manager=watchlist_manager
         )
         logger.info("✅ Extended Hours Volume Monitor initialized")
     except Exception as e:
@@ -346,9 +375,9 @@ if REALTIME_MONITOR_AVAILABLE:
     try:
         realtime_monitor = RealtimeVolumeSpikeMonitor(
             polygon_api_key=POLYGON_API_KEY,
+            discord_alerter=alert_manager.discord if alert_manager else None,
             config=config_yaml,
-            watchlist_manager=watchlist_manager,
-            discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
+            watchlist_manager=watchlist_manager
         )
         logger.info("✅ Real-Time Volume Spike Monitor initialized")
     except Exception as e:
@@ -359,9 +388,9 @@ if MOMENTUM_MONITOR_AVAILABLE:
     try:
         momentum_monitor = MomentumSignalMonitor(
             polygon_api_key=POLYGON_API_KEY,
+            discord_alerter=alert_manager.discord if alert_manager else None,
             config=config_yaml,
-            watchlist_manager=watchlist_manager,
-            discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
+            watchlist_manager=watchlist_manager
         )
         logger.info("✅ Momentum Signal Monitor initialized")
     except Exception as e:
@@ -407,10 +436,12 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
             unusual_activity_monitor = UnusualActivityMonitor(
                 analyzer=analyzer,
                 detector=analyzer.unusual_activity_detector,
-                config=config_yaml,
-                discord_alerter=alert_manager.discord  # ✅ FIXED: Pass discord_alerter
+                config=config_yaml
             )
-            logger.info("✅ Unusual Activity Monitor initialized")
+            webhook = os.getenv('DISCORD_UNUSUAL_ACTIVITY')
+            if webhook:
+                unusual_activity_monitor.set_discord_webhook(webhook)
+                logger.info("✅ Unusual Activity Monitor initialized")
         else:
             logger.warning("⚠️ Unusual activity detector not available in analyzer")
     except Exception as e:
@@ -611,7 +642,9 @@ def analyze_symbol(symbol):
         logger.info(f"📊 Analyzing {symbol}...")
         
         result = analyzer.generate_professional_signal(symbol)
-        return jsonify(result)
+        # Sanitize result to ensure JSON serializability
+        sanitized_result = sanitize_for_json(result)
+        return jsonify(sanitized_result)
     
     except Exception as e:
         logger.error(f"Error analyzing {symbol}: {str(e)}")
@@ -635,9 +668,11 @@ def analyze_all():
                     'error': str(e)
                 })
         
+        # Sanitize all results to ensure JSON serializability
+        sanitized_results = sanitize_for_json(results)
         return jsonify({
-            'results': results,
-            'count': len(results)
+            'results': sanitized_results,
+            'count': len(sanitized_results)
         })
     
     except Exception as e:
@@ -650,7 +685,8 @@ def get_gamma(symbol):
     try:
         symbol = symbol.upper()
         result = analyzer.calculate_gamma_walls(symbol)
-        return jsonify(result)
+        sanitized_result = sanitize_for_json(result)
+        return jsonify(sanitized_result)
     except Exception as e:
         logger.error(f"Error getting gamma for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -661,7 +697,8 @@ def get_gex(symbol):
     try:
         symbol = symbol.upper()
         result = analyzer.calculate_gex(symbol)
-        return jsonify(result)
+        sanitized_result = sanitize_for_json(result)
+        return jsonify(sanitized_result)
     except Exception as e:
         logger.error(f"Error getting GEX for {symbol}: {str(e)}")
         return jsonify({'error': str(e)}), 500

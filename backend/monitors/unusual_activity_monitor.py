@@ -1,48 +1,38 @@
 """
-backend/monitors/unusual_activity_monitor.py v2.0
-ENHANCED Unusual Activity Monitor - Day Trading Edition
+backend/monitors/unusual_activity_monitor.py
+Unusual Activity Monitor - PROFESSIONAL DAY TRADER EDITION
 
-IMPROVEMENTS v2.0:
-- Fixed Discord webhook access (works with DiscordAlerter)
-- Rate limit protection with retries
-- Smart cooldown (2 min prime hours, 5 min normal)
-- Pre-market monitoring from 8:00 AM
-- Priority symbols checked first
-- 15 second check interval (AGGRESSIVE)
-
-UNCHANGED (Already Good):
-- UnusualActivityDetector thresholds are already aggressive
-- 5% OI change, 1.2x volume ratio, $100k premium
-- Prime hours detection (9:30-11:30 AM)
-- Professional scoring system
-
-Routes to: DISCORD_UNUSUAL_ACTIVITY channel
+OPTIMIZED FOR:
+- Speed > Everything
+- First 2 hours priority (9:30-11:30 AM)
+- Pre-market monitoring (8:00 AM start)
+- Smart cooldown (2 min during prime hours)
+- Priority symbol handling
 """
 
 import logging
 import time
-import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from collections import defaultdict
 
 
 class UnusualActivityMonitor:
-    def __init__(self, analyzer, detector, config: dict = None, discord_alerter=None):
+    def __init__(self, analyzer, detector, discord_alerter=None, config: dict = None):
         """
-        Initialize ENHANCED Unusual Activity Monitor v2.0
+        Initialize Unusual Activity Monitor - PROFESSIONAL MODE
         
         Args:
             analyzer: EnhancedProfessionalAnalyzer instance
             detector: UnusualActivityDetector instance
+            discord_alerter: DiscordAlerter instance (modern pattern)
             config: Configuration dict
-            discord_alerter: DiscordAlerter instance (NEW)
         """
         self.logger = logging.getLogger(__name__)
         self.analyzer = analyzer
         self.detector = detector
+        self.discord_alerter = discord_alerter
         self.config = config or {}
-        self.discord = discord_alerter  # NEW: Use DiscordAlerter
         
         # PROFESSIONAL SETTINGS - Speed optimized
         self.enabled = True
@@ -57,6 +47,9 @@ class UnusualActivityMonitor:
         # PRIORITY SYMBOLS - Check these first
         self.priority_symbols = {'SPY', 'QQQ', 'NVDA', 'TSLA', 'AAPL', 'PLTR', 'ORCL'}
         
+        # Discord webhook (legacy - kept for backwards compatibility)
+        self.discord_webhook = None
+        
         # Statistics
         self.stats = {
             'checks_completed': 0,
@@ -65,33 +58,19 @@ class UnusualActivityMonitor:
             'unusual_activity_detected': 0,
             'errors': 0,
             'prime_hours_alerts': 0,
-            'premarket_alerts': 0,
-            'rate_limited': 0
+            'premarket_alerts': 0
         }
         
-        self.logger.info("✅ Unusual Activity Monitor v2.0 - PROFESSIONAL MODE")
+        self.logger.info("✅ Unusual Activity Monitor - PROFESSIONAL MODE")
         self.logger.info(f"   ⚡ SPEED: {self.check_interval}s checks (AGGRESSIVE)")
         self.logger.info(f"   ⏱️ Cooldown: {self.cooldown_prime_hours}min (prime) / {self.cooldown_normal}min (normal)")
         self.logger.info(f"   🎯 Priority: {len(self.priority_symbols)} symbols checked first")
         self.logger.info(f"   🌅 Pre-market: Monitoring from 8:00 AM")
     
-    def get_discord_webhook(self) -> Optional[str]:
-        """
-        Get Discord webhook URL from DiscordAlerter
-        Tries multiple methods to find the webhook
-        """
-        if not self.discord:
-            return None
-        
-        # Try different ways to access webhook
-        if hasattr(self.discord, 'webhooks'):
-            return self.discord.webhooks.get('unusual_activity')
-        elif hasattr(self.discord, 'config'):
-            return self.discord.config.get('webhook_unusual_activity')
-        elif hasattr(self.discord, 'webhook_unusual_activity'):
-            return self.discord.webhook_unusual_activity
-        
-        return None
+    def set_discord_webhook(self, webhook_url: str):
+        """Set Discord webhook URL"""
+        self.discord_webhook = webhook_url
+        self.logger.info(f"✅ Discord webhook configured for unusual activity")
     
     def is_market_hours(self) -> bool:
         """Extended hours: Pre-market + Regular hours (8:00 AM - 4:00 PM ET)"""
@@ -159,38 +138,10 @@ class UnusualActivityMonitor:
         cooldown_key = f"{symbol}_{strike}_{option_type}"
         self._cooldowns[cooldown_key] = datetime.now()
     
-    def send_alert_with_retry(self, webhook_url: str, payload: dict, max_retries: int = 3) -> bool:
-        """Send Discord alert with rate limit protection and retry logic"""
-        retry_delay = 2
-        
-        for attempt in range(max_retries):
-            try:
-                response = requests.post(webhook_url, json=payload, timeout=10)
-                response.raise_for_status()
-                return True
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code == 429:  # Rate limited
-                    self.stats['rate_limited'] += 1
-                    if attempt < max_retries - 1:
-                        self.logger.warning(f"Discord rate limited, retrying in {retry_delay}s...")
-                        time.sleep(retry_delay)
-                        retry_delay *= 2
-                        continue
-                    else:
-                        self.logger.error(f"Discord rate limit exceeded after {max_retries} attempts")
-                        return False
-                else:
-                    self.logger.error(f"Discord webhook error: {e}")
-                    return False
-            except Exception as e:
-                self.logger.error(f"Error sending Discord alert: {str(e)}")
-                return False
-        
-        return False
-    
     def send_discord_alert(self, alert: Dict) -> bool:
         """
-        Send unusual activity alert to Discord with professional formatting
+        Send unusual activity alert to Discord
+        Professional formatting with priority indicators
         
         Args:
             alert: Alert dict from detector
@@ -198,13 +149,14 @@ class UnusualActivityMonitor:
         Returns:
             True if sent successfully
         """
-        webhook_url = self.get_discord_webhook()
-        
-        if not webhook_url:
-            self.logger.warning("Discord webhook not configured for unusual activity")
+        # Use discord_alerter if available, otherwise fallback to webhook
+        if not self.discord_alerter and not self.discord_webhook:
+            self.logger.warning("Discord alerter/webhook not configured")
             return False
         
         try:
+            import requests
+            
             symbol = alert['symbol']
             strike = alert['strike']
             option_type = alert['option_type']
@@ -230,10 +182,6 @@ class UnusualActivityMonitor:
             time_indicator = ""
             if self.is_prime_hours():
                 time_indicator = " • 🎯 PRIME HOURS"
-                self.stats['prime_hours_alerts'] += 1
-            elif datetime.now().hour < 9 or (datetime.now().hour == 9 and datetime.now().minute < 30):
-                time_indicator = " • 🌅 PRE-MARKET"
-                self.stats['premarket_alerts'] += 1
             
             # Title
             title = f"{emoji} UNUSUAL ACTIVITY - {symbol}{time_indicator}"
@@ -303,211 +251,311 @@ class UnusualActivityMonitor:
             })
             
             # Price relationship
-            distance_pct = alert['distance_pct']
-            if abs(distance_pct) <= 2:
-                proximity = "🎯 AT THE MONEY"
-            elif abs(distance_pct) <= 5:
-                proximity = "📍 NEAR THE MONEY"
-            elif distance_pct > 0:
-                proximity = "📈 OUT OF THE MONEY"
-            else:
-                proximity = "📉 IN THE MONEY"
-            
             embed['fields'].append({
-                'name': '🎯 Strike Position',
+                'name': '📈 Price Relationship',
                 'value': (
-                    f"**Distance:** {distance_pct:+.1f}%\n"
-                    f"**Position:** {proximity}"
+                    f"**Distance:** ${alert['distance_from_price']:+.2f} ({alert['distance_pct']:+.1f}%)\n"
+                    f"**Status:** {'OTM' if abs(alert['distance_pct']) > 2 else 'ATM' if abs(alert['distance_pct']) < 1 else 'Near-Money'}"
                 ),
                 'inline': True
             })
             
-            # Time detection
-            embed['fields'].append({
-                'name': '⏰ Detection Time',
-                'value': datetime.now().strftime('%I:%M:%S %p ET'),
-                'inline': True
-            })
+            # Greeks if available
+            if 'delta' in alert.get('greeks', {}) and alert['greeks']['delta'] is not None:
+                embed['fields'].append({
+                    'name': '🎲 Greeks',
+                    'value': (
+                        f"**Delta:** {alert['greeks']['delta']:.3f}\n"
+                        f"**Gamma:** {alert['greeks'].get('gamma', 0):.4f}\n"
+                        f"**IV:** {alert['greeks'].get('iv', 0):.1f}%"
+                    ),
+                    'inline': True
+                })
             
-            # Add action guidance based on classification
+            # Action items based on urgency
             if urgency == 'EXTREME':
-                embed['fields'].append({
-                    'name': '⚠️ Institutional Alert',
-                    'value': (
-                        '**EXTREME unusual activity detected!**\n'
-                        '• Large institutional flow\n'
-                        '• Monitor price action closely\n'
-                        '• Check for catalysts/news'
-                    ),
-                    'inline': False
-                })
-            elif urgency == 'HIGH' and self.is_prime_hours():
-                embed['fields'].append({
-                    'name': '👀 Prime Hours Activity',
-                    'value': (
-                        '**High activity during prime trading hours**\n'
-                        '• Smart money may be positioning\n'
-                        '• Watch for confirmation in price action'
-                    ),
-                    'inline': False
-                })
-            
-            embed['footer'] = {
-                'text': f'Unusual Activity Monitor v2.0 • Professional mode • Score: {score:.1f}/10'
-            }
-            
-            payload = {'embeds': [embed]}
-            
-            # Send with retry logic
-            success = self.send_alert_with_retry(webhook_url, payload)
-            
-            if success:
-                self.stats['alerts_generated'] += 1
-                self.logger.info(
-                    f"✅ Unusual activity alert sent: {symbol} ${strike}{option_type[0].upper()} | "
-                    f"{urgency} | Score: {score:.1f}/10"
+                action = (
+                    "🚨 **IMMEDIATE ACTION REQUIRED**\n"
+                    "✅ Review position NOW\n"
+                    "✅ Check Bookmap for confirmation\n"
+                    "✅ Monitor for continuation\n"
+                    "✅ Consider position sizing"
+                )
+            elif urgency == 'HIGH':
+                action = (
+                    "⚡ **HIGH PRIORITY - Act Fast**\n"
+                    "✅ Open Bookmap confirmation\n"
+                    "✅ Watch for follow-through\n"
+                    "✅ Set price alerts\n"
+                    "✅ Review related strikes"
+                )
+            else:
+                action = (
+                    "👀 **WATCH CLOSELY**\n"
+                    "✅ Add to active watchlist\n"
+                    "✅ Monitor for trend\n"
+                    "✅ Track OI changes"
                 )
             
-            return success
+            embed['fields'].append({
+                'name': '🎯 Action Items',
+                'value': action,
+                'inline': False
+            })
+            
+            # Footer
+            now = datetime.now()
+            time_str = now.strftime("%H:%M:%S ET")
+            
+            # Add market phase indicator
+            if self.is_prime_hours():
+                phase = "PRIME HOURS 🎯"
+            elif now.hour < 9 or (now.hour == 9 and now.minute < 30):
+                phase = "PRE-MARKET 🌅"
+            else:
+                phase = "REGULAR HOURS"
+            
+            embed['footer'] = {
+                'text': f'Professional Unusual Activity Scanner • {time_str} • {phase}'
+            }
+            
+            # Send via discord_alerter if available, otherwise use webhook
+            if self.discord_alerter:
+                # Modern pattern - use DiscordAlerter
+                self.discord_alerter.send_embed(
+                    title=title,
+                    description=description,
+                    fields=embed['fields'],
+                    color=color,
+                    footer_text=embed['footer']['text'],
+                    channel='unusual_activity'
+                )
+            else:
+                # Legacy pattern - use raw webhook
+                import requests
+                payload = {'embeds': [embed]}
+                response = requests.post(self.discord_webhook, json=payload, timeout=10)
+                response.raise_for_status()
+            
+            self.logger.info(
+                f"✅ Alert sent: {symbol} ${strike}{option_type[0].upper()} "
+                f"({urgency}) Score: {score:.1f}/10"
+            )
+            
+            # Track prime hours alerts
+            if self.is_prime_hours():
+                self.stats['prime_hours_alerts'] += 1
+            
+            return True
             
         except Exception as e:
-            self.logger.error(f"Error sending Discord alert: {str(e)}")
-            import traceback
-            self.logger.debug(traceback.format_exc())
+            self.logger.error(f"❌ Discord alert failed: {str(e)}")
+            self.stats['errors'] += 1
             return False
     
-    def check_symbol(self, symbol: str) -> List[Dict]:
+    def _safe_float(self, value, default=0.0) -> float:
+        """Safely convert value to float with proper null handling"""
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+    
+    def _validate_options_data(self, options_data) -> bool:
+        """Validate that options data has required fields"""
+        if not options_data:
+            return False
+        
+        if isinstance(options_data, dict):
+            required_keys = ['calls', 'puts']
+            if not all(key in options_data for key in required_keys):
+                return False
+            
+            if not options_data['calls'] and not options_data['puts']:
+                return False
+        
+        elif isinstance(options_data, list):
+            if len(options_data) == 0:
+                return False
+        
+        return True
+    
+    def check_symbol(self, symbol: str) -> int:
         """
-        Check single symbol for unusual activity
+        Check one symbol for unusual activity
+        
+        Args:
+            symbol: Stock symbol to check
         
         Returns:
-            List of alerts sent
+            Number of alerts generated
         """
         try:
-            self.stats['symbols_analyzed'] += 1
+            # Get options data
+            if not hasattr(self.analyzer, 'get_options_chain'):
+                self.logger.debug(f"{symbol}: Options chain method not available")
+                return 0
             
-            # Get options data from analyzer
             options_data = self.analyzer.get_options_chain(symbol)
             
-            if not options_data:
-                return []
+            if not self._validate_options_data(options_data):
+                self.logger.debug(f"{symbol}: No valid options data")
+                return 0
             
             # Get current price
-            current_price = self.analyzer.get_current_price(symbol)
+            quote = self.analyzer.get_real_time_quote(symbol)
+            if not quote:
+                self.logger.debug(f"{symbol}: No quote data")
+                return 0
             
-            if not current_price:
-                return []
+            current_price = self._safe_float(
+                quote.get('price') or quote.get('last') or quote.get('regularMarketPrice'),
+                default=None
+            )
             
-            # Capture snapshot
-            self.detector.capture_snapshot(symbol, options_data, current_price)
+            if current_price is None or current_price <= 0:
+                self.logger.debug(f"{symbol}: Invalid price ({current_price})")
+                return 0
             
-            # Detect unusual activity
-            unusual_activities = self.detector.detect_unusual_activity(symbol)
+            # Analyze for unusual activity
+            result = self.detector.analyze_unusual_activity(
+                symbol,
+                options_data,
+                current_price
+            )
             
-            if not unusual_activities:
-                return []
+            self.stats['symbols_analyzed'] += 1
             
-            self.stats['unusual_activity_detected'] += len(unusual_activities)
+            if not result.get('detected'):
+                return 0
             
-            # Send alerts (with cooldown check)
-            alerts_sent = []
-            for alert in unusual_activities:
-                strike = alert['strike']
-                option_type = alert['option_type']
-                
-                # Check cooldown
-                if not self.check_cooldown(symbol, strike, option_type):
+            self.stats['unusual_activity_detected'] += 1
+            
+            # Send alerts
+            alerts_sent = 0
+            for alert in result.get('alerts', []):
+                # Validate alert
+                required_fields = ['symbol', 'strike', 'option_type']
+                if not all(field in alert for field in required_fields):
+                    self.logger.warning(f"Alert missing required fields: {alert}")
                     continue
                 
-                # Send alert
-                success = self.send_discord_alert(alert)
+                strike = self._safe_float(alert.get('strike'), default=None)
+                if strike is None or strike <= 0:
+                    self.logger.warning(f"Invalid strike: {alert.get('strike')}")
+                    continue
                 
-                if success:
-                    self.record_alert(symbol, strike, option_type)
-                    alerts_sent.append(alert)
+                alert['strike'] = strike
+                
+                # Check cooldown
+                if not self.check_cooldown(
+                    alert['symbol'],
+                    strike,
+                    alert['option_type']
+                ):
+                    continue
+                
+                # Send Discord alert
+                if self.send_discord_alert(alert):
+                    self.record_alert(
+                        alert['symbol'],
+                        strike,
+                        alert['option_type']
+                    )
+                    alerts_sent += 1
+                    self.stats['alerts_generated'] += 1
             
             return alerts_sent
             
         except Exception as e:
+            self.logger.error(f"Error checking {symbol}: {str(e)}", exc_info=True)
             self.stats['errors'] += 1
-            self.logger.error(f"Error checking {symbol}: {str(e)}")
-            return []
+            return 0
     
     def run_single_check(self, watchlist: List[str]) -> int:
         """
-        Run single check cycle on watchlist
+        Run single check with priority symbol handling
+        
+        Args:
+            watchlist: List of symbols to check
         
         Returns:
             Number of alerts sent
         """
-        if not self.enabled:
+        if self.market_hours_only and not self.is_market_hours():
+            self.logger.debug("Outside market hours, skipping check")
             return 0
         
-        if self.market_hours_only and not self.is_market_hours():
-            return 0
+        # Separate priority vs normal symbols
+        priority = [s for s in watchlist if s in self.priority_symbols]
+        normal = [s for s in watchlist if s not in self.priority_symbols]
+        
+        # Check priority symbols first
+        sorted_watchlist = priority + normal
+        
+        prime_indicator = " 🎯 PRIME HOURS" if self.is_prime_hours() else ""
+        self.logger.info(
+            f"🔍 Checking {len(sorted_watchlist)} symbols "
+            f"({len(priority)} priority){prime_indicator}..."
+        )
+        
+        total_alerts = 0
+        for symbol in sorted_watchlist:
+            alerts_sent = self.check_symbol(symbol)
+            total_alerts += alerts_sent
+            time.sleep(0.2)  # Fast iteration (was 0.5s)
         
         self.stats['checks_completed'] += 1
         
-        # Separate priority and regular symbols
-        priority = [s for s in watchlist if s in self.priority_symbols]
-        regular = [s for s in watchlist if s not in self.priority_symbols]
-        
-        # Check priority symbols first
-        ordered_watchlist = priority + regular
-        
-        total_alerts = 0
-        
-        for symbol in ordered_watchlist:
-            alerts = self.check_symbol(symbol)
-            total_alerts += len(alerts)
-            
-            # Small delay between symbols
-            time.sleep(0.3)
+        if total_alerts > 0:
+            self.logger.info(f"✅ Check complete: {total_alerts} alerts sent")
+        else:
+            self.logger.debug(f"Check complete: No unusual activity detected")
         
         return total_alerts
     
-    def run_continuous(self, watchlist: List[str]):
-        """Run continuous monitoring"""
-        self.logger.info("🚀 Starting Unusual Activity Monitor v2.0 (continuous mode)")
+    def run_continuous(self, watchlist_manager):
+        """
+        Run continuous monitoring - PROFESSIONAL SPEED MODE
+        
+        Args:
+            watchlist_manager: WatchlistManager instance
+        """
+        self.logger.info("🚀 Starting Unusual Activity Monitor - PROFESSIONAL MODE")
+        self.logger.info(f"   ⚡ Check interval: {self.check_interval}s (AGGRESSIVE)")
+        self.logger.info(f"   ⏱️ Cooldown: {self.cooldown_prime_hours}min (prime) / {self.cooldown_normal}min (normal)")
+        self.logger.info(f"   🌅 Extended hours: 8:00 AM - 4:00 PM")
+        self.logger.info(f"   🎯 Priority symbols: {', '.join(sorted(self.priority_symbols))}")
         
         try:
             while self.enabled:
                 try:
-                    if self.market_hours_only and not self.is_market_hours():
-                        time.sleep(60)
-                        continue
+                    # Load current watchlist
+                    watchlist = watchlist_manager.load_symbols()
                     
-                    alerts_sent = self.run_single_check(watchlist)
+                    # Run check
+                    self.run_single_check(watchlist)
                     
-                    if alerts_sent > 0:
-                        session = "PRIME HOURS" if self.is_prime_hours() else "REGULAR"
-                        self.logger.info(
-                            f"✅ Check complete: {alerts_sent} alerts sent [{session}]"
-                        )
-                    
+                    # Sleep until next check
                     time.sleep(self.check_interval)
                     
                 except Exception as e:
-                    self.logger.error(f"Error in check cycle: {str(e)}")
-                    import traceback
-                    self.logger.debug(traceback.format_exc())
-                    time.sleep(30)
+                    self.logger.error(f"Error in monitoring loop: {str(e)}", exc_info=True)
+                    self.stats['errors'] += 1
+                    time.sleep(60)  # Wait 1 minute on error
                     
         except KeyboardInterrupt:
-            self.logger.info("Stopping unusual activity monitor...")
-            self.print_stats()
+            self.logger.info("⏹️ Unusual Activity Monitor stopped")
+        except Exception as e:
+            self.logger.error(f"❌ Fatal error in monitor: {str(e)}", exc_info=True)
     
-    def print_stats(self):
-        """Print monitor statistics"""
-        print("\n" + "=" * 60)
-        print("UNUSUAL ACTIVITY MONITOR STATISTICS")
-        print("=" * 60)
-        print(f"Checks Completed: {self.stats['checks_completed']}")
-        print(f"Symbols Analyzed: {self.stats['symbols_analyzed']}")
-        print(f"Unusual Activity Detected: {self.stats['unusual_activity_detected']}")
-        print(f"Alerts Sent: {self.stats['alerts_generated']}")
-        print(f"Prime Hours Alerts: {self.stats['prime_hours_alerts']}")
-        print(f"Pre-market Alerts: {self.stats['premarket_alerts']}")
-        print(f"Rate Limited: {self.stats['rate_limited']}")
-        print(f"Errors: {self.stats['errors']}")
-        print("=" * 60 + "\n")
+    def get_statistics(self) -> Dict:
+        """Get monitor statistics"""
+        return {
+            **self.stats,
+            'priority_symbols': list(self.priority_symbols),
+            'cooldown_prime': self.cooldown_prime_hours,
+            'cooldown_normal': self.cooldown_normal,
+            'check_interval': self.check_interval
+        }

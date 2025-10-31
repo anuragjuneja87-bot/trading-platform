@@ -73,14 +73,21 @@ class ThetaDataClientV3:
         """
         try:
             url = f"{self.base_url}{endpoint}"
-            response = requests.get(url, params=params, timeout=30)
+            response = requests.get(url, params=params, timeout=10)  # ⚡ REDUCED from 30s for 7-figure scalper speed
             
             self.stats['api_calls'] += 1
             
             if response.status_code == 200:
                 return response.text
             else:
-                self.logger.warning(f"API returned {response.status_code} for {endpoint}")
+                self.logger.warning(
+                    f"❌ ThetaData API returned {response.status_code} for {endpoint} "
+                    f"with params {params}"
+                )
+                if response.status_code == 404:
+                    self.logger.warning(f"   Endpoint not found - may not exist in v3")
+                elif response.status_code == 410:
+                    self.logger.warning(f"   Endpoint deprecated/removed from v3")
                 return None
                 
         except Exception as e:
@@ -212,6 +219,10 @@ class ThetaDataClientV3:
         """
         Get Open Interest for ALL strikes (bulk call)
         
+        NOTE: The greeks endpoint already includes open_interest data.
+        This separate endpoint may be redundant. If it returns 404/410,
+        we can remove this method and use OI from greeks response.
+        
         Args:
             symbol: Stock symbol
             expiration: Expiration date in YYYY-MM-DD format
@@ -227,7 +238,7 @@ class ThetaDataClientV3:
         if cached is not None:
             return cached
         
-        # Make API call
+        # Make API call - WARNING: This endpoint might not exist in v3
         endpoint = '/v3/option/snapshot/open_interest'
         params = {
             'symbol': symbol,
