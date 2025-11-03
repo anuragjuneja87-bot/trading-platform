@@ -601,13 +601,23 @@ def schedule_sunday_routine():
 
 @app.route('/')
 def index():
-    """Serve dashboard"""
-    return send_from_directory('../frontend', 'index.html')
+    """Serve main dashboard"""
+    return send_from_directory(app.static_folder, 'professional_dashboard.html')
 
 @app.route('/alert-console')
 def alert_console():
-    """Serve alert console"""
-    return send_from_directory('../frontend', 'alert_console.html')
+    """Serve alert management console"""
+    return send_from_directory(app.static_folder, 'alert_console.html')
+
+@app.route('/gamma')
+def gamma_dashboard():
+    """Serve gamma dashboard"""
+    return send_from_directory(app.static_folder, 'gamma_dashboard.html')
+
+@app.route('/gex')
+def gex_dashboard():
+    """Serve GEX calculator"""
+    return send_from_directory(app.static_folder, 'gex_dashboard.html')
 
 @app.route('/api/analyze/<symbol>')
 def analyze_symbol(symbol):
@@ -863,7 +873,7 @@ def get_symbol_news(symbol):
 @app.route('/news-dashboard')
 def news_dashboard():
     """Serve news dashboard"""
-    return send_from_directory('../frontend', 'news_dashboard.html')
+    return send_from_directory(app.static_folder, 'news_dashboard.html')
 
 @app.route('/api/health')
 def health_check():
