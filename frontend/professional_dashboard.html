@@ -612,8 +612,8 @@
                 const response = await fetch(`${API_BASE}/watchlist`);
                 const data = await response.json();
                 
-                if (data.symbols && data.symbols.length > 0) {
-                    SYMBOLS = data.symbols;
+                if (data.watchlist && data.watchlist.length > 0) {
+                    SYMBOLS = data.watchlist;
                     document.getElementById('watchlistInfo').textContent = `Watchlist: ${SYMBOLS.length} symbols`;
                     document.getElementById('symbolList').textContent = SYMBOLS.join(' | ');
                     console.log(`✅ Loaded ${SYMBOLS.length} symbols from watchlist:`, SYMBOLS);

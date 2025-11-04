@@ -237,8 +237,8 @@
                 const response = await fetch(`${API_BASE}/watchlist`);
                 const data = await response.json();
                 
-                if (data.symbols && data.symbols.length > 0) {
-                    SYMBOLS = data.symbols;
+                if (data.watchlist && data.watchlist.length > 0) {
+                    SYMBOLS = data.watchlist;
                     document.getElementById('symbolList').textContent = `Tracking ${SYMBOLS.length} symbols: ${SYMBOLS.join(', ')}`;
                     return true;
                 } else {

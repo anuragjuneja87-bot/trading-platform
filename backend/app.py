@@ -652,7 +652,7 @@ def analyze_symbol(symbol):
 def get_watchlist():
     """Get current watchlist"""
     try:
-        watchlist = watchlist_manager.get_watchlist()
+        watchlist = watchlist_manager.load_symbols()
         return jsonify({
             'success': True,
             'watchlist': watchlist,
@@ -677,7 +677,7 @@ def add_to_watchlist():
         return jsonify({
             'success': True,
             'message': f'{symbol} added to watchlist',
-            'watchlist': watchlist_manager.get_watchlist()
+            'watchlist': watchlist_manager.load_symbols()
         })
     except Exception as e:
         logger.error(f"Error adding to watchlist: {str(e)}")
@@ -698,7 +698,7 @@ def remove_from_watchlist():
         return jsonify({
             'success': True,
             'message': f'{symbol} removed from watchlist',
-            'watchlist': watchlist_manager.get_watchlist()
+            'watchlist': watchlist_manager.load_symbols()
         })
     except Exception as e:
         logger.error(f"Error removing from watchlist: {str(e)}")
