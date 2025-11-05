@@ -1,0 +1,983 @@
+# ========================================
+# ALWAYS-ON-TRADER Configuration v4.2
+# Enhanced with OPTIMIZED VOLUME SPIKE DETECTION
+# ========================================
+
+# API Keys
+polygon_api_key: ${POLYGON_API_KEY}
+
+# ========================================
+# THETADATA CONFIGURATION
+# ========================================
+thetadata:
+  base_url: ${THETADATA_BASE_URL}
+  enabled: ${THETADATA_ENABLED}
+
+# Watchlist Configuration
+watchlist:
+  file: "data/watchlist.txt"
+  
+  filtering:
+    market_hours:
+      mode: "all"
+      
+    after_hours:
+      mode: "priority"
+      priority_symbols: ["SPY", "QQQ", "VIX"]
+      fallback_count: 3
+      
+    weekend:
+      mode: "all"
+      symbols: ["SPY"]
+      
+    pre_market:
+      mode: "priority"
+      priority_symbols: ["SPY", "QQQ", "NVDA", "TSLA"]
+      fallback_count: 5
+
+# ========================================
+# DISCORD CONFIGURATION - Multi-Channel
+# ========================================
+discord:
+  enabled: true
+  
+  # Multi-channel webhooks
+  webhook_trading: ${DISCORD_WEBHOOK_URL}
+  webhook_news: ${DISCORD_NEWS_ONLY}
+  webhook_earnings_weekly: ${DISCORD_WEEKLY_EARNINGS}
+  webhook_earnings_realtime: ${DISCORD_REALTIME_EARNINGS}
+  webhook_market_impact: ${DISCORD_CRITICAL_SIGNALS}
+  webhook_volume_spike: ${DISCORD_VOLUME_SPIKE}
+  webhook_momentum_signals: ${DISCORD_MOMENTUM_SIGNALS}
+  webhook_odte_levels: ${DISCORD_ODTE_LEVELS}
+  webhook_news_alerts: ${DISCORD_NEWS_ALERTS}
+  webhook_openai_news: ${DISCORD_OPENAI_NEWS}
+  
+  # Legacy single webhook (for backward compatibility)
+  webhook_url: ${DISCORD_WEBHOOK_URL}
+  
+  # Alert channel routing
+  channels:
+    strong_signals: ${DISCORD_WEBHOOK_URL}
+    regular_signals: ${DISCORD_WEBHOOK_URL}
+    momentum_shifts: ${DISCORD_WEBHOOK_URL}
+    
+  # Alert level thresholds
+  thresholds:
+    strong_signal_confidence: 85
+    regular_signal_confidence: 70
+    minimum_confidence: 60
+    
+  # Rate limiting
+  rate_limits:
+    max_alerts_per_symbol_per_hour: 3
+    cooldown_between_same_alerts: 300
+    
+  # Alert formatting
+  formatting:
+    include_chart_link: true
+    include_bookmap_notes: true
+    include_news_headlines: true
+    max_headlines: 2
+    color_scheme:
+      strong_buy: 0x00ff00
+      buy: 0x00cc00
+      strong_sell: 0xff0000
+      sell: 0xcc0000
+      momentum_shift: 0xffff00
+      monitor: 0x888888
+
+# ========================================
+# 🚀 REAL-TIME VOLUME SPIKE MONITOR (OPTIMIZED FOR 7-FIGURE DAY TRADING)
+# AGGRESSIVE configuration - Speed & early detection prioritized
+# ========================================
+realtime_volume_spike:
+  enabled: true
+  
+  # Market Hours Configuration (9:30 AM - 4:00 PM ET)
+  market_hours:
+    # RVOL Thresholds - OPTIMIZED for early institutional flow detection
+    thresholds:
+      elevated: 2.0    # Early institutional activity - catch building momentum
+      high: 3.5        # Strong conviction move - significant volume
+      extreme: 5.5     # Parabolic setup - rare but actionable
+    
+    # Price movement filter - LOWERED to catch moves at inception
+    min_price_change_pct: 0.6    # Don't miss small price starts with big volume
+    
+    # Check intervals by session - ALL AGGRESSIVE
+    check_intervals:
+      first_hour: 15        # 9:30-10:30 AM - FASTEST (was 20s)
+      power_hour: 15        # 3:00-4:00 PM - FASTEST (was 20s)
+      mid_day: 20           # 10:30 AM-3:00 PM - FASTER (was 30s)
+    
+    # Cooldown between alerts - REDUCED for evolving setups
+    cooldown_minutes: 5     # Quick re-alerts on continuation (was 8)
+    
+    # VWAP proximity filter - INFORMATIONAL ONLY
+    vwap_filter:
+      enabled: true
+      proximity_pct: 0.5    # Alert if within 0.5% of VWAP
+      require_proximity: false  # Never filter out - just inform
+  
+  # Pre-Market Configuration (4:00 AM - 9:30 AM ET)
+  # CRITICAL: This is where big moves start - BE EARLY
+  pre_market:
+    # AGGRESSIVE thresholds - catch pre-market runners EARLY
+    thresholds:
+      elevated: 2.0    # Early pre-market activity (was 3.5)
+      high: 3.5        # Significant pre-market move (was 5.0)
+      extreme: 5.5     # Major pre-market event (was 8.0)
+    
+    # RELAXED price filter - volume matters more pre-market
+    min_price_change_pct: 0.75    # Catch starts before 2%+ moves (was 1.5)
+    
+    # FASTER check interval - speed is everything
+    check_interval: 25           # Much faster scanning (was 45s)
+    
+    # REDUCED cooldown - don't miss continuation
+    cooldown_minutes: 8          # Allow re-alerts on building momentum (was 15)
+    
+    # VWAP filter - WIDER for pre-market volatility
+    vwap_filter:
+      enabled: true
+      proximity_pct: 1.0        # Wider range for pre-market (was 0.75)
+      require_proximity: false  # Never filter out
+  
+  # After Hours Configuration (4:00 PM - 8:00 PM ET)
+  # CRITICAL: Earnings, news, continuation plays
+  after_hours:
+    # AGGRESSIVE thresholds - same as pre-market
+    thresholds:
+      elevated: 2.0    # Early after-hours activity (was 3.5)
+      high: 3.5        # Significant move (was 5.0)
+      extreme: 5.5     # Major event (was 8.0)
+    
+    # RELAXED price filter
+    min_price_change_pct: 0.75    # Early detection (was 1.5)
+    
+    # FASTER scanning
+    check_interval: 30           # Much faster (was 60s)
+    
+    # REDUCED cooldown
+    cooldown_minutes: 8          # Allow re-alerts (was 15)
+    
+    vwap_filter:
+      enabled: false  # VWAP less relevant after hours
+
+# ========================================
+# NEWS MONITORING (Legacy - for watchlist stocks)
+# ========================================
+news_monitoring:
+  enabled: true
+  max_alerts_per_symbol_per_day: 10
+  check_interval_seconds: 180
+  min_impact_level: 'MEDIUM'
+  
+  strong_positive_keywords:
+    - "beats"
+    - "soars"
+    - "surge"
+    - "breakthrough"
+    - "record"
+    - "upgrade to buy"
+    - "raised target"
+  
+  strong_negative_keywords:
+    - "plunges"
+    - "crashes"
+    - "misses badly"
+    - "downgrade to sell"
+    - "investigation"
+    - "lawsuit"
+    - "halted"
+
+# ========================================
+# 🚨 MARKET IMPACT MONITOR
+# High-impact news alerts (macro, M&A, analyst, spillover)
+# Routes to: DISCORD_NEWS_ALERTS channel
+# ========================================
+market_impact_monitor:
+  enabled: true
+  check_interval: 60                    # Check every 60 seconds
+  lookback_hours: 2                     # Only check news from last 2 hours
+  max_alerts_per_hour: 20               # High tolerance for important news
+  
+  # Impact scoring threshold (0-10 scale)
+  min_impact_score: 7.0                 # Only alert if impact >= 7/10
+  
+  # Volume Confirmation Settings
+  volume_confirmation:
+    enabled: true                       # Require volume spike for confirmation
+    min_rvol: 2.0                       # 2.0x RVOL minimum
+    critical_rvol: 3.0                  # 3.0x+ = CRITICAL alert
+  
+  # Macro Event Keywords (Fed, tariffs, economic data)
+  macro_keywords:
+    - "Fed"
+    - "Federal Reserve"
+    - "Powell"
+    - "FOMC"
+    - "interest rate"
+    - "rate cut"
+    - "rate hike"
+    - "tariff"
+    - "tariffs"
+    - "trade war"
+    - "Trump tariff"
+    - "China tariff"
+    - "Treasury"
+    - "inflation"
+    - "CPI"
+    - "jobs report"
+    - "unemployment"
+    - "GDP"
+    - "recession"
+    - "economic data"
+    - "circuit breaker"
+    - "market halt"
+    - "trading halt"
+    - "emergency meeting"
+  
+  # Analyst Event Keywords
+  analyst_keywords:
+    - "upgrade"
+    - "downgrade"
+    - "price target"
+    - "initiated coverage"
+    - "raises target"
+    - "lowers target"
+    - "outperform"
+    - "underperform"
+    - "buy rating"
+    - "sell rating"
+    - "overweight"
+    - "underweight"
+  
+  # M&A Event Keywords
+  ma_keywords:
+    - "merger"
+    - "acquisition"
+    - "acquires"
+    - "acquired"
+    - "takeover"
+    - "buyout"
+    - "deal"
+    - "to acquire"
+    - "to buy"
+    - "agrees to buy"
+    - "merger agreement"
+    - "acquisition agreement"
+  
+  # Earnings Event Keywords
+  earnings_keywords:
+    - "beats estimates"
+    - "misses estimates"
+    - "earnings surprise"
+    - "blowout earnings"
+    - "disappointing earnings"
+    - "eps beat"
+    - "revenue beat"
+    - "guidance raised"
+    - "guidance lowered"
+  
+  # Thresholds for filtering
+  min_price_target_change_percent: 20   # Only alert on PT raises >20%
+  min_earnings_surprise_percent: 10     # Only alert on >10% earnings surprise
+  
+  # 🎯 SPILLOVER MAPPING (NVDA → related stocks)
+  spillover_map:
+    NVDA:
+      - NVTS      # AI infrastructure
+      - SMCI      # Server/AI hardware
+      - ARM       # Chip design
+      - AMD       # Direct competitor
+      - AVGO      # Networking chips
+      - TSM       # Manufacturer
+      - INTC      # Competitor
+      - MU        # Memory chips
+      - MRVL      # Networking
+    
+    TSLA:
+      - RIVN      # EV competitor
+      - LCID      # EV competitor
+      - F         # Traditional auto
+      - GM        # Traditional auto
+      - CHPT      # EV charging
+    
+    AAPL:
+      - QCOM      # Supplier
+      - CIRR      # Supplier
+      - SWKS      # Supplier
+    
+    MSFT:
+      - PLTR      # AI/Data analytics
+      - SNOW      # Cloud data
+      - DDOG      # Cloud monitoring
+      - NET       # Cloud infrastructure
+    
+    GOOGL:
+      - PLTR      # AI analytics
+      - AI        # AI software
+      - C3AI      # AI applications
+    
+    AMZN:
+      - SHOP      # E-commerce
+      - WMT       # Retail competitor
+      - EBAY      # E-commerce
+    
+    CRM:
+      - NOW       # Enterprise software
+      - SNOW      # Data cloud
+      - WDAY      # HR software
+      - DDOG      # Monitoring
+    
+    SQ:
+      - PYPL      # Payment competitor
+      - COIN      # Crypto
+      - HOOD      # Trading platform
+      - SOFI      # Fintech
+    
+    META:
+      - SNAP      # Social media
+      - PINS      # Social platform
+      - RBLX      # Gaming/social
+
+# ========================================
+# EARNINGS MONITORING
+# ========================================
+earnings_monitoring:
+  enabled: true
+  
+  weekly_enabled: true
+  weekly_day: 0
+  weekly_time: "07:00"
+  
+  realtime_enabled: true
+  realtime_check_interval: 300
+
+# ========================================
+# 🔍 OPENAI NEWS MONITOR
+# ========================================
+openai_monitor:
+  enabled: true
+  check_interval: 60
+  lookback_hours: 2
+  max_alerts_per_hour: 10
+  
+  keywords:
+    - "OpenAI"
+    - "Open AI"
+    - "ChatGPT"
+    - "GPT-4"
+    - "GPT-5"
+    - "Sam Altman"
+    - "Altman"
+  
+  volume_confirmation:
+    enabled: true
+    min_rvol_for_alert: 1.5
+    critical_rvol: 2.5
+    confirmation_window: 300
+  
+  monitor_all_tech: true
+  priority_tickers:
+    - NVDA
+    - AMD
+    - AVGO
+    - MSFT
+    - GOOGL
+    - META
+    - AMZN
+    - ORCL
+
+# ========================================
+# 📊 EXTENDED HOURS VOLUME MONITOR (Legacy)
+# ========================================
+extended_hours_volume_monitor:
+  enabled: true
+  
+  # Spike detection
+  spike_threshold: 3.0                  # 3.0x RVOL = spike
+  critical_threshold: 5.0               # 5.0x RVOL = critical
+  
+  # Alert settings
+  cooldown_minutes: 10                # 30 min cooldown per symbol
+  max_alerts_per_session: 5             # Max 5 alerts per symbol per session
+  
+  # Session times (ET)
+  sessions:
+    pre_market:
+      start: "04:00"
+      end: "09:30"
+    after_hours:
+      start: "16:00"
+      end: "20:00"
+  
+  # Filters
+  min_price: 5.0                        # Ignore penny stocks
+  watchlist_only: true                  # Only monitor watchlist
+
+# ========================================
+# 🎯 MOMENTUM SIGNAL MONITOR
+# Combines RVOL + Dark Pool + Gamma Walls
+# Routes to: DISCORD_MOMENTUM_SIGNALS
+# ========================================
+momentum_signal_monitor:
+  enabled: true
+  check_interval: 60                    # Check every 60 seconds
+  market_hours_only: true               # Only alert during 9:30 AM - 4:00 PM ET
+  
+  # Cooldowns (OPTIMIZED for 7-figure scalping - faster re-alerts)
+  cooldown_minutes:
+    momentum_signal: 10                 # ⬇️ FROM 15 (faster momentum re-alerts)
+    gamma_approach: 5                   # ⬇️ FROM 10 (catch gamma wall interactions sooner)
+    dark_pool_flip: 2                   # ⬇️ FROM 5 (CRITICAL for scalping exits)
+    extreme_setup: 20                   # ⬇️ FROM 30 (rare but actionable)
+    confluence_alert: 10                # NEW: For 75%+ confluence setups
+  
+  # Thresholds (ALIGNED with VolumeAnalyzer v2.0 for 7-figure scalping)
+  thresholds:
+    min_rvol: 1.8                       # ⬇️ FROM 2.5 (39% MORE SENSITIVE - catch moves early)
+    high_rvol: 2.3                      # NEW: High volume tier (institutional flow)
+    extreme_rvol: 3.5                   # ⬇️ FROM 4.0 (13% MORE SENSITIVE - explosive moves)
+    min_dark_pool_strength: 4           # ✅ KEEP (filters noise, quality signals)
+    min_dark_pool_value: 1000000        # ✅ KEEP ($1M+ blocks = institutions)
+    gamma_wall_distance_pct: 1.5        # ⬆️ FROM 1.0 (alert EARLIER - 50% more warning)
+    gamma_wall_urgent_pct: 0.75         # ⬆️ FROM 0.5 (urgent zone expanded)
+    min_confluence: 7                   # ✅ KEEP (high-quality setups)
+    extreme_confluence: 8               # ✅ KEEP (best-of-best)
+  
+  # Filters
+  filters:
+    watchlist_only: true                # Only monitor watchlist symbols
+    min_price: 5.0                      # Ignore penny stocks
+    max_alert_per_symbol_per_day: 8     # ⬆️ FROM 5 (more alerts for fast scalping)
+
+# ========================================
+# 📊 REAL-TIME EARNINGS MONITOR
+# Calendar-based approach (all stocks with earnings this week)
+# Routes to: DISCORD_REALTIME_EARNINGS
+# ========================================
+earnings_monitor:
+  enabled: true
+  
+  # Scan windows (ONLY during pre/post market)
+  premarket_window:
+    start_time: "05:00"              # 5:00 AM ET
+    end_time: "08:00"                # 8:00 AM ET
+    check_interval: 20               # Check every 20 seconds
+  
+  postmarket_window:
+    start_time: "15:50"              # 3:50 PM ET (10 min before close)
+    end_time: "19:00"                # 7:00 PM ET
+    check_interval: 10               # Check every 10 seconds (FASTEST - critical window)
+  
+  # Calendar refresh
+  calendar_refresh: "daily"          # Refresh earnings calendar daily at market close
+  
+  # Detection settings
+  lookback_minutes: 30               # Check news from last 30 minutes (fast detection)
+  
+  # Earnings keywords
+  earnings_keywords:
+    - "earnings"
+    - "reports q"
+    - "quarterly results"
+    - "beats"
+    - "misses"
+    - "eps"
+    - "guidance"
+    - "blowout"
+    - "disappointing earnings"
+    - "earnings surprise"
+    - "beats estimates"
+    - "misses estimates"
+  
+  # Alert settings
+  alert_all_earnings: true           # Alert on ALL earnings (not just watchlist)
+  deduplicate: true                  # Prevent duplicate alerts for same earnings
+# ========================================
+# 🎯 0DTE GAMMA LEVEL MONITOR
+# Alert at 9:00 AM EST when price near gamma walls
+# Routes to: DISCORD_ODTE_LEVELS
+# ========================================
+odte_gamma_monitor:
+  enabled: true
+  
+  # Alert timing (EXTENDED for 6-figure day trading)
+  alert_time: "08:45"                   # 8:45 AM EST (pre-market start)
+  alert_window_minutes: 50              # 50-minute window (8:45-9:35 AM)
+  
+  # Proximity thresholds (WIDENED for earlier warnings)
+  min_proximity_pct: 0.5                # Minimum 0.5% away from gamma wall
+  max_proximity_pct: 3.0                # Maximum 3% away from gamma wall
+  
+  # Filters
+  weekdays_only: true                   # Only alert Monday-Friday
+  watchlist_only: true                  # Only monitor watchlist symbols
+  require_odte: true                    # Only alert if 0DTE options exist
+
+# ========================================
+# 🚀 PHASE 1: VOLUME ANALYSIS
+# ========================================
+volume_analysis:
+  enabled: true
+  
+  rvol_high_threshold: 2.0
+  rvol_extreme_threshold: 3.0
+  rvol_lookback_days: 20
+  
+  spike_threshold: 1.5
+  spike_lookback_bars: 10
+  
+  dryup_threshold: 0.5
+  dryup_lookback_bars: 15
+  
+  block_trade_percentile: 95
+  
+  rvol_weight: 3
+  spike_weight: 2
+  dryup_weight: 1
+  block_weight: 2
+
+# ========================================
+# 🚀 PHASE 1: KEY LEVEL DETECTION
+# ========================================
+key_levels:
+  enabled: true
+  
+  previous_day_levels: true
+  premarket_levels: true
+  vwap_bands: true
+  psychological_levels: true
+  pivot_points: true
+  
+  proximity_threshold: 0.005
+  minimum_confluence_score: 6
+  
+  confluence_weights:
+    previous_day_high: 3
+    previous_day_low: 3
+    previous_close: 2
+    vwap: 2
+    vwap_1sd: 2
+    vwap_2sd: 3
+    premarket_high: 2
+    premarket_low: 2
+    psychological: 2
+    pivot: 1
+  
+  high_confluence_resistance: 4
+  high_confluence_support: 4
+  previous_day_break_with_volume: 5
+
+# ========================================
+# 🚀 PHASE 1: RISK MANAGEMENT
+# ========================================
+risk_management:
+  minimum_risk_reward: 2.0
+  enforce_rr_filter: false              # DISABLED per user request
+  
+  max_risk_per_trade_percent: 1.0
+  account_size: 100000
+  
+  use_atr_stops: false
+  stop_loss_multiplier: 2.0
+
+# ========================================
+# 🚀 PHASE 1: SIGNAL METRICS TRACKING
+# ========================================
+signal_metrics:
+  enabled: true
+  track_performance: true
+  metrics_file: "data/metrics/signal_metrics.csv"
+  
+  auto_update_outcomes: false
+  
+  generate_daily_summary: true
+  daily_summary_time: "16:30"
+
+# Pushover Configuration
+pushover:
+  enabled: true
+  user_key: ${PUSHOVER_USER_KEY}
+  api_token: ${PUSHOVER_API_TOKEN}
+  
+  filter:
+    alert_types: ["STRONG BUY", "STRONG SELL", "MOMENTUM SHIFT"]
+    minimum_confidence: 80
+    
+  sounds:
+    strong_buy: "cashregister"
+    strong_sell: "alien"
+    momentum_shift: "intermission"
+    
+  priority:
+    strong_signals: 1
+    momentum_shift: 1
+    regular_signals: 0
+
+# ========================================
+# Market Schedule (ENHANCED WITH PHASE 1)
+# ========================================
+market_schedule:
+  timezone: "America/New_York"
+  
+  trading_hours:
+    monday_friday:
+      pre_market: "04:00-09:30"
+      market_open: "09:30-16:00"
+      after_hours: "16:00-20:00"
+    
+  scan_intervals:
+    pre_market: 300
+    first_hour: 60
+    midday: 120
+    power_hour: 60
+    after_hours: 300
+    weekend: 900
+    market_hours: 60
+    
+  first_scan:
+    pre_market_start: true
+    market_open: true
+    after_hours_start: false
+
+# ========================================
+# Analysis Configuration (ENHANCED WITH PHASE 1)
+# ========================================
+analysis:
+  signals:
+    use_gap_detection: true
+    use_news_sentiment: true
+    use_dark_pools: true
+    use_options_flow: true
+    use_camarilla_levels: true
+    use_volume_analysis: true
+    use_key_level_detection: true
+    
+  timeframes:
+    - "1H"
+    - "1D"
+    
+  thresholds:
+    default_signal_threshold: 8
+    strong_signal_threshold: 12
+    news_driven_threshold: 6
+    gap_driven_threshold: 6
+    high_rvol_threshold: 6
+    
+  total_factors: 26
+    
+  significance:
+    gap_percentage: 2.0
+    large_gap_percentage: 3.0
+    volume_spike_multiplier: 1.5
+    news_impact_threshold: "MEDIUM"
+    rvol_high_multiplier: 2.0
+    rvol_extreme_multiplier: 3.0
+    confluence_high_score: 7
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "logs/always_on_trader.log"
+  
+  rotation:
+    max_bytes: 10485760
+    backup_count: 5
+    
+  log_all_analyses: false
+  log_api_requests: false
+  log_signal_scores: true
+  log_volume_analysis: true
+  log_key_levels: true
+  log_rr_filtering: true
+
+# Error Handling
+error_handling:
+  max_retries: 3
+  retry_delay: 5
+  
+  on_api_error: "skip_symbol"
+  on_network_error: "retry"
+  
+  alert_on_errors: true
+  error_alert_cooldown: 3600
+
+# Cache Configuration
+cache:
+  enabled: true
+  ttl: 30
+  max_size: 1000
+
+# Testing/Development
+development:
+  dry_run: false
+  test_mode: false
+  test_symbols: ["SPY", "QQQ"]
+  verbose_output: false
+  test_volume_analysis: false
+  test_key_levels: false
+
+# Backup/Persistence
+persistence:
+  save_alerts: true
+  alerts_file: "data/alerts_history.json"
+  save_analyses: false
+  
+  max_alert_history: 1000
+  alert_retention_days: 30
+  save_metrics: true
+  metrics_directory: "data/metrics"
+
+# ========================================
+# 🚀 SYSTEM SUMMARY v4.2
+# ========================================
+# Features Active:
+# ✅ Trading Signals (26 factors, Phase 1)
+# ✅ OPTIMIZED Real-Time Volume Spike Monitor
+# ✅ Market Impact Monitor (macro, M&A, analyst, spillover)
+# ✅ OpenAI News Monitor (AI-specific news)
+# ✅ Pre-Market Volume Monitor (extended hours spikes)
+# ✅ Momentum Signal Monitor (RVOL + Dark Pool + Gamma)
+# ✅ 0DTE Gamma Monitor (9AM gamma wall alerts)
+# ✅ Volume Analysis (RVOL, spikes, dry-ups)
+# ✅ Key Level Detection (confluence scoring)
+# ✅ Earnings Monitoring (weekly + realtime)
+# ✅ Signal Metrics Tracking (win rate, performance)
+# ✅ Multi-Channel Discord Routing
+# ✅ Session-Aware Volume Detection (first hour/power hour)
+# ✅ VWAP Proximity Filtering
+# ========================================# ========================================
+# 🚀 MISSING MONITOR CONFIGURATIONS
+# Add these sections to your config.yaml
+# ========================================
+
+# ========================================
+# UNUSUAL ACTIVITY MONITOR
+# Professional day trader settings - AGGRESSIVE
+# Routes to: DISCORD_UNUSUAL_ACTIVITY
+# ========================================
+unusual_activity_monitor:
+  enabled: true
+  check_interval: 10  # Check every 10 seconds (FAST)
+  market_hours_only: true
+  
+  thresholds:
+    # AGGRESSIVE - Catch most unusual activity
+    min_oi_change_pct: 15          # Down from typical 30+
+    min_volume_ratio: 1.2          # Down from typical 1.5+
+    min_score: 4.0                 # Down from typical 6.0+
+    min_premium_swept: 50000       # Down from typical 100k+
+    
+    # Score multipliers
+    extreme_oi_change_pct: 50      # 50%+ OI change = extreme
+    extreme_volume_ratio: 3.0      # 3x+ volume = extreme
+    extreme_premium: 1000000       # $1M+ = extreme
+  
+  filters:
+    watchlist_only: true
+    min_price: 5.0
+    max_price: 1000.0
+    max_alerts_per_symbol_per_day: 10
+    
+    # Option filters
+    min_dte: 0                     # Include 0DTE
+    max_dte: 45                    # Up to 45 DTE
+    min_delta: 0.20                # Min delta for options
+    max_delta: 1.0
+  
+  cooldown_minutes:
+    # ULTRA-SHORT for active trading
+    prime_hours: 1                 # 1 minute during 9:30-11:30 AM
+    normal: 2                      # 2 minutes rest of day
+  
+  # Classification thresholds
+  classifications:
+    whale_threshold: 500000        # $500k+ = whale trade
+    institutional_threshold: 250000  # $250k+ = institutional
+    aggressive_threshold: 100000   # $100k+ = aggressive
+
+# ========================================
+# MOMENTUM SIGNAL MONITOR
+# Combines RVOL + Dark Pool + Gamma Walls
+# Routes to: DISCORD_MOMENTUM_SIGNALS
+# ========================================
+momentum_signal_monitor:
+  enabled: true
+  check_interval: 30  # Check every 30 seconds
+  market_hours_only: true
+  
+  thresholds:
+    # AGGRESSIVE - Lower bar for signals
+    min_rvol: 1.2              # Down from typical 1.5-1.8
+    high_rvol: 2.0             # Down from typical 2.3
+    extreme_rvol: 3.0          # Down from typical 3.5
+    
+    # Dark pool thresholds
+    min_dark_pool_strength: 2  # Down from typical 3-4
+    min_dark_pool_value: 500000  # Down from typical 1M
+    
+    # Gamma wall thresholds
+    gamma_wall_distance_pct: 2.0   # Wider range (up from 1.0-1.5)
+    gamma_wall_urgent_pct: 1.0     # Wider range (up from 0.5-0.75)
+    
+    # Confluence thresholds (CRITICAL FIX)
+    min_confluence: 3          # Down from your current 7 (!!!)
+    extreme_confluence: 5      # Down from your current 8
+    
+    # Signal quality
+    min_factor_count: 3        # Need 3+ factors aligned
+    extreme_factor_count: 5    # 5+ factors = extreme setup
+  
+  filters:
+    watchlist_only: true
+    min_price: 5.0
+    max_alerts_per_symbol_per_day: 8
+  
+  cooldown_minutes:
+    # SHORT cooldowns for evolving setups
+    momentum_signal: 2         # Down from typical 5
+    gamma_approach: 1          # Down from typical 3
+    dark_pool_flip: 1          # Down from typical 2
+    extreme_setup: 5           # Down from typical 10
+    confluence_alert: 2        # Down from typical 5
+  
+  # Advanced features
+  features:
+    detect_gamma_approach: true
+    detect_dark_pool_flip: true
+    detect_extreme_confluence: true
+    calculate_targets: true
+    include_interpretation: true
+
+# ========================================
+# WALL STRENGTH MONITOR
+# Tracks OI changes at gamma walls (5-min checks)
+# Routes to: DISCORD_ODTE_LEVELS
+# ========================================
+wall_strength_monitor:
+  enabled: true
+  check_interval: 120  # Check every 2 minutes
+  market_hours_only: true
+  
+  thresholds:
+    # AGGRESSIVE - Catch wall changes early
+    min_oi_change_pct: 10          # Minimum OI change to track
+    strong_change_pct: 20          # Strong wall building
+    very_strong_change_pct: 35     # Very strong (was 50)
+    
+    # Weakening thresholds (negative)
+    breaking_change_pct: -15       # Wall breaking (was -25)
+    moderate_change_pct: -10       # Moderate weakening (was -15)
+    weak_change_pct: -5            # Slight weakening
+    
+    # Distance thresholds
+    max_wall_distance_pct: 3.0     # Only track walls within 3%
+    urgent_wall_distance_pct: 1.0  # Urgent if within 1%
+  
+  filters:
+    watchlist_only: true
+    min_strike_oi: 1000            # Minimum OI to consider
+    track_both_sides: true         # Track calls and puts
+    max_walls_per_symbol: 5        # Track top 5 walls per symbol
+  
+  cooldown_minutes:
+    # VERY SHORT for rapid wall changes
+    WALL_BUILDING: 2               # 2 minutes (was 5-10)
+    WALL_WEAKENING: 2              # 2 minutes (was 5-7)
+    WALL_BROKEN: 1                 # 1 minute (URGENT)
+  
+  # Baseline tracking
+  baseline:
+    lookback_checks: 3             # Average over last 3 checks
+    update_frequency: 5            # Update baseline every 5 checks
+
+# ========================================
+# REALTIME VOLUME SPIKE MONITOR
+# Alternative to realtime_volume_spike (if you want simpler config)
+# Routes to: DISCORD_VOLUME_SPIKE
+# ========================================
+realtime_volume_spike_monitor:
+  enabled: false  # Set to true if you want to use this instead
+  check_interval: 15
+  market_hours_only: true
+  
+  thresholds:
+    min_spike_multiple: 1.3        # 1.3x+ = spike
+    extreme_spike_multiple: 2.5    # 2.5x+ = extreme
+    min_urgency_score: 4.5
+    min_volume: 100000
+    
+    # Price movement filter
+    min_price_change_pct: 0.5      # Optional price confirmation
+    require_price_movement: false   # Don't require (volume is enough)
+  
+  filters:
+    watchlist_only: true
+    min_price: 5.0
+    max_price: 1000.0
+  
+  cooldown_minutes:
+    volume_spike: 2                # Quick re-alerts
+    extreme_spike: 1               # Very quick for extreme
+
+# ========================================
+# EXTENDED HOURS VOLUME MONITOR
+# Pre-market & After-hours activity
+# Routes to: DISCORD_VOLUME_SPIKE or DISCORD_MOMENTUM_SIGNALS
+# ========================================
+extended_hours_volume_monitor:
+  enabled: true
+  check_interval: 30
+  market_hours_only: false  # This one SHOULD be false
+  
+  premarket:
+    # 4:00 AM - 9:30 AM ET
+    enabled: true
+    start_time: "04:00"
+    end_time: "09:30"
+    
+    thresholds:
+      min_volume_ratio: 1.5        # 1.5x+ vs average pre-market
+      min_price_change_pct: 0.75   # 0.75%+ price move
+      min_urgency_score: 5.0
+    
+    check_interval: 25             # Faster during pre-market
+  
+  afterhours:
+    # 4:00 PM - 8:00 PM ET
+    enabled: true
+    start_time: "16:00"
+    end_time: "20:00"
+    
+    thresholds:
+      min_volume_ratio: 2.0        # Higher bar after-hours
+      min_price_change_pct: 0.5
+      min_urgency_score: 5.0
+    
+    check_interval: 30
+  
+  filters:
+    watchlist_only: true
+    min_price: 5.0
+  
+  cooldown_minutes: 5
+
+# ========================================
+# CONFIGURATION NOTES
+# ========================================
+# 
+# IMPORTANT: You have TWO volume spike configs now:
+# 1. realtime_volume_spike (lines 94-167) - Your original, complex config
+# 2. realtime_volume_spike_monitor (above) - Simpler, monitor-compatible
+#
+# RECOMMENDATION: 
+# - Keep realtime_volume_spike enabled (your current one)
+# - Set realtime_volume_spike_monitor enabled: false
+# - OR migrate settings from old to new and disable the old one
+#
+# The monitor classes expect the new naming convention with "_monitor" suffix.
+# ========================================

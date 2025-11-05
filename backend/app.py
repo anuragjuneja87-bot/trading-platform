@@ -523,7 +523,7 @@ def run_realtime_volume_monitor():
     """Run real-time volume monitor continuously"""
     if realtime_monitor:
         try:
-            realtime_monitor.run_continuous(watchlist_manager)
+            realtime_monitor.run_continuous()
         except Exception as e:
             logger.error(f"Real-time volume monitor error: {str(e)}")
 
@@ -531,7 +531,7 @@ def run_momentum_monitor():
     """Run momentum signal monitor continuously"""
     if momentum_monitor:
         try:
-            momentum_monitor.run_continuous(watchlist_manager)
+            momentum_monitor.run_continuous()
         except Exception as e:
             logger.error(f"Momentum monitor error: {str(e)}")
 

@@ -1,0 +1,343 @@
+anu.juneja@DH2LJ445Q1 trading-platform % python3 backend/app.py
+2025-11-05 17:40:48,215 - __main__ - INFO - ✅ config.yaml loaded
+2025-11-05 17:40:48,223 - analyzers.thetadata_client_v3 - INFO - ✅ ThetaData v3 Terminal connected: http://localhost:25503
+2025-11-05 17:40:48,223 - analyzers.enhanced_professional_analyzer - INFO - ✅ ThetaData v3 client initialized (60s cache for day trading)
+2025-11-05 17:40:48,223 - analyzers.enhanced_professional_analyzer - INFO -    💡 Using IV-based strike filtering for efficiency
+2025-11-05 17:40:48,224 - news.unified_news_engine - INFO - ✅ Benzinga client initialized
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unified News Engine initialized (Benzinga + Polygon)
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ⚠️ Tradier API kept as emergency fallback (production mode)
+2025-11-05 17:40:48,224 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,224 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,224 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ Volume Analyzer enabled
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ Key Level Detector enabled
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - 📊 Signal Thresholds: Base=8, High Impact=6
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - 💡 Gamma Walls: ThetaData (PRIMARY)
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ GEX Calculator initialized
+2025-11-05 17:40:48,224 - analyzers.wall_strength_tracker - INFO - ✅ Wall Strength Tracker initialized (DAY TRADER MODE)
+2025-11-05 17:40:48,224 - analyzers.wall_strength_tracker - INFO -    📁 Storage: backend/data/wall_history
+2025-11-05 17:40:48,224 - analyzers.wall_strength_tracker - INFO -    🔥 Building thresholds: 10% / 20% / 35%
+2025-11-05 17:40:48,224 - analyzers.wall_strength_tracker - INFO -    ⚠️ Weakening thresholds: 8% / 15% / 25%
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ Wall Strength Tracker initialized
+2025-11-05 17:40:48,224 - analyzers.unusual_activity_detector - INFO - ✅ Unusual Activity Detector - PROFESSIONAL MODE
+2025-11-05 17:40:48,224 - analyzers.unusual_activity_detector - INFO -    ⚡ SPEED OPTIMIZED for 6-figure trading
+2025-11-05 17:40:48,224 - analyzers.unusual_activity_detector - INFO -    🎯 OI threshold: 1.05x (5% change)
+2025-11-05 17:40:48,224 - analyzers.unusual_activity_detector - INFO -    🎯 Volume threshold: 1.2x (1.2x average)
+2025-11-05 17:40:48,224 - analyzers.unusual_activity_detector - INFO -    🎯 Alert threshold: 3.5/10 (AGGRESSIVE)
+2025-11-05 17:40:48,224 - analyzers.unusual_activity_detector - INFO -    ⏱️ Lookback: 5 minutes (FAST)
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unusual Activity Detector initialized
+2025-11-05 17:40:48,224 - analyzers.pin_probability_calculator - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,224 - analyzers.enhanced_professional_analyzer - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,224 - analyzers.pin_probability_calculator - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,224 - __main__ - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,224 - analyzers.confluence_alert_system - INFO - ✅ Confluence Alert System initialized
+2025-11-05 17:40:48,224 - analyzers.confluence_alert_system - INFO -    🎯 Alert threshold: 75%
+2025-11-05 17:40:48,224 - analyzers.confluence_alert_system - INFO -    ⚡ Optimized for 6-7 figure day trader
+2025-11-05 17:40:48,224 - __main__ - INFO - ✅ Confluence Alert System initialized
+2025-11-05 17:40:48,224 - utils.earnings_state_manager - INFO - 📊 Loaded 14 earnings symbols
+2025-11-05 17:40:48,241 - utils.signal_metrics - INFO - Loaded 16645 historical signals
+2025-11-05 17:40:48,241 - utils.signal_metrics - INFO - Signal metrics tracker initialized: /Users/anu.juneja/Desktop/trading-platform/backend/data/metrics/signal_metrics.csv
+2025-11-05 17:40:48,241 - __main__ - INFO - ✅ Signal Metrics Tracker initialized
+2025-11-05 17:40:48,296 - scheduler.market_scheduler - INFO - Market scheduler initialized (config: /Users/anu.juneja/Desktop/trading-platform/backend/config/config.yaml)
+2025-11-05 17:40:48,298 - analyzers.thetadata_client_v3 - INFO - ✅ ThetaData v3 Terminal connected: http://localhost:25503
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ ThetaData v3 client initialized (60s cache for day trading)
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO -    💡 Using IV-based strike filtering for efficiency
+2025-11-05 17:40:48,298 - news.unified_news_engine - INFO - ✅ Benzinga client initialized
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unified News Engine initialized (Benzinga + Polygon)
+2025-11-05 17:40:48,298 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,298 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,298 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ Volume Analyzer enabled
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ Key Level Detector enabled
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - 📊 Signal Thresholds: Base=8, High Impact=6
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - 💡 Gamma Walls: ThetaData (PRIMARY)
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ GEX Calculator initialized
+2025-11-05 17:40:48,298 - analyzers.wall_strength_tracker - INFO - ✅ Wall Strength Tracker initialized (DAY TRADER MODE)
+2025-11-05 17:40:48,298 - analyzers.wall_strength_tracker - INFO -    📁 Storage: backend/data/wall_history
+2025-11-05 17:40:48,298 - analyzers.wall_strength_tracker - INFO -    🔥 Building thresholds: 10% / 20% / 35%
+2025-11-05 17:40:48,298 - analyzers.wall_strength_tracker - INFO -    ⚠️ Weakening thresholds: 8% / 15% / 25%
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ Wall Strength Tracker initialized
+2025-11-05 17:40:48,298 - analyzers.unusual_activity_detector - INFO - ✅ Unusual Activity Detector - PROFESSIONAL MODE
+2025-11-05 17:40:48,298 - analyzers.unusual_activity_detector - INFO -    ⚡ SPEED OPTIMIZED for 6-figure trading
+2025-11-05 17:40:48,298 - analyzers.unusual_activity_detector - INFO -    🎯 OI threshold: 1.05x (5% change)
+2025-11-05 17:40:48,298 - analyzers.unusual_activity_detector - INFO -    🎯 Volume threshold: 1.2x (1.2x average)
+2025-11-05 17:40:48,298 - analyzers.unusual_activity_detector - INFO -    🎯 Alert threshold: 3.5/10 (AGGRESSIVE)
+2025-11-05 17:40:48,298 - analyzers.unusual_activity_detector - INFO -    ⏱️ Lookback: 5 minutes (FAST)
+2025-11-05 17:40:48,298 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unusual Activity Detector initialized
+2025-11-05 17:40:48,299 - analyzers.pin_probability_calculator - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,299 - analyzers.enhanced_professional_analyzer - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,299 - alerts.alert_filter - INFO - Alert filter initialized
+2025-11-05 17:40:48,299 - alerts.discord_alerter - INFO - Discord alerter initialized with channels: trading, news, earnings_weekly, earnings_realtime, volume_spike, odte_levels, news_alerts, openai_news
+2025-11-05 17:40:48,299 - alerts.alert_manager - INFO - Discord alerter enabled
+2025-11-05 17:40:48,314 - utils.signal_metrics - INFO - Loaded 16645 historical signals
+2025-11-05 17:40:48,314 - utils.signal_metrics - INFO - Signal metrics tracker initialized: /Users/anu.juneja/Desktop/trading-platform/backend/data/metrics/signal_metrics.csv
+2025-11-05 17:40:48,314 - alerts.alert_manager - INFO - ✅ Signal metrics tracking enabled
+2025-11-05 17:40:48,314 - alerts.alert_manager - INFO - Enhanced Alert Manager (Phase 1 + Volume Spikes) initialized
+2025-11-05 17:40:48,314 - alerts.alert_manager - INFO -   📊 Volume spike alerts: ENABLED (cooldown: 10min)
+2025-11-05 17:40:48,314 - __main__ - INFO - ✅ Alert Manager initialized
+2025-11-05 17:40:48,314 - database.news_database - INFO - ✅ Database tables initialized
+2025-11-05 17:40:48,314 - database.news_database - INFO - ✅ News database initialized: data/news_history.db
+2025-11-05 17:40:48,314 - __main__ - INFO - ✅ News Database initialized
+2025-11-05 17:40:48,325 - utils.config_manager - INFO - ✅ Configuration loaded successfully
+2025-11-05 17:40:48,325 - utils.config_manager - INFO - ✅ Config Manager initialized: /Users/anu.juneja/Desktop/trading-platform/backend/config/config.yaml
+2025-11-05 17:40:48,325 - __main__ - INFO - ✅ Config Manager initialized
+2025-11-05 17:40:48,325 - news.unified_news_engine - INFO - ✅ Benzinga client initialized
+2025-11-05 17:40:48,325 - __main__ - INFO - ✅ Unified News Engine initialized (Benzinga + Polygon)
+2025-11-05 17:40:48,325 - __main__ - INFO - ✅ OpenAI News Monitor initialized (30s interval)
+2025-11-05 17:40:48,325 - utils.watchlist_manager - INFO - Loaded 12 symbols from watchlist
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO - 📊 Monitoring 12 watchlist stocks
+2025-11-05 17:40:48,325 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,325 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,325 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO - ✅ Volume analyzer enabled for market impact
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO - ✅ Market Impact Monitor initialized
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO -    Macro keywords: 24
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO -    Watchlist stocks: 12
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO -    Spillover maps: 9
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO -    Min RVOL: 2.0x
+2025-11-05 17:40:48,325 - monitors.market_impact_monitor - INFO - ✅ Discord webhook configured for market impact
+2025-11-05 17:40:48,325 - __main__ - INFO - ✅ Market Impact Monitor initialized (15s interval)
+2025-11-05 17:40:48,325 - __main__ - INFO -    📡 Routes to: DISCORD_NEWS_ONLY (Watchlist News)
+2025-11-05 17:40:48,326 - __main__ - INFO - ✅ Macro News Detector initialized (15s interval - CRITICAL)
+2025-11-05 17:40:48,326 - __main__ - INFO -    🚨 Routes to: DISCORD_CRITICAL_SIGNALS (Fed/Tariffs/Economic)
+2025-11-05 17:40:48,326 - __main__ - INFO - ✅ Spillover Detector initialized (20s interval)
+2025-11-05 17:40:48,326 - __main__ - INFO -    📊 Routes to: DISCORD_NEWS_ALERTS (Related Tickers)
+2025-11-05 17:40:48,326 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,326 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,326 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,326 - monitors.extended_hours_volume_monitor - INFO - 🌅 Extended Hours Volume Monitor initialized
+2025-11-05 17:40:48,326 - monitors.extended_hours_volume_monitor - INFO -    Check interval: 60s
+2025-11-05 17:40:48,326 - monitors.extended_hours_volume_monitor - INFO -    Spike threshold: 2.0x RVOL
+2025-11-05 17:40:48,326 - monitors.extended_hours_volume_monitor - INFO -    Price filter: ±0.5% minimum
+2025-11-05 17:40:48,326 - monitors.extended_hours_volume_monitor - INFO -    Cooldown: 5 minutes (UPDATED)
+2025-11-05 17:40:48,326 - __main__ - INFO - ✅ Extended Hours Volume Monitor initialized
+2025-11-05 17:40:48,326 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,326 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,326 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO - 🚀 OPTIMIZED Real-Time Volume Spike Monitor v2.0 initialized
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO - 📋 Configuration:
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Market Hours Thresholds: {'elevated': 2.0, 'high': 3.5, 'extreme': 5.5}
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Market Price Filter: ±0.6%
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Market Check Intervals: First Hour=15s, Power Hour=15s, Mid-Day=20s
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Market Cooldown: 5 min
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Market VWAP Filter: {'enabled': True, 'proximity_pct': 0.5, 'require_proximity': False}
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Pre-Market Thresholds: {'elevated': 2.0, 'high': 3.5, 'extreme': 5.5}
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Pre-Market Price Filter: ±0.75%
+2025-11-05 17:40:48,326 - monitors.realtime_volume_spike_monitor - INFO -    Pre-Market Check Interval: 25s
+2025-11-05 17:40:48,326 - __main__ - INFO - ✅ Real-Time Volume Spike Monitor initialized
+2025-11-05 17:40:48,328 - analyzers.thetadata_client_v3 - INFO - ✅ ThetaData v3 Terminal connected: http://localhost:25503
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ ThetaData v3 client initialized (60s cache for day trading)
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO -    💡 Using IV-based strike filtering for efficiency
+2025-11-05 17:40:48,328 - news.unified_news_engine - INFO - ✅ Benzinga client initialized
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unified News Engine initialized (Benzinga + Polygon)
+2025-11-05 17:40:48,328 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,328 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,328 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ Volume Analyzer enabled
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ Key Level Detector enabled
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - 📊 Signal Thresholds: Base=8, High Impact=6
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - 💡 Gamma Walls: ThetaData (PRIMARY)
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ GEX Calculator initialized
+2025-11-05 17:40:48,328 - analyzers.wall_strength_tracker - INFO - ✅ Wall Strength Tracker initialized (DAY TRADER MODE)
+2025-11-05 17:40:48,328 - analyzers.wall_strength_tracker - INFO -    📁 Storage: backend/data/wall_history
+2025-11-05 17:40:48,328 - analyzers.wall_strength_tracker - INFO -    🔥 Building thresholds: 10% / 20% / 35%
+2025-11-05 17:40:48,328 - analyzers.wall_strength_tracker - INFO -    ⚠️ Weakening thresholds: 8% / 15% / 25%
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ Wall Strength Tracker initialized
+2025-11-05 17:40:48,328 - analyzers.unusual_activity_detector - INFO - ✅ Unusual Activity Detector - PROFESSIONAL MODE
+2025-11-05 17:40:48,328 - analyzers.unusual_activity_detector - INFO -    ⚡ SPEED OPTIMIZED for 6-figure trading
+2025-11-05 17:40:48,328 - analyzers.unusual_activity_detector - INFO -    🎯 OI threshold: 1.05x (5% change)
+2025-11-05 17:40:48,328 - analyzers.unusual_activity_detector - INFO -    🎯 Volume threshold: 1.2x (1.2x average)
+2025-11-05 17:40:48,328 - analyzers.unusual_activity_detector - INFO -    🎯 Alert threshold: 3.5/10 (AGGRESSIVE)
+2025-11-05 17:40:48,328 - analyzers.unusual_activity_detector - INFO -    ⏱️ Lookback: 5 minutes (FAST)
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unusual Activity Detector initialized
+2025-11-05 17:40:48,328 - analyzers.pin_probability_calculator - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,328 - analyzers.enhanced_professional_analyzer - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,328 - analyzers.confluence_alert_system - INFO - ✅ Confluence Alert System initialized
+2025-11-05 17:40:48,328 - analyzers.confluence_alert_system - INFO -    🎯 Alert threshold: 75%
+2025-11-05 17:40:48,328 - analyzers.confluence_alert_system - INFO -    ⚡ Optimized for 6-7 figure day trader
+2025-11-05 17:40:48,328 - monitors.momentum_signal_monitor - INFO - ✅ Momentum Signal Monitor initialized
+2025-11-05 17:40:48,328 - monitors.momentum_signal_monitor - INFO -    Check Interval: 30s
+2025-11-05 17:40:48,328 - monitors.momentum_signal_monitor - INFO -    Min RVOL: 1.2x
+2025-11-05 17:40:48,328 - monitors.momentum_signal_monitor - INFO -    Min Dark Pool Strength: 2
+2025-11-05 17:40:48,328 - monitors.momentum_signal_monitor - INFO -    Gamma Wall Distance: 2.0%
+2025-11-05 17:40:48,328 - monitors.momentum_signal_monitor - INFO -    🎯 Confluence alerts: 75%+ confidence
+2025-11-05 17:40:48,328 - __main__ - INFO - ✅ Momentum Signal Monitor initialized
+2025-11-05 17:40:48,330 - analyzers.thetadata_client_v3 - INFO - ✅ ThetaData v3 Terminal connected: http://localhost:25503
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ ThetaData v3 client initialized (60s cache for day trading)
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO -    💡 Using IV-based strike filtering for efficiency
+2025-11-05 17:40:48,330 - news.unified_news_engine - INFO - ✅ Benzinga client initialized
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unified News Engine initialized (Benzinga + Polygon)
+2025-11-05 17:40:48,330 - analyzers.volume_analyzer - INFO - ✅ Volume Analyzer v2.0 initialized (day_trader mode)
+2025-11-05 17:40:48,330 - analyzers.volume_analyzer - INFO -    📏 Thresholds: 1.8x / 2.3x / 3.5x
+2025-11-05 17:40:48,330 - analyzers.volume_analyzer - INFO -    ⏱️ Lookback: 6 bars
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ Volume Analyzer enabled
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ Key Level Detector enabled
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - 📊 Signal Thresholds: Base=8, High Impact=6
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - 💡 Gamma Walls: ThetaData (PRIMARY)
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ GEX Calculator initialized
+2025-11-05 17:40:48,330 - analyzers.wall_strength_tracker - INFO - ✅ Wall Strength Tracker initialized (DAY TRADER MODE)
+2025-11-05 17:40:48,330 - analyzers.wall_strength_tracker - INFO -    📁 Storage: backend/data/wall_history
+2025-11-05 17:40:48,330 - analyzers.wall_strength_tracker - INFO -    🔥 Building thresholds: 10% / 20% / 35%
+2025-11-05 17:40:48,330 - analyzers.wall_strength_tracker - INFO -    ⚠️ Weakening thresholds: 8% / 15% / 25%
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ Wall Strength Tracker initialized
+2025-11-05 17:40:48,330 - analyzers.unusual_activity_detector - INFO - ✅ Unusual Activity Detector - PROFESSIONAL MODE
+2025-11-05 17:40:48,330 - analyzers.unusual_activity_detector - INFO -    ⚡ SPEED OPTIMIZED for 6-figure trading
+2025-11-05 17:40:48,330 - analyzers.unusual_activity_detector - INFO -    🎯 OI threshold: 1.05x (5% change)
+2025-11-05 17:40:48,330 - analyzers.unusual_activity_detector - INFO -    🎯 Volume threshold: 1.2x (1.2x average)
+2025-11-05 17:40:48,330 - analyzers.unusual_activity_detector - INFO -    🎯 Alert threshold: 3.5/10 (AGGRESSIVE)
+2025-11-05 17:40:48,330 - analyzers.unusual_activity_detector - INFO -    ⏱️ Lookback: 5 minutes (FAST)
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ Unusual Activity Detector initialized
+2025-11-05 17:40:48,330 - analyzers.pin_probability_calculator - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,330 - analyzers.enhanced_professional_analyzer - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,330 - analyzers.pin_probability_calculator - INFO - ✅ Pin Probability Calculator initialized
+2025-11-05 17:40:48,330 - monitors.odte_gamma_monitor - INFO - ✅ 0DTE Gamma Monitor initialized
+2025-11-05 17:40:48,330 - monitors.odte_gamma_monitor - INFO -    🕐 Alert time: 08:45 EST
+2025-11-05 17:40:48,330 - monitors.odte_gamma_monitor - INFO -    📏 Proximity: 0.5%-3.0%
+2025-11-05 17:40:48,330 - monitors.odte_gamma_monitor - INFO -    ⏱️ Alert window: 50 minutes
+2025-11-05 17:40:48,330 - monitors.odte_gamma_monitor - INFO -    📅 Weekdays only: True
+2025-11-05 17:40:48,330 - monitors.odte_gamma_monitor - INFO - ✅ Discord webhook configured for 0DTE alerts
+2025-11-05 17:40:48,330 - __main__ - INFO - ✅ 0DTE Gamma Monitor initialized
+2025-11-05 17:40:48,330 - monitors.wall_strength_monitor - INFO - ✅ Wall Strength Monitor initialized
+2025-11-05 17:40:48,330 - monitors.wall_strength_monitor - INFO -    🕐 Check interval: 120 seconds
+2025-11-05 17:40:48,330 - monitors.wall_strength_monitor - INFO -    ⏱️ Cooldowns: Building=5min, Weakening=5min, Broken=3min
+2025-11-05 17:40:48,330 - monitors.wall_strength_monitor - INFO - ✅ Discord webhook configured for wall strength alerts
+2025-11-05 17:40:48,330 - __main__ - INFO - ✅ Wall Strength Monitor initialized
+2025-11-05 17:40:48,330 - monitors.unusual_activity_monitor - INFO - ✅ Unusual Activity Monitor - PROFESSIONAL MODE
+2025-11-05 17:40:48,330 - monitors.unusual_activity_monitor - INFO -    ⚡ SPEED: 10s checks (AGGRESSIVE)
+2025-11-05 17:40:48,330 - monitors.unusual_activity_monitor - INFO -    ⏱️ Cooldown: 1min (prime) / 2min (normal)
+2025-11-05 17:40:48,330 - monitors.unusual_activity_monitor - INFO -    🎯 Priority: 7 symbols checked first
+2025-11-05 17:40:48,330 - monitors.unusual_activity_monitor - INFO -    🌅 Pre-market: Monitoring from 8:00 AM
+2025-11-05 17:40:48,330 - monitors.unusual_activity_monitor - INFO - ✅ Discord webhook configured for unusual activity
+2025-11-05 17:40:48,330 - __main__ - INFO - ✅ Unusual Activity Monitor initialized
+2025-11-05 17:40:48,330 - __main__ - INFO - ✅ Earnings Monitor initialized (Benzinga API)
+2025-11-05 17:40:48,331 - __main__ - INFO - ✅ Config routes blueprint registered
+
+============================================================
+🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.5.2
+   (WITH REALTIME VOLUME + MOMENTUM MONITORS FIXED)
+============================================================
+
+📊 Dashboard: http://localhost:5001
+⚙️  Alert Console: http://localhost:5001/alert-console
+🩺 Health: http://localhost:5001/api/health
+
+📅 Earnings: ✅ ENABLED
+📊 Earnings Symbols: 14
+2025-11-05 17:40:48,338 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-05 17:40:48,338 - apscheduler.scheduler - INFO - Added job "Sunday Earnings Scan (8 PM ET)" to job store "default"
+2025-11-05 17:40:48,338 - apscheduler.scheduler - INFO - Scheduler started
+2025-11-05 17:40:48,339 - __main__ - INFO - ✅ Sunday earnings scan scheduled for 8:00 PM ET
+2025-11-05 17:40:48,339 - routes.config_routes - INFO - ✅ Config routes initialized
+2025-11-05 17:40:48,339 - __main__ - INFO - ✅ Config routes initialized with monitor instances
+
+⚙️  Alert Console: READY
+   • Real-time configuration
+   • Test alerts
+   • Hot reload
+
+📢 Starting Alert System...
+2025-11-05 17:40:48,339 - alerts.alert_manager - INFO - Starting continuous scanning mode (Phase 1 + Volume Spikes)...
+   ✅ Alert system started
+
+📊 Starting Wall Strength Monitor...
+2025-11-05 17:40:48,339 - alerts.alert_manager - INFO - Initial phase: AFTERHOURS
+2025-11-05 17:40:48,339 - alerts.alert_manager - INFO - Signal tracking: ENABLED
+2025-11-05 17:40:48,339 - alerts.alert_manager - INFO - Volume spike alerts: ENABLED (cooldown: 10min)
+2025-11-05 17:40:48,339 - monitors.wall_strength_monitor - INFO - 🚀 Starting Wall Strength Monitor (continuous mode)
+2025-11-05 17:40:48,339 - monitors.wall_strength_monitor - INFO -    🕐 Check interval: 120 seconds
+2025-11-05 17:40:48,339 - monitors.wall_strength_monitor - INFO -    🏢 Market hours only: True
+   ✅ Wall strength monitor started
+   🕐 Tracks OI/Volume changes every 5 minutes
+   📡 Routes to: DISCORD_ODTE_LEVELS
+
+🔍 Starting Unusual Activity Monitor...
+2025-11-05 17:40:48,339 - monitors.unusual_activity_monitor - INFO - 🚀 Starting Unusual Activity Monitor - PROFESSIONAL MODE
+2025-11-05 17:40:48,339 - monitors.unusual_activity_monitor - INFO -    ⚡ Check interval: 10s (AGGRESSIVE)
+2025-11-05 17:40:48,339 - monitors.unusual_activity_monitor - INFO -    ⏱️ Cooldown: 1min (prime) / 2min (normal)
+2025-11-05 17:40:48,339 - monitors.unusual_activity_monitor - INFO -    🌅 Extended hours: 8:00 AM - 4:00 PM
+2025-11-05 17:40:48,339 - monitors.unusual_activity_monitor - INFO -    🎯 Priority symbols: AAPL, NVDA, ORCL, PLTR, QQQ, SPY, TSLA
+   ✅ Unusual activity monitor started
+   🕐 Scans every 10 seconds
+   📡 Routes to: DISCORD_UNUSUAL_ACTIVITY
+
+📊 Starting Earnings Monitor...
+2025-11-05 17:40:48,339 - monitors.earnings_monitor - INFO - 📅 Refreshing earnings calendar...
+2025-11-05 17:40:48,339 - utils.watchlist_manager - INFO - Loaded 12 symbols from watchlist
+2025-11-05 17:40:48,339 - scheduler.market_scheduler - INFO - Market state: after_hours | Mode: priority | Total symbols in watchlist: 12
+2025-11-05 17:40:48,339 - scheduler.market_scheduler - INFO - Using 2 priority symbols: ['SPY', 'QQQ']
+2025-11-05 17:40:48,339 - alerts.alert_manager - INFO - Starting scan: after_hours (AFTERHOURS) | 2 symbols
+   ✅ Earnings monitor started (Benzinga API)
+   🌅 Pre-market: 5:00 AM - 8:00 AM ET (20s checks)
+   🌆 Post-market: 3:50 PM - 7:00 PM ET (5s checks) ⚡ ULTRA-FAST
+2025-11-05 17:40:48,339 - utils.watchlist_manager - INFO - Loaded 12 symbols from watchlist
+   📅 Daily preview: 6:00 PM ET
+   📡 Routes to: DISCORD_REALTIME_EARNINGS
+2025-11-05 17:40:48,340 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2025-11-05 17:40:48,340 - apscheduler.scheduler - INFO - Added job "Daily Earnings Preview (6 PM ET)" to job store "default"
+2025-11-05 17:40:48,340 - apscheduler.scheduler - INFO - Scheduler started
+2025-11-05 17:40:48,340 - utils.watchlist_manager - INFO - Loaded 12 symbols from watchlist
+2025-11-05 17:40:48,340 - __main__ - INFO - ✅ Daily earnings preview scheduled for 6:00 PM ET
+
+🤖 Starting OpenAI News Monitor...
+2025-11-05 17:40:48,340 - monitors.openai_news_monitor - INFO - ✅ OpenAI news monitor started (check every 30s)
+   ✅ OpenAI news monitor started
+   🕐 Checks every 30 seconds (REAL-TIME)
+   📡 Routes to: DISCORD_OPENAI_NEWS
+
+🚨 Starting Macro News Detector...
+2025-11-05 17:40:48,341 - monitors.macro_news_detector - INFO - 🚨 Macro news detector started (check every 15s)
+   ✅ Macro news detector started
+   🕐 Checks every 15 seconds (CRITICAL - FASTEST)
+   📡 Routes to: DISCORD_CRITICAL_SIGNALS
+   🎯 Monitors: Fed, FOMC, Tariffs, CPI, Jobs, GDP
+
+📊 Starting Spillover Detector...
+2025-11-05 17:40:48,341 - monitors.spillover_detector - INFO - 🔗 Spillover detector started (check every 20s)
+2025-11-05 17:40:48,341 - monitors.spillover_detector - INFO -    Monitoring 9 major tickers: NVDA, TSLA, AAPL, MSFT, GOOGL, AMZN, CRM, SQ, META
+   ✅ Spillover detector started
+   🕐 Checks every 20 seconds (HIGH PRIORITY)
+   📡 Routes to: DISCORD_NEWS_ALERTS
+   🎯 Monitors: NVDA→SMCI, TSLA→RIVN, etc.
+
+📈 Starting Real-Time Volume Monitor...
+2025-11-05 17:40:48,341 - monitors.realtime_volume_spike_monitor - INFO - 🚀 Starting OPTIMIZED Real-Time Volume Spike Monitor (continuous mode)
+2025-11-05 17:40:48,341 - monitors.realtime_volume_spike_monitor - INFO -    Session-aware: Pre-market, First Hour, Mid-Day, Power Hour, After Hours
+   ✅ Real-time volume monitor started
+   🕐 Scans for volume spikes in real-time
+   📡 Routes to: DISCORD alerts (configured channel)
+   🎯 Monitors: Watchlist stocks for unusual volume
+
+🚀 Starting Momentum Signal Monitor...
+2025-11-05 17:40:48,341 - monitors.momentum_signal_monitor - INFO - 🚀 Starting Momentum Signal Monitor...
+2025-11-05 17:40:48,341 - monitors.momentum_signal_monitor - INFO -    Market Hours Only: False
+   ✅ Momentum monitor started
+   🕐 Scans for momentum shifts in real-time
+   📡 Routes to: DISCORD alerts (configured channel)
+   🎯 Monitors: Watchlist stocks for momentum changes
+
+📰 Market Impact Monitor Active...
+2025-11-05 17:40:48,341 - utils.watchlist_manager - INFO - Loaded 12 symbols from watchlist
+2025-11-05 17:40:48,341 - monitors.realtime_volume_spike_monitor - INFO - 📋 Loaded 12 symbols from watchlist
+2025-11-05 17:40:48,342 - monitors.realtime_volume_spike_monitor - INFO - 🔍 AFTER HOURS check: 12 symbols (Interval: 30s, RVOL≥2.0x, Price≥0.75%)
+   🕐 Checks every 15 seconds (REAL-TIME)
+   📡 Routes to: DISCORD_NEWS_ONLY
+   🎯 Monitors: Watchlist stocks only
+
+============================================================
+✅ ALL SYSTEMS ONLINE - READY FOR TRADING!
+============================================================
+
+🎯 ACTIVE FEATURES:
+   • Real-Time Volume Monitor - Volume spikes & alerts ✨ NOW ACTIVE
+   • Momentum Signal Monitor - Price momentum tracking ✨ NOW ACTIVE
+   • Wall Strength Tracker - Monitors gamma walls
+   • Unusual Activity Detector - Smart money tracking
+   • Alert Management Console - Real-time config
+   • OpenAI News Monitor - AI sector news
+   • Macro News Detector - Fed/Tariffs/Economic
+   • Spillover Detector - Related ticker opportunities
+   • Earnings Monitor - Pre/Post market tracking
+2025-11-05 17:40:48,342 - utils.watchlist_manager - INFO - Loaded 12 symbols from watchlist
+2025-11-05 17:40:48,342 - monitors.momentum_signal_monitor - INFO - 🔍 Checking 12 symbols for momentum signals...
+============================================================
+
