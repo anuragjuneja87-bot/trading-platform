@@ -181,6 +181,15 @@ class EnhancedProfessionalAnalyzer:
                 self.logger.error(f"⚠️ Unusual Activity Detector initialization failed: {str(e)}")
         else:
             self.logger.warning("⚠️ Unusual Activity Detector not available")
+        
+        # Initialize Pin Probability Calculator
+        self.pin_calculator = None
+        try:
+            from analyzers.pin_probability_calculator import PinProbabilityCalculator
+            self.pin_calculator = PinProbabilityCalculator()
+            self.logger.info("✅ Pin Probability Calculator initialized")
+        except Exception as e:
+            self.logger.warning(f"Pin Probability Calculator not available: {str(e)}")
     
     def _make_request(self, endpoint: str, params: dict = None) -> dict:
         """Make Polygon API request"""
@@ -1272,6 +1281,136 @@ class EnhancedProfessionalAnalyzer:
             'reward_amount': round(reward, 2)
         }
     
+    def calculate_vwap(self, symbol: str, lookback_minutes: int = 120) -> float:
+        """
+        Calculate VWAP (Volume Weighted Average Price) for intraday trading
+        
+        Args:
+            symbol: Stock symbol
+            lookback_minutes: How far back to calculate (default: 120 min = 2 hours)
+        
+        Returns:
+            VWAP price, or 0 if unavailable
+        """
+        try:
+            # Get intraday bars (1-minute)
+            today = datetime.now().strftime('%Y-%m-%d')
+            endpoint = f"/v2/aggs/ticker/{symbol}/range/1/minute/{today}/{today}"
+            
+            data = self._make_request(endpoint, {
+                'adjusted': 'true',
+                'sort': 'asc',
+                'limit': 50000
+            })
+            
+            if 'results' not in data or not data['results']:
+                return 0.0
+            
+            bars = data['results'][-lookback_minutes:]  # Last N minutes
+            
+            if not bars:
+                return 0.0
+            
+            # Calculate VWAP = Sum(Price * Volume) / Sum(Volume)
+            total_pv = 0
+            total_volume = 0
+            
+            for bar in bars:
+                typical_price = (bar['h'] + bar['l'] + bar['c']) / 3
+                volume = bar['v']
+                
+                total_pv += typical_price * volume
+                total_volume += volume
+            
+            if total_volume == 0:
+                return 0.0
+            
+            vwap = total_pv / total_volume
+            
+            if self.debug_mode:
+                self.logger.debug(f"VWAP calculated: ${vwap:.2f} (from {len(bars)} bars)")
+            
+            return round(vwap, 2)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating VWAP for {symbol}: {str(e)}")
+            return 0.0
+    
+    def calculate_momentum(self, symbol: str) -> Dict:
+        """
+        Calculate momentum across multiple timeframes for scalping
+        
+        Returns: {
+            '1m': 'BULLISH' | 'BEARISH' | 'NEUTRAL',
+            '5m': 'BULLISH' | 'BEARISH' | 'NEUTRAL',
+            '15m': 'BULLISH' | 'BEARISH' | 'NEUTRAL'
+        }
+        """
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            endpoint = f"/v2/aggs/ticker/{symbol}/range/1/minute/{today}/{today}"
+            
+            data = self._make_request(endpoint, {
+                'adjusted': 'true',
+                'sort': 'asc',
+                'limit': 50000
+            })
+            
+            if 'results' not in data or not data['results']:
+                return {'1m': 'NEUTRAL', '5m': 'NEUTRAL', '15m': 'NEUTRAL'}
+            
+            bars = data['results']
+            
+            if len(bars) < 15:
+                return {'1m': 'NEUTRAL', '5m': 'NEUTRAL', '15m': 'NEUTRAL'}
+            
+            # Get last N bars for each timeframe
+            last_1m = bars[-1:]
+            last_5m = bars[-5:]
+            last_15m = bars[-15:]
+            
+            def determine_trend(bars_list):
+                """Determine trend from bar list"""
+                if not bars_list or len(bars_list) < 2:
+                    return 'NEUTRAL'
+                
+                # Compare first and last bar
+                start_price = bars_list[0]['c']
+                end_price = bars_list[-1]['c']
+                
+                # Also check if consistently trending
+                closes = [b['c'] for b in bars_list]
+                
+                # Simple trend: last price vs first price
+                pct_change = ((end_price - start_price) / start_price) * 100
+                
+                # Check consistency (at least 60% of bars trending in same direction)
+                up_bars = sum(1 for i in range(1, len(closes)) if closes[i] > closes[i-1])
+                down_bars = sum(1 for i in range(1, len(closes)) if closes[i] < closes[i-1])
+                total_bars = len(closes) - 1
+                
+                if pct_change > 0.15 and (up_bars / total_bars) > 0.5:
+                    return 'BULLISH'
+                elif pct_change < -0.15 and (down_bars / total_bars) > 0.5:
+                    return 'BEARISH'
+                else:
+                    return 'NEUTRAL'
+            
+            momentum = {
+                '1m': determine_trend(last_1m),
+                '5m': determine_trend(last_5m),
+                '15m': determine_trend(last_15m)
+            }
+            
+            if self.debug_mode:
+                self.logger.debug(f"Momentum: 1m={momentum['1m']}, 5m={momentum['5m']}, 15m={momentum['15m']}")
+            
+            return momentum
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating momentum for {symbol}: {str(e)}")
+            return {'1m': 'NEUTRAL', '5m': 'NEUTRAL', '15m': 'NEUTRAL'}
+    
     def generate_professional_signal(self, symbol: str) -> Dict:
         """Generate signal with Tradier gamma walls + Wall Strength Tracking integration"""
         try:
@@ -1295,6 +1434,34 @@ class EnhancedProfessionalAnalyzer:
             news = self.get_enhanced_news_sentiment(symbol)
             bias_1h = self.calculate_timeframe_bias(symbol, '1H')
             bias_daily = self.calculate_timeframe_bias(symbol, '1D')
+            
+            # NEW: Calculate VWAP and momentum
+            vwap = self.calculate_vwap(symbol)
+            momentum = self.calculate_momentum(symbol)
+            
+            # NEW: Calculate pin probability (if 0DTE and calculator available)
+            pin_analysis = {}
+            if self.pin_calculator and open_interest.get('expires_today'):
+                try:
+                    # Get options data for pin probability
+                    options_data = []  # You may need to populate this from your options flow
+                    gamma_data = {'net_gex': {'total': 0}}  # From your GEX calculator if available
+                    expiration_date = open_interest.get('expiration', '')
+                    
+                    pin_analysis = self.pin_calculator.analyze_pin_probability(
+                        symbol,
+                        current_price,
+                        options_data,
+                        gamma_data,
+                        expiration_date
+                    )
+                    
+                    if self.debug_mode and pin_analysis.get('available'):
+                        pin_pct = pin_analysis['pin_probability']['percent']
+                        self.logger.debug(f"Pin Probability: {pin_pct}% to ${pin_analysis.get('max_pain', 0)}")
+                        
+                except Exception as e:
+                    self.logger.error(f"Pin probability calculation failed: {str(e)}")
             
             # Volume Analysis
             volume_analysis = {}
@@ -1533,6 +1700,8 @@ class EnhancedProfessionalAnalyzer:
                 'alert_type': alert_type,
                 'confidence': round(confidence, 1),
                 'current_price': current_price,
+                'vwap': vwap,  # NEW: VWAP field
+                'momentum': momentum,  # NEW: Momentum across timeframes
                 'support': support_resistance['support'],
                 'resistance': support_resistance['resistance'],
                 'bias_1h': bias_1h['bias'],
@@ -1549,6 +1718,7 @@ class EnhancedProfessionalAnalyzer:
                 'premarket_rvol': premarket_rvol,
                 'key_levels': key_levels,
                 'wall_strength': wall_strength,
+                'pin_analysis': pin_analysis,  # NEW: Pin probability analysis
                 'entry_targets': entry_targets,
                 'momentum_shifted': momentum_shifted,
                 'bullish_score': bullish_factors,

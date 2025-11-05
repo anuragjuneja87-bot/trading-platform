@@ -58,19 +58,19 @@ class ODTEGammaMonitor:
         odte_config = config.get('odte_gamma_monitor', {})
         
         # Alert timing (extended for pre-market + open)
-        self.alert_time = odte_config.get('alert_time', '08:45')  # 8:45 AM EST (pre-market)
-        self.alert_window_minutes = odte_config.get('alert_window_minutes', 50)  # 50 min window (8:45-9:35 AM)
+        self.alert_time = odte_config.get('alert_time', '06:00')  # 6:00 AM EST (pre-market)
+        self.alert_window_minutes = odte_config.get('alert_window_minutes', 540)  # 540 min window (6:00-7:30 AM)   - 9 hours
         
         # Proximity thresholds (0.5-3% for 6-figure trading - catch early)
-        self.min_proximity_pct = odte_config.get('min_proximity_pct', 0.5)
-        self.max_proximity_pct = odte_config.get('max_proximity_pct', 3.0)
+        self.min_proximity_pct = odte_config.get('min_proximity_pct', 0.3)
+        self.max_proximity_pct = odte_config.get('max_proximity_pct', 5.0)
         
         # PIN ALERT THRESHOLDS (AGGRESSIVE for 6-7 figure trader)
         self.pin_alert_thresholds = {
-            'min_probability': 60,        # Alert at 60%+ (was 75%)
-            'max_hours_to_expiry': 3,     # Alert <3 hours (was 2)
-            'distance_threshold_pct': 1.0, # Alert >1% from max pain
-            'morning_alert_time': '10:00', # Morning planning alert
+            'min_probability': 50,        # Alert at 50%+ (was 75%)
+            'max_hours_to_expiry': 4,     # Alert <4 hours (was 2)
+            'distance_threshold_pct': 1.5, # Alert >1% from max pain
+            'morning_alert_time': '09:00', # Morning planning alert
             'power_hour_time': '15:00'     # Final confirmation alert
         }
         
@@ -684,9 +684,9 @@ class ODTEGammaMonitor:
         
         for symbol in symbols:
             # Skip if already alerted today
-            if symbol in self.alerted_today:
-                self.logger.debug(f"{symbol}: Already alerted today")
-                continue
+            #if symbol in self.alerted_today:
+               # self.logger.debug(f"{symbol}: Already alerted today")
+                #continue
             
             self.stats['symbols_checked'] += 1
             
@@ -712,7 +712,7 @@ class ODTEGammaMonitor:
             success = self.send_alert(alert_data)
             
             if success:
-                self.alerted_today.add(symbol)
+                #self.alerted_today.add(symbol)
                 alerts_sent += 1
             
             # ADDITIONAL: Check pin probability alert (AGGRESSIVE)

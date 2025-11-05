@@ -38,15 +38,15 @@ class WallStrengthMonitor:
         
         # Monitor settings
         self.enabled = True
-        self.check_interval = 300  # 5 minutes
+        self.check_interval = 120  # 2 minutes
         self.market_hours_only = True
         
         # Cooldown to prevent spam (per symbol per strike)
         # OPTIMIZED for 7-figure day trading speed
         self.cooldown_minutes = {
-            'WALL_BUILDING': 5,      # 5 min (was 10)
-            'WALL_WEAKENING': 5,     # 5 min (was 7)
-            'WALL_BROKEN': 3         # 3 min - URGENT (unchanged)
+            'WALL_BUILDING': 2,      # 2 min (was 10)
+            'WALL_WEAKENING': 2,     # 2 min (was 7)
+            'WALL_BROKEN': 1         # 1 min - URGENT (unchanged)
         }
         
         self.last_alert_time = {}  # {(symbol, strike, type): timestamp}

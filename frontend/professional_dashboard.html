@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Trading Dashboard v4.3 - CLEANED</title>
+    <title>Professional Trading Dashboard v5.0 - OPTIMIZED FOR DAY TRADING</title>
     <style>
         * {
             margin: 0;
@@ -208,6 +208,54 @@
             color: #ffff00;
         }
 
+        /* NEW: VWAP Styles */
+        .vwap-price {
+            font-weight: bold;
+            color: #00ccff;
+            font-size: 12px;
+        }
+
+        .vwap-distance {
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .vwap-above {
+            color: #ff6666; /* Above VWAP = bearish for mean reversion */
+        }
+
+        .vwap-below {
+            color: #66ff66; /* Below VWAP = bullish for mean reversion */
+        }
+
+        .vwap-neutral {
+            color: #ffff00; /* At VWAP */
+        }
+
+        /* NEW: Momentum Styles */
+        .momentum-cell {
+            font-size: 16px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .momentum-bullish {
+            color: #00ff00;
+        }
+
+        .momentum-bearish {
+            color: #ff0000;
+        }
+
+        .momentum-neutral {
+            color: #888888;
+        }
+
+        .momentum-arrow {
+            display: inline-block;
+            margin: 0 2px;
+        }
+
         .bullish {
             color: #00ff00;
             font-weight: bold;
@@ -220,34 +268,6 @@
 
         .neutral {
             color: #888888;
-        }
-
-        .volume-extreme {
-            color: #ff0000;
-            font-weight: bold;
-            animation: blink 1s infinite;
-        }
-
-        .volume-high {
-            color: #ff6600;
-            font-weight: bold;
-        }
-
-        .volume-elevated {
-            color: #ffff00;
-            font-weight: bold;
-        }
-
-        .volume-normal {
-            color: #00ff00;
-        }
-
-        .volume-low {
-            color: #888888;
-        }
-
-        .volume-unknown {
-            color: #666666;
         }
 
         .alert-buy {
@@ -278,19 +298,20 @@
             animation: blink 1s infinite;
         }
 
+        .alert-monitor {
+            color: #666666;
+            padding: 4px 8px;
+        }
+
         .alert-extreme {
-            background: #330033;
-            color: #ff00ff;
+            background: #330000;
+            color: #ff0000;
             padding: 4px 8px;
             border-radius: 3px;
             font-weight: bold;
             text-align: center;
             animation: blink 0.5s infinite;
-        }
-
-        .alert-monitor {
-            color: #666666;
-            padding: 4px 8px;
+            border: 2px solid #ff0000;
         }
 
         @keyframes blink {
@@ -315,12 +336,12 @@
             color: #888888;
         }
 
-        .institutional-buy, .institutional-buying {
+        .institutional-buying {
             color: #00ff00;
             font-weight: bold;
         }
 
-        .institutional-sell, .institutional-selling {
+        .institutional-selling {
             color: #ff0000;
             font-weight: bold;
         }
@@ -351,59 +372,76 @@
             line-height: 1.4;
         }
 
-        .gamma-zone {
-            font-size: 11px;
-            line-height: 1.5;
+        .volume-unknown {
+            color: #666;
         }
 
-        .gamma-strike-price {
-            font-size: 13px;
-            font-weight: bold;
-            letter-spacing: 0.5px;
+        .volume-low {
+            color: #888;
         }
 
-        .gamma-label {
-            font-size: 11px;
-            font-weight: bold;
-            letter-spacing: 0.3px;
-        }
-
-        .gamma-resistance {
-            color: #ff8800;
-            font-weight: bold;
-        }
-
-        .gamma-resistance .gamma-strike-price {
-            color: #ff6600;
-        }
-
-        .gamma-support {
-            color: #00ff00;
-            font-weight: bold;
-        }
-
-        .gamma-support .gamma-strike-price {
-            color: #00ff00;
-        }
-
-        .gamma-current {
+        .volume-elevated {
             color: #ffff00;
             font-weight: bold;
-            font-size: 14px;
-            letter-spacing: 0.5px;
+        }
+
+        .volume-high {
+            color: #ff9900;
+            font-weight: bold;
+        }
+
+        .volume-extreme {
+            color: #ff0000;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+
+        .gamma-zone {
+            line-height: 1.4;
+            font-size: 11px;
         }
 
         .gamma-0dte {
             color: #ff00ff;
             font-weight: bold;
-            font-size: 12px;
-            animation: blink 1.5s infinite;
+            font-size: 11px;
+            animation: pulse 2s infinite;
+            text-align: center;
+            margin-bottom: 4px;
         }
 
         .gamma-separator {
             color: #333;
-            margin: 3px 0;
             font-size: 8px;
+            text-align: center;
+            margin: 2px 0;
+        }
+
+        .gamma-resistance {
+            color: #ff9944;
+        }
+
+        .gamma-support {
+            color: #44ff44;
+        }
+
+        .gamma-strike-price {
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .gamma-label {
+            font-size: 9px;
+            color: #888;
+            font-weight: bold;
+        }
+
+        .gamma-current {
+            text-align: center;
+            color: #ffff00;
+            font-weight: bold;
+            font-size: 11px;
+            margin: 2px 0;
         }
 
         .gamma-data {
@@ -419,7 +457,6 @@
             color: #44ff44;
         }
 
-        /* === FEATURE 3: Unusual Activity Badge Styles === */
         .unusual-badge {
             margin-top: 5px;
             padding: 4px 8px;
@@ -449,7 +486,6 @@
             color: #00ffff;
             border: 1px solid #00ffff;
         }
-        /* === END FEATURE 3 CSS === */
 
         .wall-badge {
             display: inline-block;
@@ -511,13 +547,14 @@
         }
 
         .regime-warning {
-            background: #330033;
-            border: 2px solid #ff00ff;
-            padding: 10px;
-            margin-bottom: 10px;
+            background: #330000;
+            color: #ff0000;
+            padding: 15px;
             text-align: center;
+            border: 2px solid #ff0000;
+            margin-bottom: 10px;
             font-weight: bold;
-            color: #ff00ff;
+            font-size: 14px;
             animation: blink 1s infinite;
         }
     </style>
@@ -525,7 +562,7 @@
 <body>
     <div class="header">
         <div>
-            <h1>⚡ PROFESSIONAL TRADING DASHBOARD v4.3 - CLEANED ⚡</h1>
+            <h1>⚡ PROFESSIONAL TRADING DASHBOARD v5.0 ⚡</h1>
             <div style="font-size: 10px; color: #666; margin-top: 4px;" id="symbolList">
                 Loading watchlist...
             </div>
@@ -534,8 +571,8 @@
             <div class="market-time" id="marketTime">--:--:-- ET</div>
             <div class="market-status closed" id="marketStatus">MARKET CLOSED</div>
             <div class="controls" style="margin-top: 8px;">
-                <span class="watchlist-info" id="watchlistInfo">Watchlist: --</span>
-                <span class="update-indicator" id="updateIndicator">Updated: --:--</span>
+                <span class="watchlist-info" id="watchlistInfo">0 symbols</span>
+                <span class="update-indicator" id="updateIndicator">Never</span>
                 
                 <button class="earnings-toggle" id="earningsToggle" onclick="toggleEarningsMonitoring()">
                     <span id="earningsIcon">📅</span>
@@ -549,19 +586,26 @@
                 <button class="sound-toggle" id="testAlertBtn" style="background: #330033; border-color: #8b5cf6;">
                     🧪 TEST ALERT
                 </button>
-                <span class="notification-status" id="notificationStatus" onclick="requestNotificationPermission()">NOTIFICATIONS: OFF</span>
+                <span class="notification-status" id="notificationStatus" onclick="requestNotificationPermission()">
+                    NOTIFICATIONS: OFF
+                </span>
+                
                 <button class="refresh-btn" onclick="window.open('gamma_dashboard.html', '_blank')" style="background: #330033; border: 1px solid #ff00ff; color: #ff00ff;">
-                    🎯 GAMMA DETAIL VIEW
+                    🎯 GAMMA DETAIL
                 </button>
                 <button class="refresh-btn" onclick="window.open('gex_dashboard.html', '_blank')" style="background: #003300; border: 1px solid #00ff00; color: #00ff00;">
-                    💰 GEX CALCULATOR
+                    💰 GEX
+                </button>
+                <button class="refresh-btn" onclick="window.open('leveraged_dashboard.html', '_blank')" style="background: #331100; border: 1px solid #ff9900; color: #ff9900;">
+                    📊 LEVERAGED
                 </button>
                 <button class="refresh-btn" onclick="window.open('alert_console.html', '_blank')" style="background: #330033; border: 1px solid #ff00ff; color: #ff00ff;">
-                    ⚙️ ALERT CONSOLE
+                    ⚙️ ALERTS
                 </button>
-                <button class="refresh-btn" onclick="window.open('news-dashboard', '_blank')" style="background: #003333; border: 1px solid #00ccff; color: #00ccff;">
-                    📰 NEWS FEED
+                <button class="refresh-btn" onclick="window.open('news_dashboard.html', '_blank')" style="background: #003333; border: 1px solid #00ccff; color: #00ccff;">
+                    📰 NEWS
                 </button>
+                
                 <button class="refresh-btn" id="refreshBtn">REFRESH NOW</button>
             </div>
         </div>
@@ -575,9 +619,11 @@
                 <tr>
                     <th>SYMBOL</th>
                     <th>PRICE</th>
+                    <th>VWAP 📊</th>
+                    <th>% FROM<br>VWAP</th>
                     <th>SUP/RES</th>
-                    <th>PRE-MKT RVOL</th>
-                    <th>INTRADAY SPIKE</th>
+                    <th>VOLUME<br>RVOL</th>
+                    <th>MOMENTUM<br>🔥</th>
                     <th>DARK POOL 💰</th>
                     <th style="min-width: 280px;">0DTE GAMMA ZONES 🎯</th>
                     <th>NEWS</th>
@@ -587,7 +633,7 @@
             </thead>
             <tbody id="tableBody">
                 <tr>
-                    <td colspan="10" class="loading">LOADING WATCHLIST...</td>
+                    <td colspan="12" class="loading">LOADING WATCHLIST...</td>
                 </tr>
             </tbody>
         </table>
@@ -649,51 +695,13 @@
         }
 
         function updateEarningsDisplay() {
-            const toggleBtn = document.getElementById('earningsToggle');
-            const iconEl = document.getElementById('earningsIcon');
-            const textEl = document.getElementById('earningsText');
-            const countEl = document.getElementById('earningsCount');
-            
-            if (earningsEnabled) {
-                toggleBtn.classList.remove('disabled');
-                iconEl.textContent = '📅';
-                textEl.textContent = 'EARNINGS: ON';
-                countEl.textContent = `(${earningsSymbolsCount})`;
+            const btn = document.getElementById('earningsToggle');
+            if (earningsEnabled && earningsSymbolsCount > 0) {
+                btn.textContent = `📅 EARNINGS (${earningsSymbolsCount})`;
+                btn.classList.remove('disabled');
             } else {
-                toggleBtn.classList.add('disabled');
-                iconEl.textContent = '🚫';
-                textEl.textContent = 'EARNINGS: OFF';
-                countEl.textContent = '(DISABLED)';
-            }
-        }
-
-        async function toggleEarningsMonitoring() {
-            try {
-                const endpoint = earningsEnabled ? 'disable' : 'enable';
-                const response = await fetch(`${API_BASE}/earnings/${endpoint}`, {
-                    method: 'POST'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    earningsEnabled = data.status.enabled;
-                    earningsSymbolsCount = data.status.symbols_count;
-                    
-                    updateEarningsDisplay();
-                    
-                    const message = earningsEnabled ? 
-                        `✅ Earnings monitoring enabled (${earningsSymbolsCount} symbols)` :
-                        '🔕 Earnings monitoring disabled for this week';
-                    
-                    console.log(message);
-                    
-                    if (notificationsEnabled) {
-                        showNotification('Earnings Monitoring', message, 0);
-                    }
-                }
-            } catch (error) {
-                console.error('Error toggling earnings:', error);
+                btn.textContent = `📅 EARNINGS (OFF)`;
+                btn.classList.add('disabled');
             }
         }
 
@@ -712,85 +720,62 @@
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
 
-            if (alertType.includes('STRONG')) {
-                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.1);
-
-                setTimeout(() => {
-                    const osc2 = audioContext.createOscillator();
-                    const gain2 = audioContext.createGain();
-                    osc2.connect(gain2);
-                    gain2.connect(audioContext.destination);
-                    osc2.frequency.setValueAtTime(800, audioContext.currentTime);
-                    gain2.gain.setValueAtTime(0.3, audioContext.currentTime);
-                    gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-                    osc2.start(audioContext.currentTime);
-                    osc2.stop(audioContext.currentTime + 0.1);
-                }, 150);
-
-            } else if (alertType.includes('SHIFT')) {
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.3);
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.3);
-
-            } else if (alertType.includes('EXTREME')) {
-                for (let i = 0; i < 3; i++) {
-                    setTimeout(() => {
-                        const osc = audioContext.createOscillator();
-                        const gain = audioContext.createGain();
-                        osc.connect(gain);
-                        gain.connect(audioContext.destination);
-                        osc.frequency.setValueAtTime(1000, audioContext.currentTime);
-                        gain.gain.setValueAtTime(0.4, audioContext.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.08);
-                        osc.start(audioContext.currentTime);
-                        osc.stop(audioContext.currentTime + 0.08);
-                    }, i * 100);
-                }
-            } else if (alertType.includes('UNUSUAL')) {
-                // FEATURE 3: Triple beep for unusual activity
-                for (let i = 0; i < 3; i++) {
-                    setTimeout(() => {
-                        const osc = audioContext.createOscillator();
-                        const gain = audioContext.createGain();
-                        osc.connect(gain);
-                        gain.connect(audioContext.destination);
-                        osc.frequency.setValueAtTime(900, audioContext.currentTime);
-                        gain.gain.setValueAtTime(0.35, audioContext.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-                        osc.start(audioContext.currentTime);
-                        osc.stop(audioContext.currentTime + 0.1);
-                    }, i * 120);
-                }
-
-
-            } else if (!alertType.includes('MONITOR') && !alertType.includes('WAIT')) {
-                oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+            if (alertType.includes('EXTREME') || alertType.includes('WAIT')) {
+                // Urgent triple beep
+                [0, 0.15, 0.3].forEach((delay, i) => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    osc.frequency.setValueAtTime(1200, audioContext.currentTime + delay);
+                    gain.gain.setValueAtTime(0.3, audioContext.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + delay + 0.1);
+                    osc.start(audioContext.currentTime + delay);
+                    osc.stop(audioContext.currentTime + delay + 0.1);
+                });
+            } else if (alertType.includes('STRONG')) {
+                // Double beep for STRONG signals
+                [0, 0.15].forEach(delay => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    osc.frequency.setValueAtTime(1000, audioContext.currentTime + delay);
+                    gain.gain.setValueAtTime(0.3, audioContext.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + delay + 0.15);
+                    osc.start(audioContext.currentTime + delay);
+                    osc.stop(audioContext.currentTime + delay + 0.15);
+                });
+            } else if (alertType.includes('SHIFT') || alertType.includes('PROFIT')) {
+                // Descending tone for momentum shift
+                oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(500, audioContext.currentTime + 0.2);
                 gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-                oscillator.start(audioContext.currentTime);
+                oscillator.start();
                 oscillator.stop(audioContext.currentTime + 0.2);
+            } else {
+                // Single beep for regular signals
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.15);
             }
         }
 
         function showNotification(symbol, alertType, confidence) {
             if (!notificationsEnabled) return;
 
-            const icon = alertType.includes('BUY') ? '🟢' : alertType.includes('SELL') ? '🔴' : '⚠️';
-            const title = `${icon} ${symbol} - ${alertType}`;
-            const body = confidence ? `Confidence: ${confidence}%` : 'Check dashboard for details';
-
-            if (Notification.permission === 'granted') {
-                const notification = new Notification(title, {
-                    body: body,
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="75" font-size="75">📊</text></svg>',
-                    requireInteraction: false,
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const confidenceText = confidence ? ` (${confidence.toFixed(0)}%)` : '';
+                const emoji = alertType.includes('BUY') ? '🟢' : alertType.includes('SELL') ? '🔴' : '🟡';
+                
+                const notification = new Notification(`${emoji} ${symbol} - ${alertType}`, {
+                    body: `Confidence: ${confidenceText}`,
+                    icon: '/static/icon.png',
+                    badge: '/static/badge.png',
+                    vibrate: [200, 100, 200],
                     tag: symbol
                 });
 
@@ -879,14 +864,15 @@
             return `volume-${lowerClass}`;
         }
 
-        function formatVolumeDisplay(volumeData, isSpike = false) {
+        function formatVolumeDisplay(volumeData) {
+            // UPDATED: Combines pre-market and intraday into one display
             if (!volumeData) {
                 return '<span class="volume-unknown">--</span>';
             }
             
-            const ratio = isSpike ? (volumeData.spike_ratio || 0) : (volumeData.rvol || 0);
+            const rvol = volumeData.rvol || 0;
             
-            if (ratio === 0) {
+            if (rvol === 0) {
                 return '<span class="volume-unknown">--</span>';
             }
             
@@ -895,16 +881,57 @@
             const spikeDetected = volumeData.spike_detected || false;
             const cssClass = getVolumeClass(classification);
             
-            const spikeEmoji = spikeDetected ? (isSpike ? ' ⚡' : ' 🔥') : '';
+            const spikeEmoji = spikeDetected ? ' 🔥' : '';
             
-            let display = `<span class="${cssClass}">${ratio.toFixed(2)}x${spikeEmoji}<br><small>${classification}</small></span>`;
+            let display = `<span class="${cssClass}">${rvol.toFixed(2)}x${spikeEmoji}<br><small>${classification}</small></span>`;
             
-            if (isSpike && direction && direction !== 'NEUTRAL' && direction !== 'UNKNOWN') {
+            if (direction && direction !== 'NEUTRAL' && direction !== 'UNKNOWN') {
                 const dirEmoji = direction === 'BREAKOUT' ? '⬆️' : '⬇️';
                 display += `<br><span style="font-size: 9px;">${dirEmoji} ${direction}</span>`;
             }
             
             return display;
+        }
+
+        // NEW: Format VWAP distance
+        function formatVWAPDistance(current_price, vwap) {
+            if (!current_price || !vwap || vwap === 0) {
+                return '<span class="vwap-neutral">--</span>';
+            }
+            
+            const distance_pct = ((current_price - vwap) / vwap) * 100;
+            
+            let cssClass = 'vwap-neutral';
+            if (Math.abs(distance_pct) < 0.1) {
+                cssClass = 'vwap-neutral';
+            } else if (distance_pct > 0) {
+                cssClass = 'vwap-above'; // Above VWAP = extended upside
+            } else {
+                cssClass = 'vwap-below'; // Below VWAP = extended downside
+            }
+            
+            const sign = distance_pct > 0 ? '+' : '';
+            
+            return `<span class="vwap-distance ${cssClass}">${sign}${distance_pct.toFixed(2)}%</span>`;
+        }
+
+        // NEW: Format momentum arrows
+        function formatMomentum(momentum) {
+            if (!momentum) {
+                return '<span class="momentum-neutral">→ → →</span>';
+            }
+            
+            const m1 = momentum['1m'] || 'NEUTRAL';
+            const m5 = momentum['5m'] || 'NEUTRAL';
+            const m15 = momentum['15m'] || 'NEUTRAL';
+            
+            function getArrow(trend) {
+                if (trend === 'BULLISH') return '<span class="momentum-bullish">↑</span>';
+                if (trend === 'BEARISH') return '<span class="momentum-bearish">↓</span>';
+                return '<span class="momentum-neutral">→</span>';
+            }
+            
+            return `<div class="momentum-cell">${getArrow(m1)} ${getArrow(m5)} ${getArrow(m15)}</div>`;
         }
 
         function getWallStrengthBadge(wallStrength, strike, type) {
@@ -942,7 +969,6 @@
         }
 
         function formatUnusualActivity(unusualData) {
-            // FEATURE 3: Format unusual activity badge
             if (!unusualData || !unusualData.detected) {
                 return '';
             }
@@ -952,10 +978,8 @@
                 return '';
             }
             
-            // Show only the highest priority alert
             const topAlert = alerts[0];
             
-            // Determine badge class
             let badgeClass = 'unusual-moderate';
             if (topAlert.urgency === 'EXTREME') {
                 badgeClass = 'unusual-extreme';
@@ -963,9 +987,8 @@
                 badgeClass = 'unusual-high';
             }
             
-            // Format message
             const strike = topAlert.strike;
-            const optionType = topAlert.option_type[0]; // C or P
+            const optionType = topAlert.option_type[0];
             const oiChange = topAlert.oi_change_pct;
             
             return `<div class="unusual-badge ${badgeClass}">🔥 UNUSUAL<br>${strike}${optionType} ${oiChange > 0 ? '+' : ''}${oiChange.toFixed(0)}% OI</div>`;
@@ -1116,42 +1139,54 @@
             
             if (!row) {
                 const tbody = document.getElementById('tableBody');
-                if (tbody.children[0]?.colSpan === 10) {
+                if (tbody.children[0]?.colSpan === 12) {
                     tbody.innerHTML = '';
                 }
                 row = document.createElement('tr');
                 row.setAttribute('data-symbol', symbol);
-                row.innerHTML = '<td></td>'.repeat(10);
+                row.innerHTML = '<td></td>'.repeat(12); // UPDATED: 12 columns now
                 tbody.appendChild(row);
             }
 
             const cells = row.children;
             const entryTargets = data.entry_targets || {};
-            const premarketVol = data.premarket_rvol || {};
-            const volumeAnalysis = data.volume_analysis || {};
-            const intradaySpike = volumeAnalysis.volume_spike || {};
-
-            // CLEANED: Removed VWAP (cell 2) and Camarilla (cell 3)
-            // New column order: Symbol, Price, Sup/Res, Pre-Mkt RVOL, Intraday Spike, Dark Pool, Gamma, News, Entry/TP/SL, Alert
+            const volumeData = data.volume_analysis?.volume_spike || data.premarket_rvol || {};
+            
+            // NEW COLUMN ORDER:
+            // 0: Symbol
+            // 1: Price
+            // 2: VWAP (NEW)
+            // 3: % FROM VWAP (NEW)
+            // 4: Sup/Res
+            // 5: Volume (COMBINED)
+            // 6: Momentum (NEW)
+            // 7: Dark Pool
+            // 8: Gamma Zones
+            // 9: News
+            // 10: Entry/TP/SL
+            // 11: Alert
             
             updateCell(cells[0], `<span class="symbol">${data.symbol}</span>`, false);
             updateCell(cells[1], `<span class="price">${formatPrice(data.current_price)}</span>`);
-            updateCell(cells[2], `<span class="level" style="line-height: 1.4;">RES: ${formatPrice(data.resistance)}<br>SUP: ${formatPrice(data.support)}</span>`);
-            updateCell(cells[3], formatVolumeDisplay(premarketVol, false));
-            updateCell(cells[4], formatVolumeDisplay(intradaySpike, true));
-            updateCell(cells[5], formatDarkPool(data.dark_pool_details || {}));
-            // FEATURE 3: Gamma zones + Unusual Activity
+            updateCell(cells[2], `<span class="vwap-price">${formatPrice(data.vwap)}</span>`); // NEW
+            updateCell(cells[3], formatVWAPDistance(data.current_price, data.vwap)); // NEW
+            updateCell(cells[4], `<span class="level" style="line-height: 1.4;">RES: ${formatPrice(data.resistance)}<br>SUP: ${formatPrice(data.support)}</span>`);
+            updateCell(cells[5], formatVolumeDisplay(volumeData)); // COMBINED
+            updateCell(cells[6], formatMomentum(data.momentum)); // NEW
+            updateCell(cells[7], formatDarkPool(data.dark_pool_details || {}));
+            
+            // Gamma zones + Unusual Activity
             let gammaContent = formatGammaZones(data.open_interest || {}, data.wall_strength || {});
             const unusualContent = formatUnusualActivity(data.unusual_activity || {});
             if (unusualContent) {
                 gammaContent += unusualContent;
             }
-            updateCell(cells[6], gammaContent);
-            updateCell(cells[7], `<span class="news-${(data.news_sentiment || 'neutral').toLowerCase().replace(/\s+/g, '.')}">${data.news_sentiment || '--'}</span>`);
+            updateCell(cells[8], gammaContent);
+            updateCell(cells[9], `<span class="news-${(data.news_sentiment || 'neutral').toLowerCase().replace(/\s+/g, '.')}">${data.news_sentiment || '--'}</span>`);
             
             const entryInfo = entryTargets.entry ? 
                 `E: ${formatPrice(entryTargets.entry)}<br>TP: ${formatPrice(entryTargets.tp1)}<br>SL: ${formatPrice(entryTargets.stop_loss)}` : '--';
-            updateCell(cells[8], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
+            updateCell(cells[10], `<span class="entry-targets" style="line-height: 1.4;">${entryInfo}</span>`);
 
             const alertClass = getAlertClass(data.alert_type);
             const currentAlert = data.alert_type || 'MONITOR';
@@ -1160,12 +1195,12 @@
             
             const alertContent = `<span class="${alertClass}">${data.alert_type || 'MONITOR'}${data.confidence ? `<br><span class="confidence ${getConfidenceClass(data.confidence)}">${data.confidence.toFixed(0)}%</span>` : ''}</span>`;
             
-            if (cells[9].innerHTML !== alertContent) {
-                cells[9].innerHTML = alertContent;
+            if (cells[11].innerHTML !== alertContent) {
+                cells[11].innerHTML = alertContent;
                 
                 if (isNewAlert && !isFirstLoad) {
-                    cells[9].classList.add('alert-changed');
-                    setTimeout(() => cells[9].classList.remove('alert-changed'), 2000);
+                    cells[11].classList.add('alert-changed');
+                    setTimeout(() => cells[11].classList.remove('alert-changed'), 2000);
                     
                     playAlertSound(currentAlert);
                     showNotification(data.symbol, currentAlert, data.confidence);
@@ -1238,7 +1273,7 @@
         }
 
         async function initialize() {
-            console.log('🚀 Initializing Professional Trading Dashboard v4.3 - CLEANED');
+            console.log('🚀 Initializing Professional Trading Dashboard v5.0 - OPTIMIZED FOR DAY TRADING');
             
             await loadWatchlist();
             await loadEarningsStatus();
@@ -1260,7 +1295,8 @@
             
             console.log('✅ Dashboard initialized with', SYMBOLS.length, 'symbols');
             console.log(`📅 Earnings monitoring: ${earningsEnabled ? 'ENABLED' : 'DISABLED'} (${earningsSymbolsCount} symbols)`);
-            console.log('🧹 CLEANED VERSION: Removed VWAP & Camarilla columns');
+            console.log('📊 NEW: VWAP and Momentum columns added');
+            console.log('🔥 OPTIMIZED: Combined volume column for cleaner view');
             console.log('🎯 0DTE gamma pinning detection active');
             console.log('🧱 Wall strength tracking enabled');
         }

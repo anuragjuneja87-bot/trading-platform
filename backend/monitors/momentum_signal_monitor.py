@@ -51,29 +51,29 @@ class MomentumSignalMonitor:
         
         # Monitoring state
         self.enabled = self.config.get('enabled', True)
-        self.check_interval = self.config.get('check_interval', 60)
+        self.check_interval = self.config.get('check_interval', 30)
         self.market_hours_only = self.config.get('market_hours_only', True)
         
         # Cooldown tracking
         self.last_alert = defaultdict(lambda: defaultdict(float))
         self.cooldowns = self.config.get('cooldown_minutes', {
-            'momentum_signal': 15,
-            'gamma_approach': 10,
-            'dark_pool_flip': 5,
-            'extreme_setup': 30,
-            'confluence_alert': 15  # Same as momentum
+            'momentum_signal': 5,
+            'gamma_approach': 3,
+            'dark_pool_flip': 2,
+            'extreme_setup': 10,
+            'confluence_alert': 5  # Same as momentum
         })
         
         # Thresholds
         thresholds = self.config.get('thresholds', {})
-        self.min_rvol = thresholds.get('min_rvol', 2.5)
-        self.extreme_rvol = thresholds.get('extreme_rvol', 4.0)
-        self.min_dark_pool_strength = thresholds.get('min_dark_pool_strength', 4)
+        self.min_rvol = thresholds.get('min_rvol', 1.5)
+        self.extreme_rvol = thresholds.get('extreme_rvol', 3.0)
+        self.min_dark_pool_strength = thresholds.get('min_dark_pool_strength', 3)
         self.min_dark_pool_value = thresholds.get('min_dark_pool_value', 1000000)
         self.gamma_wall_distance = thresholds.get('gamma_wall_distance_pct', 1.0)
         self.gamma_wall_urgent = thresholds.get('gamma_wall_urgent_pct', 0.5)
-        self.min_confluence = thresholds.get('min_confluence', 7)
-        self.extreme_confluence = thresholds.get('extreme_confluence', 8)
+        self.min_confluence = thresholds.get('min_confluence', 5)
+        self.extreme_confluence = thresholds.get('extreme_confluence', 7)
         
         # Filters
         filters = self.config.get('filters', {})

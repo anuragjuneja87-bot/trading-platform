@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gamma Levels Detail View - 0DTE Zones + Wall Strength</title>
+    <title>Gamma Levels Dashboard v2.0 - With Max Pain & Pin Probability</title>
     <style>
         * {
             margin: 0;
@@ -152,6 +152,24 @@
             text-align: left;
         }
 
+        /* NEW: Max Pain Column Styles */
+        .max-pain-cell {
+            min-width: 140px;
+            text-align: center;
+            vertical-align: middle;
+            background: #0f0a0f;
+            padding: 10px;
+        }
+
+        /* NEW: Pin Probability Column Styles */
+        .pin-probability-cell {
+            min-width: 120px;
+            text-align: center;
+            vertical-align: middle;
+            background: #0a0f0f;
+            padding: 10px;
+        }
+
         .wall-building {
             color: #00ff00;
             font-weight: bold;
@@ -216,8 +234,8 @@
                     <th style="background: #331100;">RESISTANCE 2</th>
                     <th style="background: #003300;">SUPPORT 1</th>
                     <th style="background: #003311;">SUPPORT 2</th>
-                    <th style="background: #002244;">WALL STRENGTH<br><small style="opacity:0.7;">OI Changes</small></th>
-                    <th>DATA<br>SOURCE</th>
+                    <th style="background: #440044;">MAX PAIN 🎯<br><small style="opacity:0.7;">Target Price</small></th>
+                    <th style="background: #004444;">PIN %<br><small style="opacity:0.7;">Probability</small></th>
                 </tr>
             </thead>
             <tbody id="tableBody">
@@ -282,6 +300,73 @@
                 </div>
                 <div style="font-size: 9px; color: #777;">
                     ${level.direction} ${Math.abs(level.distance_pct).toFixed(1)}%
+                </div>
+            `;
+        }
+
+        function formatMaxPain(maxPain, currentPrice) {
+            /**
+             * Format Max Pain display
+             * Shows target price and distance from current
+             */
+            const distance = currentPrice - maxPain;
+            const distancePct = (distance / currentPrice) * 100;
+            const direction = distance > 0 ? '↓' : '↑';
+            const directionColor = distance > 0 ? '#ff6666' : '#66ff66';
+            
+            return `
+                <div style="text-align: center;">
+                    <div style="font-size: 16px; font-weight: bold; color: #ff00ff; margin-bottom: 4px;">
+                        $${maxPain.toFixed(2)}
+                    </div>
+                    <div style="font-size: 11px; color: ${directionColor}; font-weight: bold;">
+                        ${direction} ${Math.abs(distancePct).toFixed(1)}% away
+                    </div>
+                    <div style="font-size: 9px; color: #888; margin-top: 2px;">
+                        Current: $${currentPrice.toFixed(2)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatPinProbability(pinProbability, hoursUntilExpiry) {
+            /**
+             * Format Pin Probability display
+             * Shows percentage and strength indicator
+             */
+            const pinPct = pinProbability.percent || 0;
+            const strength = pinProbability.strength || 'UNKNOWN';
+            
+            // Color based on probability
+            let pinColor = '#888888';
+            let strengthEmoji = '○';
+            
+            if (pinPct >= 75) {
+                pinColor = '#00ff00';
+                strengthEmoji = '◆◆◆';
+            } else if (pinPct >= 60) {
+                pinColor = '#ffff00';
+                strengthEmoji = '◆◆';
+            } else if (pinPct >= 45) {
+                pinColor = '#ff9900';
+                strengthEmoji = '◆';
+            } else {
+                pinColor = '#666666';
+                strengthEmoji = '○';
+            }
+            
+            return `
+                <div style="text-align: center;">
+                    <div style="font-size: 18px; font-weight: bold; color: ${pinColor}; margin-bottom: 4px;">
+                        ${pinPct.toFixed(0)}%
+                    </div>
+                    <div style="font-size: 11px; color: ${pinColor}; font-weight: bold;">
+                        ${strengthEmoji}
+                    </div>
+                    <div style="font-size: 10px; color: #888; margin-top: 2px;">
+                        ${strength}
+                    </div>
+                    ${hoursUntilExpiry ? `<div style="font-size: 9px; color: #666; margin-top: 2px;">${hoursUntilExpiry.toFixed(1)}h left</div>` : ''}
                 </div>
             `;
         }
@@ -376,15 +461,15 @@
             const expiration = oi.expiration || '--';
             const expDisplay = `<div style="font-size: 11px;">${expiration}</div>`;
 
-            // Data source
-            const source = oi.data_source || 'unknown';
-            const sourceClass = source === 'tradier' ? 'color: #00ff00;' : 'color: #ff6600;';
-            const sourceText = source === 'tradier' ? '📡 Tradier' : '⚠️ Fallback';
-            const sourceDisplay = `<div style="${sourceClass} font-size: 11px; font-weight: bold;">${sourceText}</div>`;
+            // Max Pain (from pin_analysis)
+            const pinAnalysis = data.pin_analysis || {};
+            const maxPain = pinAnalysis.max_pain || 0;
+            const maxPainDisplay = maxPain > 0 ? formatMaxPain(maxPain, currentPrice) : '<div style="color: #666;">No data</div>';
 
-            // Wall Strength
-            const wallStrength = data.wall_strength || {};
-            const wallStrengthDisplay = formatWallStrength(wallStrength);
+            // Pin Probability
+            const pinProbability = pinAnalysis.pin_probability || {};
+            const pinPct = pinProbability.percent || 0;
+            const pinDisplay = pinPct > 0 ? formatPinProbability(pinProbability, oi.hours_until_expiry) : '<div style="color: #666;">No data</div>';
 
             return `
                 <tr>
@@ -396,8 +481,8 @@
                     <td class="gamma-cell resistance-2">${formatGammaLevel(res2)}</td>
                     <td class="gamma-cell support-1">${formatGammaLevel(sup1)}</td>
                     <td class="gamma-cell support-2">${formatGammaLevel(sup2)}</td>
-                    <td class="wall-strength-cell">${wallStrengthDisplay}</td>
-                    <td>${sourceDisplay}</td>
+                    <td class="max-pain-cell">${maxPainDisplay}</td>
+                    <td class="pin-probability-cell">${pinDisplay}</td>
                 </tr>
             `;
         }

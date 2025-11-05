@@ -755,7 +755,60 @@ def remove_earnings_symbol():
     except Exception as e:
         logger.error(f"Error removing earnings symbol: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
+@app.route('/api/news-feed/all', methods=['GET'])
+def get_news_feed_all():
+    """Get all news from Polygon API (no database needed)"""
+    try:
+        logger.info("📰 Fetching news from Polygon...")
+        
+        # Get watchlist symbols
+        watchlist = watchlist_manager.load_symbols()
+        news_by_symbol = {}
+        
+        # Fetch news for each symbol (limit to 15 to avoid rate limits)
+        for symbol in watchlist[:15]:
+            try:
+                # Use your existing analyzer to get news
+                news_data = analyzer.get_enhanced_news_sentiment(symbol)
+                
+                if news_data.get('headlines') and len(news_data['headlines']) > 0:
+                    news_by_symbol[symbol] = []
+                    
+                    for headline in news_data['headlines'][:5]:  # Top 5 per symbol
+                        news_by_symbol[symbol].append({
+                            'headline': headline,
+                            'sentiment': news_data.get('sentiment', 'NEUTRAL'),
+                            'timestamp': datetime.now().isoformat(),
+                            'time_str': 'Recent',
+                            'url': '#',
+                            'channel': 'polygon'
+                        })
+                
+                # Small delay to avoid rate limits
+                time.sleep(0.05)
+                
+            except Exception as e:
+                logger.error(f"Error fetching news for {symbol}: {str(e)}")
+                continue
+        
+        logger.info(f"✅ Loaded news for {len(news_by_symbol)} symbols")
+        
+        return jsonify({
+            'success': True,
+            'news': news_by_symbol,
+            'count': len(news_by_symbol),
+            'total_articles': sum(len(items) for items in news_by_symbol.values()),
+            'source': 'polygon_api',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in news feed endpoint: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'news': {}
+        }), 500
 @app.route('/api/pin-probability/<symbol>')
 def get_pin_probability(symbol):
     """Calculate pin probability for a symbol"""

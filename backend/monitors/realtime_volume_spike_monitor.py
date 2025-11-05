@@ -82,17 +82,17 @@ class RealtimeVolumeSpikeMonitor:
         # Market hours configuration
         market_config = realtime_config.get('market_hours', {})
         self.market_thresholds = market_config.get('thresholds', {
-            'elevated': 2.5,
-            'high': 4.0,
-            'extreme': 6.0
+            'elevated': 1.5,
+            'high': 2.5,
+            'extreme': 4.0
         })
-        self.market_min_price_change = market_config.get('min_price_change_pct', 1.0)
+        self.market_min_price_change = market_config.get('min_price_change_pct', 0.3)
         self.market_check_intervals = market_config.get('check_intervals', {
-            'first_hour': 20,
-            'power_hour': 20,
-            'mid_day': 30
+            'first_hour': 15,
+            'power_hour': 15,
+            'mid_day': 20
         })
-        self.market_cooldown = market_config.get('cooldown_minutes', 8)
+        self.market_cooldown = market_config.get('cooldown_minutes', 3)
         self.market_vwap_config = market_config.get('vwap_filter', {
             'enabled': True,
             'proximity_pct': 0.5,
@@ -102,13 +102,13 @@ class RealtimeVolumeSpikeMonitor:
         # Pre-market configuration
         premarket_config = realtime_config.get('pre_market', {})
         self.premarket_thresholds = premarket_config.get('thresholds', {
-            'elevated': 3.5,
-            'high': 5.0,
-            'extreme': 8.0
+            'elevated': 2.0,
+            'high': 3.0,
+            'extreme': 5.0
         })
-        self.premarket_min_price_change = premarket_config.get('min_price_change_pct', 1.5)
-        self.premarket_check_interval = premarket_config.get('check_interval', 45)
-        self.premarket_cooldown = premarket_config.get('cooldown_minutes', 15)
+        self.premarket_min_price_change = premarket_config.get('min_price_change_pct', 0.4)
+        self.premarket_check_interval = premarket_config.get('check_interval', 30)
+        self.premarket_cooldown = premarket_config.get('cooldown_minutes', 5)
         self.premarket_vwap_config = premarket_config.get('vwap_filter', {
             'enabled': True,
             'proximity_pct': 0.75,

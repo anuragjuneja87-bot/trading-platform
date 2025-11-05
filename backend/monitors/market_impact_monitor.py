@@ -40,8 +40,8 @@ class MarketImpactMonitor:
         # Configuration
         self.config = config.get('market_impact_monitor', {})
         self.enabled = self.config.get('enabled', True)
-        self.check_interval = self.config.get('check_interval', 60)
-        self.lookback_hours = self.config.get('lookback_hours', 2)
+        self.check_interval = self.config.get('check_interval', 30)
+        self.lookback_hours = self.config.get('lookback_hours', 1)
         self.max_alerts_per_hour = self.config.get('max_alerts_per_hour', 20)
         
         # Watchlist
@@ -96,8 +96,8 @@ class MarketImpactMonitor:
         
         # Volume confirmation
         self.volume_enabled = self.config.get('volume_confirmation', {}).get('enabled', True)
-        self.min_rvol = self.config.get('volume_confirmation', {}).get('min_rvol', 2.0)
-        self.critical_rvol = self.config.get('volume_confirmation', {}).get('critical_rvol', 3.0)
+        self.min_rvol = self.config.get('volume_confirmation', {}).get('min_rvol', 1.5)
+        self.critical_rvol = self.config.get('volume_confirmation', {}).get('critical_rvol', 2.0)
         
         # Initialize volume analyzer
         self.volume_analyzer = None
@@ -116,7 +116,7 @@ class MarketImpactMonitor:
         # Thresholds
         self.min_price_target_change = self.config.get('min_price_target_change_percent', 20)
         self.min_earnings_surprise = self.config.get('min_earnings_surprise_percent', 10)
-        self.min_impact_score = self.config.get('min_impact_score', 7.0)
+        self.min_impact_score = self.config.get('min_impact_score', 4.0)
         
         # Discord webhook
         self.discord_webhook = None

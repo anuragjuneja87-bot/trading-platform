@@ -36,12 +36,12 @@ class UnusualActivityMonitor:
         
         # PROFESSIONAL SETTINGS - Speed optimized
         self.enabled = True
-        self.check_interval = 15  # 15 seconds (FAST)
+        self.check_interval = 10  # 10 seconds (FAST)
         self.market_hours_only = True
         
         # SMART COOLDOWN - Different for prime hours
-        self.cooldown_prime_hours = 2   # 2 min during 9:30-11:30 AM
-        self.cooldown_normal = 5        # 5 min rest of day
+        self.cooldown_prime_hours = 1   # 1 min during 9:30-11:30 AM
+        self.cooldown_normal = 2        # 2 min rest of day
         self._cooldowns = {}
         
         # PRIORITY SYMBOLS - Check these first
@@ -84,7 +84,7 @@ class UnusualActivityMonitor:
             return False
         
         current_minutes = hour * 60 + minute
-        premarket_start = 8 * 60        # 8:00 AM (pre-market monitoring)
+        premarket_start = 7 * 60        # 7:00 AM (pre-market monitoring)
         market_close = 16 * 60          # 4:00 PM
         
         return premarket_start <= current_minutes < market_close
