@@ -176,11 +176,47 @@ def sanitize_for_json(obj):
 app = Flask(__name__, static_folder='../frontend', static_url_path='')
 CORS(app)
 
+# ========================================
+# IMPROVED LOGGING CONFIGURATION
+# Logs to both file and console
+# ========================================
+from logging.handlers import RotatingFileHandler
+
+# Create logs directory
+logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
+os.makedirs(logs_dir, exist_ok=True)
+
+# Log file path
+log_file = os.path.join(logs_dir, 'always_on_trader.log')
+
+# Create formatter
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# File handler with rotation (10MB max, keep 5 backups)
+file_handler = RotatingFileHandler(
+    log_file,
+    maxBytes=10 * 1024 * 1024,  # 10MB
+    backupCount=5
+)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+# Console handler (still show in terminal)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+
+# Configure root logger
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    handlers=[file_handler, console_handler]
 )
+
 logger = logging.getLogger(__name__)
+logger.info(f"📁 Logging to file: {log_file}")
 
 # Load config.yaml
 config_yaml = {}
