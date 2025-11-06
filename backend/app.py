@@ -1,16 +1,19 @@
 """
-backend/app.py - COMPLETE VERSION v4.5.2
+backend/app.py - COMPLETE VERSION v4.5.3
 WITH ALERT CONSOLE + WALL STRENGTH + UNUSUAL ACTIVITY + EARNINGS MONITOR
-+ REALTIME VOLUME MONITOR + MOMENTUM MONITOR (THREADING FIXED)
++ REALTIME VOLUME MONITOR + MOMENTUM MONITOR + LIVE GREEKS MONITOR
 
 COMPLETE REPLACEMENT FILE
 Copy this entire file to replace your existing app.py
 
-CHANGES IN v4.5.2:
-- Added run_realtime_volume_monitor() function (line 511)
-- Added run_momentum_monitor() function (line 518)
-- Added threading startup for realtime_monitor (line 1017)
-- Added threading startup for momentum_monitor (line 1027)
+CHANGES IN v4.5.3:
+- Added LiveGreeksMonitor import and initialization
+- Added run_live_greeks_monitor() function 
+- Added /api/live-greeks/<symbol> route
+- Added /api/live-greeks/batch route
+- Added threading startup for live_greeks_monitor
+- Updated health check with live_greeks status
+- Added live_greeks to monitor_instances
 """
 
 from flask import Flask, jsonify, send_from_directory, request
@@ -141,6 +144,14 @@ try:
 except ImportError:
     UNUSUAL_ACTIVITY_AVAILABLE = False
     logging.warning("Unusual Activity Monitor not available")
+
+# Live Greeks Monitor
+try:
+    from monitors.live_greeks_monitor import LiveGreeksMonitor
+    LIVE_GREEKS_AVAILABLE = True
+except ImportError:
+    LIVE_GREEKS_AVAILABLE = False
+    logging.warning("Live Greeks Monitor not available")
 
 load_dotenv()
 
@@ -490,6 +501,19 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
 
+# Live Greeks Monitor
+live_greeks_monitor = None
+if LIVE_GREEKS_AVAILABLE and analyzer:
+    try:
+        live_greeks_monitor = LiveGreeksMonitor(
+            analyzer=analyzer,
+            discord_alerter=alert_manager.discord if alert_manager else None,
+            check_interval=10  # 10 seconds
+        )
+        logger.info("✅ Live Greeks Monitor initialized")
+    except Exception as e:
+        logger.error(f"❌ Live Greeks Monitor failed: {str(e)}")
+
 
 # Initialize Earnings Monitor with Benzinga API
 earnings_monitor = None
@@ -550,6 +574,17 @@ def run_unusual_activity_monitor():
             unusual_activity_monitor.run_continuous(watchlist_manager)
         except Exception as e:
             logger.error(f"Unusual activity monitor error: {str(e)}")
+
+def run_live_greeks_monitor():
+    """Run live greeks monitor continuously"""
+    if live_greeks_monitor:
+        try:
+            watchlist = watchlist_manager.get_watchlist()
+            live_greeks_monitor.start(watchlist)
+            while True:
+                time.sleep(60)
+        except Exception as e:
+            logger.error(f"Live greeks monitor error: {str(e)}")
 
 # ============================================================================
 # CRITICAL FIX: Add run functions for realtime and momentum monitors
@@ -964,6 +999,58 @@ def news_dashboard():
     """Serve news dashboard"""
     return send_from_directory(app.static_folder, 'news_dashboard.html')
 
+@app.route('/api/live-greeks/<symbol>')
+def get_live_greeks(symbol):
+    """Get live greeks for symbol"""
+    try:
+        symbol = symbol.upper()
+        
+        if not live_greeks_monitor:
+            return jsonify({
+                'error': 'Live greeks monitor not initialized'
+            }), 503
+        
+        greeks = live_greeks_monitor.get_live_greeks(symbol)
+        
+        if not greeks:
+            return jsonify({
+                'error': f'No greeks data available for {symbol}'
+            }), 404
+        
+        return jsonify(greeks)
+        
+    except Exception as e:
+        logger.error(f"Error getting live greeks for {symbol}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/live-greeks/batch', methods=['POST'])
+def get_batch_live_greeks():
+    """Get live greeks for multiple symbols"""
+    try:
+        data = request.get_json()
+        symbols = data.get('symbols', [])
+        
+        if not symbols:
+            return jsonify({'error': 'No symbols provided'}), 400
+        
+        if not live_greeks_monitor:
+            return jsonify({
+                'error': 'Live greeks monitor not initialized'
+            }), 503
+        
+        results = {}
+        for symbol in symbols:
+            symbol = symbol.upper()
+            greeks = live_greeks_monitor.get_live_greeks(symbol)
+            if greeks:
+                results[symbol] = greeks
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        logger.error(f"Error getting batch live greeks: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/health')
 def health_check():
     """Health check"""
@@ -971,7 +1058,7 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '4.5.2-realtime-momentum-fixed',
+        'version': '4.5.3-with-live-greeks',
         'polygon_enabled': bool(POLYGON_API_KEY),
         'alerts_enabled': alert_manager is not None,
         'config_manager_enabled': config_manager is not None,
@@ -999,6 +1086,11 @@ def health_check():
             'enabled': momentum_monitor is not None,
             'running': momentum_monitor is not None
         },
+        'live_greeks': {
+            'enabled': live_greeks_monitor is not None,
+            'running': live_greeks_monitor is not None,
+            'check_interval': 10 if live_greeks_monitor else 0
+        },
         'phase1_features': {
             'volume_analysis': analyzer.volume_analyzer is not None,
             'key_level_detection': analyzer.key_level_detector is not None,
@@ -1022,8 +1114,8 @@ def health_check():
 
 if __name__ == '__main__':
     print("\n" + "=" * 60)
-    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.5.2")
-    print("   (WITH REALTIME VOLUME + MOMENTUM MONITORS FIXED)")
+    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.5.3")
+    print("   (WITH LIVE GREEKS MONITOR)")
     print("=" * 60)
     print(f"\n📊 Dashboard: http://localhost:5001")
     print(f"⚙️  Alert Console: http://localhost:5001/alert-console")
@@ -1048,7 +1140,8 @@ if __name__ == '__main__':
             'wall_strength': wall_strength_monitor,
             'unusual_activity': unusual_activity_monitor,
             'momentum': momentum_monitor,
-            'earnings': earnings_monitor
+            'earnings': earnings_monitor,
+            'live_greeks': live_greeks_monitor
         }
         
         init_config_routes(config_manager, alert_manager, monitor_instances)
@@ -1156,6 +1249,21 @@ if __name__ == '__main__':
         print(f"   📡 Routes to: DISCORD alerts (configured channel)")
         print(f"   🎯 Monitors: Watchlist stocks for momentum changes")
     
+    # ============================================================================
+    # Start Live Greeks Monitor with Threading
+    # ============================================================================
+    if live_greeks_monitor:
+        print(f"\n🔢 Starting Live Greeks Monitor...")
+        live_greeks_thread = threading.Thread(
+            target=run_live_greeks_monitor,
+            daemon=True
+        )
+        live_greeks_thread.start()
+        print(f"   ✅ Live greeks monitor started")
+        print(f"   🕐 Updates every 10 seconds")
+        print(f"   📡 Provides real-time options greeks")
+        print(f"   🎯 Monitors: Watchlist stocks for greek changes")
+    
     if market_impact_monitor:
         print(f"\n📰 Market Impact Monitor Active...")
         print(f"   🕐 Checks every 15 seconds (REAL-TIME)")
@@ -1166,8 +1274,9 @@ if __name__ == '__main__':
     print("✅ ALL SYSTEMS ONLINE - READY FOR TRADING!")
     print("=" * 60)
     print(f"\n🎯 ACTIVE FEATURES:")
-    print(f"   • Real-Time Volume Monitor - Volume spikes & alerts ✨ NOW ACTIVE")
-    print(f"   • Momentum Signal Monitor - Price momentum tracking ✨ NOW ACTIVE")
+    print(f"   • Real-Time Volume Monitor - Volume spikes & alerts")
+    print(f"   • Momentum Signal Monitor - Price momentum tracking")
+    print(f"   • Live Greeks Monitor - Real-time options greeks ✨ NEW")
     print(f"   • Wall Strength Tracker - Monitors gamma walls")
     print(f"   • Unusual Activity Detector - Smart money tracking")
     print(f"   • Alert Management Console - Real-time config")

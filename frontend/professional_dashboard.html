@@ -146,6 +146,113 @@
             border: 1px solid #00ff00;
         }
 
+        /* Live Greeks Panel */
+        .live-greeks-panel {
+            background: #0a0a0a;
+            border: 2px solid #ff00ff;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
+        }
+
+        .live-greeks-panel h2 {
+            color: #ff00ff;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        .greeks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 10px;
+        }
+
+        .greek-card {
+            background: #1a001a;
+            border: 1px solid #ff00ff;
+            padding: 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .greek-card:hover {
+            background: #2a002a;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+
+        .greek-card .symbol {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+
+        .greek-card .price {
+            font-size: 14px;
+            color: #ffff00;
+            margin-bottom: 8px;
+        }
+
+        .greek-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .greek-stat {
+            text-align: center;
+        }
+
+        .greek-stat-label {
+            font-size: 9px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .greek-stat-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+
+        .delta-change {
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .delta-up {
+            color: #00ff00;
+        }
+
+        .delta-down {
+            color: #ff0000;
+        }
+
+        .delta-neutral {
+            color: #ffff00;
+        }
+
+        .wall-alert {
+            background: #ff00ff;
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-top: 6px;
+            text-align: center;
+            animation: pulseWall 1.5s infinite;
+        }
+
+        @keyframes pulseWall {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -612,6 +719,16 @@
     </div>
 
     <div id="regimeWarning" style="display: none;" class="regime-warning"></div>
+
+    <!-- Live Greeks Panel -->
+    <div class="live-greeks-panel">
+        <h2>🔴 LIVE GREEKS MONITOR (Updates every 10s)</h2>
+        <div class="greeks-grid" id="greeksGrid">
+            <div style="grid-column: 1/-1; text-align: center; color: #666; padding: 20px;">
+                Loading live greeks data...
+            </div>
+        </div>
+    </div>
 
     <div class="table-container">
         <table id="dataTable">
@@ -1276,6 +1393,14 @@
             console.log('🚀 Initializing Professional Trading Dashboard v5.0 - OPTIMIZED FOR DAY TRADING');
             
             await loadWatchlist();
+            
+            // Start live greeks updates after SYMBOLS loaded
+            if (SYMBOLS && SYMBOLS.length > 0) {
+                console.log('🔴 Starting Live Greeks Monitor...');
+                updateLiveGreeks(); // Initial load
+                setInterval(updateLiveGreeks, 10000); // Every 10 seconds
+            }
+            
             await loadEarningsStatus();
             
             setInterval(updateTime, 1000);
@@ -1300,6 +1425,141 @@
             console.log('🎯 0DTE gamma pinning detection active');
             console.log('🧱 Wall strength tracking enabled');
         }
+
+        // ==================== LIVE GREEKS MONITOR ====================
+        let previousDeltas = {}; // Track delta changes
+
+        async function updateLiveGreeks() {
+            try {
+                const response = await fetch(`${API_BASE}/live-greeks/batch`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ symbols: SYMBOLS })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayLiveGreeks(data);
+                
+            } catch (error) {
+                console.error('Error updating live greeks:', error);
+                document.getElementById('greeksGrid').innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: #ff0000; padding: 20px;">
+                        ⚠️ Error loading live greeks: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function displayLiveGreeks(data) {
+            const grid = document.getElementById('greeksGrid');
+            
+            if (!data || Object.keys(data).length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: #666; padding: 20px;">
+                        No live greeks data available
+                    </div>
+                `;
+                return;
+            }
+            
+            // Filter for relevant tickers (near walls or big moves)
+            const relevantTickers = Object.entries(data).filter(([symbol, greeks]) => {
+                // Show if near gamma wall (<3%)
+                if (greeks.wall_distance_pct && greeks.wall_distance_pct < 3.0) {
+                    return true;
+                }
+                
+                // Show if delta changed significantly
+                if (previousDeltas[symbol]) {
+                    const deltaChange = Math.abs(greeks.delta - previousDeltas[symbol]);
+                    if (deltaChange >= 0.05) {
+                        return true;
+                    }
+                }
+                
+                // Always show first few tickers
+                return Object.keys(previousDeltas).length < 5;
+            });
+            
+            if (relevantTickers.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: #888; padding: 20px;">
+                        📊 No significant greek movements detected<br>
+                        <span style="font-size: 10px; color: #666;">Monitoring ${Object.keys(data).length} symbols...</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            grid.innerHTML = relevantTickers.map(([symbol, greeks]) => {
+                const prevDelta = previousDeltas[symbol] || greeks.delta;
+                const deltaChange = greeks.delta - prevDelta;
+                const deltaChangeAbs = Math.abs(deltaChange);
+                
+                let deltaChangeClass = 'delta-neutral';
+                let deltaArrow = '→';
+                if (deltaChange > 0.01) {
+                    deltaChangeClass = 'delta-up';
+                    deltaArrow = '⬆️';
+                } else if (deltaChange < -0.01) {
+                    deltaChangeClass = 'delta-down';
+                    deltaArrow = '⬇️';
+                }
+                
+                // Store current delta
+                previousDeltas[symbol] = greeks.delta;
+                
+                // Check if near wall
+                const nearWall = greeks.wall_distance_pct && greeks.wall_distance_pct < 3.0;
+                const wallAlert = nearWall ? `
+                    <div class="wall-alert">
+                        🔥 ${greeks.wall_distance_pct.toFixed(1)}% FROM ${greeks.wall_type} WALL
+                    </div>
+                ` : '';
+                
+                return `
+                    <div class="greek-card">
+                        <div class="symbol">${symbol}</div>
+                        <div class="price">$${greeks.price.toFixed(2)}</div>
+                        
+                        <div class="greek-stats">
+                            <div class="greek-stat">
+                                <div class="greek-stat-label">Delta</div>
+                                <div class="greek-stat-value">${greeks.delta.toFixed(2)}</div>
+                                <div class="delta-change ${deltaChangeClass}">
+                                    ${prevDelta.toFixed(2)} ${deltaArrow} ${greeks.delta.toFixed(2)}
+                                </div>
+                            </div>
+                            
+                            <div class="greek-stat">
+                                <div class="greek-stat-label">Gamma</div>
+                                <div class="greek-stat-value">${greeks.gamma.toFixed(3)}</div>
+                            </div>
+                            
+                            <div class="greek-stat">
+                                <div class="greek-stat-label">Wall</div>
+                                <div class="greek-stat-value" style="font-size: 12px;">
+                                    ${greeks.wall_strike ? '$' + greeks.wall_strike.toFixed(2) : '--'}
+                                </div>
+                                <div style="font-size: 9px; color: #888;">
+                                    ${greeks.wall_distance_pct ? greeks.wall_distance_pct.toFixed(1) + '%' : '--'}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${wallAlert}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==================== END LIVE GREEKS MONITOR ====================
 
         initialize();
     </script>
