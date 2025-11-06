@@ -30,12 +30,7 @@ class DiscordAlerter:
                 'volume_spike': self._expand_env_var(config.get('webhook_volume_spike')),
                 'odte_levels': self._expand_env_var(config.get('webhook_odte_levels')),
                 'news_alerts': self._expand_env_var(config.get('webhook_news_alerts')),
-                'openai_news': self._expand_env_var(config.get('webhook_openai_news')),
-            
-            # Monitor-specific channels
-            'unusual_activity': self._expand_env_var(config.get('webhook_unusual_activity')),
-            'momentum_signals': self._expand_env_var(config.get('webhook_momentum_signals')),
-            'wall_strength': self._expand_env_var(config.get('webhook_odte_levels'))
+                'openai_news': self._expand_env_var(config.get('webhook_openai_news'))
             }
             
             if webhook_url:
@@ -102,44 +97,6 @@ class DiscordAlerter:
             self.logger.error(f"❌ Discord webhook failed for {channel}: {str(e)}")
             return False
     
-
-    def send_webhook(self, channel: str, payload: Dict) -> bool:
-        """
-        PUBLIC method to send webhook to specific channel
-        Wrapper for _send_webhook with channel name normalization
-        
-        Args:
-            channel: Channel name (case-insensitive)
-            payload: Discord payload dict (must include 'embeds' wrapper)
-        
-        Returns:
-            True if sent successfully, False otherwise
-        """
-        # Normalize channel name to lowercase
-        channel_lower = channel.lower()
-        
-        # Channel name mapping
-        channel_map = {
-            'momentum_signals': 'momentum_signals',
-            'unusual_activity': 'unusual_activity',
-            'volume_spike': 'volume_spike',
-            'odte_levels': 'odte_levels',
-            'wall_strength': 'odte_levels',  # Shares ODTE channel
-            'news_alerts': 'news_alerts',
-            'market_impact': 'market_impact',
-            'trading': 'trading',
-            'news': 'news',
-            'earnings_weekly': 'earnings_weekly',
-            'earnings_realtime': 'earnings_realtime',
-            'openai_news': 'openai_news'
-        }
-        
-        # Get mapped channel name
-        mapped_channel = channel_map.get(channel_lower, channel_lower)
-        
-        # Use the private _send_webhook method
-        return self._send_webhook(mapped_channel, payload)
-
     def send_volume_spike_alert(self, symbol: str, volume_data: Dict, session: str = 'REGULAR') -> bool:
         """
         Send volume spike alert

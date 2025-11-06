@@ -189,10 +189,11 @@ class WallStrengthMonitor:
                 'inline': True
             })
             
-            # Timeline
+            # Timeline (LIMIT to last 10 entries to avoid Discord 400)
             if len(timeline) >= 2:
                 timeline_text = []
-                for entry in timeline:
+                # FIXED: Limit to last 10 entries to prevent >1024 char Discord limit
+                for entry in timeline[-10:]:
                     change_emoji = ''
                     if entry['change_pct'] >= 50:
                         change_emoji = ' 🔥🔥🔥'
@@ -208,9 +209,14 @@ class WallStrengthMonitor:
                         f"({entry['change_pct']:+.1f}%){change_emoji}"
                     )
                 
+                # Safety truncation (Discord field limit: 1024 chars)
+                timeline_value = '\n'.join(timeline_text)
+                if len(timeline_value) > 1000:
+                    timeline_value = timeline_value[:1000] + '...'
+                
                 embed['fields'].append({
                     'name': '⏱️ Timeline',
-                    'value': '\n'.join(timeline_text),
+                    'value': timeline_value,
                     'inline': False
                 })
             
