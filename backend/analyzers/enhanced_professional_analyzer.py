@@ -690,7 +690,74 @@ class EnhancedProfessionalAnalyzer:
                 'symbol': symbol,
                 'available': False,
                 'error': str(e)
-            } 
+            }
+    
+    def calculate_relative_strength(self, symbol: str, current_price: float, benchmark: str = 'SPY') -> float:
+        """
+        Calculate relative strength vs benchmark (SPY or QQQ)
+        
+        Returns percentage outperformance/underperformance
+        Example: If NVDA +3% and SPY +1%, returns +2.0 (outperforming by 2%)
+        
+        Args:
+            symbol: Stock symbol to analyze
+            current_price: Current price of symbol
+            benchmark: Benchmark symbol (SPY or QQQ)
+        
+        Returns:
+            Relative strength percentage (can be negative)
+        """
+        try:
+            # Don't calculate RS for benchmarks themselves
+            if symbol == benchmark:
+                return 0.0
+            
+            # Get previous close for symbol
+            yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+            test_date = datetime.now() - timedelta(days=1)
+            while test_date.weekday() >= 5:  # Skip weekends
+                test_date -= timedelta(days=1)
+            yesterday = test_date.strftime('%Y-%m-%d')
+            
+            # Get symbol's previous close
+            endpoint = f"/v2/aggs/ticker/{symbol}/range/1/day/{yesterday}/{yesterday}"
+            data = self._make_request(endpoint, {'adjusted': 'true'})
+            
+            if 'results' not in data or not data['results']:
+                return 0.0
+            
+            symbol_prev_close = data['results'][0]['c']
+            
+            # Get benchmark's previous close
+            endpoint = f"/v2/aggs/ticker/{benchmark}/range/1/day/{yesterday}/{yesterday}"
+            data = self._make_request(endpoint, {'adjusted': 'true'})
+            
+            if 'results' not in data or not data['results']:
+                return 0.0
+            
+            benchmark_prev_close = data['results'][0]['c']
+            
+            # Get benchmark's current price
+            endpoint = f"/v2/last/trade/{benchmark}"
+            data = self._make_request(endpoint)
+            benchmark_current_price = data.get('results', {}).get('p', 0) if 'results' in data else 0
+            
+            if benchmark_current_price == 0 or symbol_prev_close == 0 or benchmark_prev_close == 0:
+                return 0.0
+            
+            # Calculate % changes
+            symbol_change_pct = ((current_price - symbol_prev_close) / symbol_prev_close) * 100
+            benchmark_change_pct = ((benchmark_current_price - benchmark_prev_close) / benchmark_prev_close) * 100
+            
+            # Relative strength = symbol change - benchmark change
+            relative_strength = symbol_change_pct - benchmark_change_pct
+            
+            return round(relative_strength, 2)
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating relative strength for {symbol} vs {benchmark}: {str(e)}")
+            return 0.0
+    
     def detect_gap(self, symbol: str, current_price: float = None) -> Dict:
         """Detect pre-market gap"""
         try:
@@ -1439,6 +1506,10 @@ class EnhancedProfessionalAnalyzer:
             vwap = self.calculate_vwap(symbol)
             momentum = self.calculate_momentum(symbol)
             
+            # NEW: Calculate Relative Strength vs SPY and QQQ
+            rs_spy = self.calculate_relative_strength(symbol, current_price, 'SPY')
+            rs_qqq = self.calculate_relative_strength(symbol, current_price, 'QQQ')
+            
             # NEW: Calculate pin probability (if 0DTE and calculator available)
             pin_analysis = {}
             if self.pin_calculator and open_interest.get('expires_today'):
@@ -1702,6 +1773,8 @@ class EnhancedProfessionalAnalyzer:
                 'current_price': current_price,
                 'vwap': vwap,  # NEW: VWAP field
                 'momentum': momentum,  # NEW: Momentum across timeframes
+                'rs_spy': rs_spy,  # NEW: Relative Strength vs SPY
+                'rs_qqq': rs_qqq,  # NEW: Relative Strength vs QQQ
                 'support': support_resistance['support'],
                 'resistance': support_resistance['resistance'],
                 'bias_1h': bias_1h['bias'],

@@ -133,15 +133,15 @@ class OpeningRangeAnalyzer:
         or_close = opening_bars.iloc[-1]['c']
         or_range = or_high - or_low
         
-        # Determine direction
+        # Determine direction (AGGRESSIVE thresholds for 7-figure scalping)
         price_change = ((or_close - or_open) / or_open) * 100
         
-        if price_change > 0.3:
+        if price_change > 0.2:  # LOWERED from 0.3% to 0.2%
             direction = 'BULLISH'
-            strength = 'STRONG' if price_change > 0.8 else 'MODERATE'
-        elif price_change < -0.3:
+            strength = 'STRONG' if price_change > 0.5 else 'MODERATE'  # LOWERED from 0.8% to 0.5%
+        elif price_change < -0.2:  # LOWERED from -0.3% to -0.2%
             direction = 'BEARISH'
-            strength = 'STRONG' if price_change < -0.8 else 'MODERATE'
+            strength = 'STRONG' if price_change < -0.5 else 'MODERATE'  # LOWERED from -0.8% to -0.5%
         else:
             direction = 'NEUTRAL'
             strength = 'WEAK'
@@ -155,7 +155,7 @@ class OpeningRangeAnalyzer:
         prev_avg_volume = prev_levels.get('prev_volume', 0) / 390 if prev_levels else 0  # 390 minutes in trading day
         
         volume_ratio = avg_volume_per_min / prev_avg_volume if prev_avg_volume > 0 else 1.0
-        high_volume = volume_ratio > 1.5
+        high_volume = volume_ratio > 1.3  # LOWERED from 1.5x to 1.3x for aggressive detection
         
         # Check if broke/held previous day levels
         prev_close = prev_levels.get('prev_close', or_open)

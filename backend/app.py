@@ -153,6 +153,23 @@ except ImportError:
     LIVE_GREEKS_AVAILABLE = False
     logging.warning("Live Greeks Monitor not available")
 
+# Relative Strength Monitor
+try:
+    from monitors.relative_strength_monitor import RelativeStrengthMonitor
+    RS_MONITOR_AVAILABLE = True
+except ImportError:
+    RS_MONITOR_AVAILABLE = False
+    logging.warning("Relative Strength Monitor not available")
+
+# Opening Range Monitor
+try:
+    from monitors.opening_range_monitor import OpeningRangeMonitor
+    from analyzers.opening_range_analyzer import OpeningRangeAnalyzer
+    OR_MONITOR_AVAILABLE = True
+except ImportError:
+    OR_MONITOR_AVAILABLE = False
+    logging.warning("Opening Range Monitor not available")
+
 load_dotenv()
 
 # JSON Sanitization Helper
@@ -501,6 +518,36 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
 
+# Initialize Opening Range Analyzer
+or_analyzer = None
+if OR_MONITOR_AVAILABLE:
+    try:
+        or_analyzer = OpeningRangeAnalyzer(api_key=POLYGON_KEY)
+        logger.info("✅ Opening Range Analyzer initialized")
+    except Exception as e:
+        logger.error(f"❌ Opening Range Analyzer failed: {str(e)}")
+        OR_MONITOR_AVAILABLE = False
+
+# Initialize Relative Strength Monitor
+rs_monitor = None
+if RS_MONITOR_AVAILABLE:
+    try:
+        rs_monitor = RelativeStrengthMonitor(analyzer, config_yaml)
+        logger.info("✅ Relative Strength Monitor initialized")
+    except Exception as e:
+        logger.error(f"❌ Relative Strength Monitor failed: {str(e)}")
+        RS_MONITOR_AVAILABLE = False
+
+# Initialize Opening Range Monitor
+or_monitor = None
+if OR_MONITOR_AVAILABLE and or_analyzer:
+    try:
+        or_monitor = OpeningRangeMonitor(analyzer, or_analyzer, config_yaml)
+        logger.info("✅ Opening Range Monitor initialized")
+    except Exception as e:
+        logger.error(f"❌ Opening Range Monitor failed: {str(e)}")
+        OR_MONITOR_AVAILABLE = False
+
 # Live Greeks Monitor
 live_greeks_monitor = None
 if LIVE_GREEKS_AVAILABLE and analyzer:
@@ -605,6 +652,22 @@ def run_momentum_monitor():
             momentum_monitor.run_continuous()
         except Exception as e:
             logger.error(f"Momentum monitor error: {str(e)}")
+
+def run_rs_monitor():
+    """Run relative strength monitor continuously"""
+    if rs_monitor:
+        try:
+            rs_monitor.run_continuous(watchlist_manager)
+        except Exception as e:
+            logger.error(f"Relative strength monitor error: {str(e)}")
+
+def run_or_monitor():
+    """Run opening range monitor continuously"""
+    if or_monitor:
+        try:
+            or_monitor.run_continuous(watchlist_manager)
+        except Exception as e:
+            logger.error(f"Opening range monitor error: {str(e)}")
 
 # ============================================================================
 
@@ -1263,6 +1326,40 @@ if __name__ == '__main__':
         print(f"   🕐 Updates every 10 seconds")
         print(f"   📡 Provides real-time options greeks")
         print(f"   🎯 Monitors: Watchlist stocks for greek changes")
+    
+    # Start Relative Strength Monitor
+    if rs_monitor:
+        try:
+            print(f"\n📊 Starting Relative Strength Monitor...")
+            rs_thread = threading.Thread(
+                target=run_rs_monitor,
+                daemon=True,
+                name='RelativeStrengthMonitor'
+            )
+            rs_thread.start()
+            print(f"   ✅ Relative strength monitor started")
+            print(f"   🕐 Checks every 30 seconds")
+            print(f"   📡 Routes to: DISCORD_MOMENTUM_SIGNALS")
+            print(f"   🎯 Pre-market: ±1.0% threshold | Market: ±1.5%")
+        except Exception as e:
+            logger.error(f"❌ RS Monitor thread failed: {str(e)}")
+    
+    # Start Opening Range Monitor
+    if or_monitor:
+        try:
+            print(f"\n🚀 Starting Opening Range Monitor...")
+            or_thread = threading.Thread(
+                target=run_or_monitor,
+                daemon=True,
+                name='OpeningRangeMonitor'
+            )
+            or_thread.start()
+            print(f"   ✅ Opening range monitor started")
+            print(f"   🕐 Active window: 9:30-11:30 AM ET")
+            print(f"   📡 Routes to: DISCORD_VOLUME_SPIKE")
+            print(f"   🎯 Detects: OR direction + Breakouts/Breakdowns")
+        except Exception as e:
+            logger.error(f"❌ OR Monitor thread failed: {str(e)}")
     
     if market_impact_monitor:
         print(f"\n📰 Market Impact Monitor Active...")

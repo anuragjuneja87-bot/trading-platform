@@ -48,27 +48,27 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1600px;
+            min-width: 1400px;
         }
 
         th {
             background: #1a001a;
             color: #ff00ff;
-            padding: 15px 10px;
+            padding: 12px 6px;
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             border: 1px solid #ff00ff;
             white-space: nowrap;
             font-weight: bold;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             position: sticky;
             top: 0;
             z-index: 10;
         }
 
         td {
-            padding: 12px 8px;
+            padding: 10px 6px;
             border: 1px solid #330033;
             text-align: center;
             vertical-align: top;
@@ -112,15 +112,16 @@
         }
 
         .gamma-cell {
-            line-height: 1.6;
-            min-width: 140px;
+            line-height: 1.5;
+            min-width: 110px;
+            font-size: 11px;
         }
 
         .strike-price {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
-            margin-bottom: 4px;
-            letter-spacing: 0.5px;
+            margin-bottom: 3px;
+            letter-spacing: 0.3px;
         }
 
         .resistance-1 .strike-price {
@@ -140,48 +141,142 @@
         }
 
         .oi-volume {
-            font-size: 11px;
+            font-size: 10px;
             color: #aaa;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }
 
         /* NEW: Wall Strength Styles */
         .wall-strength-cell {
-            min-width: 200px;
-            line-height: 1.5;
+            min-width: 160px;
+            line-height: 1.4;
             text-align: left;
+            font-size: 10px;
         }
 
         /* NEW: Max Pain Column Styles */
         .max-pain-cell {
-            min-width: 140px;
+            min-width: 110px;
             text-align: center;
             vertical-align: middle;
             background: #0f0a0f;
-            padding: 10px;
+            padding: 8px;
         }
 
         /* NEW: Pin Probability Column Styles */
         .pin-probability-cell {
-            min-width: 120px;
+            min-width: 100px;
             text-align: center;
             vertical-align: middle;
             background: #0a0f0f;
-            padding: 10px;
+            padding: 8px;
+        }
+
+        /* Wall Status Animations */
+        @keyframes pulse-orange {
+            0%, 100% { box-shadow: 0 0 5px #ff6600; background: #221100; }
+            50% { box-shadow: 0 0 20px #ff6600; background: #331100; }
+        }
+
+        @keyframes flash-yellow {
+            0%, 100% { background: #1a1a00; }
+            50% { background: #333300; }
+        }
+
+        @keyframes flash-red {
+            0%, 100% { background: #1a0000; }
+            50% { background: #330000; }
+        }
+
+        @keyframes glow-green {
+            0%, 100% { box-shadow: 0 0 10px #00ff00; }
+            50% { box-shadow: 0 0 15px #00ff00; }
         }
 
         .wall-building {
-            color: #00ff00;
+            animation: pulse-orange 2s infinite;
+            color: #ff6600;
             font-weight: bold;
+            padding: 6px;
+            border-radius: 3px;
+            margin: 3px 0;
         }
 
         .wall-weakening {
-            color: #ff6600;
+            animation: flash-yellow 1.5s infinite;
+            color: #ffff00;
             font-weight: bold;
+            padding: 6px;
+            border-radius: 3px;
+            margin: 3px 0;
+        }
+
+        .wall-breaking {
+            animation: flash-red 1s infinite;
+            color: #ff0000;
+            font-weight: bold;
+            padding: 6px;
+            border-radius: 3px;
+            margin: 3px 0;
+        }
+
+        .wall-strong {
+            animation: glow-green 3s infinite;
+            color: #00ff00;
+            font-weight: bold;
+            padding: 6px;
+            border-radius: 3px;
+            margin: 3px 0;
         }
 
         .wall-stable {
             color: #666666;
+        }
+
+        /* Proximity Alert Animations */
+        @keyframes flash-red-urgent {
+            0%, 100% { background: #330000; box-shadow: 0 0 20px #ff0000; }
+            50% { background: #660000; box-shadow: 0 0 40px #ff0000; }
+        }
+
+        @keyframes pulse-yellow-warning {
+            0%, 100% { background: #1a1a00; box-shadow: 0 0 15px #ffff00; }
+            50% { background: #333300; box-shadow: 0 0 30px #ffff00; }
+        }
+
+        @keyframes glow-green-approach {
+            0%, 100% { background: #001a00; box-shadow: 0 0 10px #00ff00; }
+            50% { background: #002200; box-shadow: 0 0 20px #00ff00; }
+        }
+
+        tr.proximity-critical {
+            animation: flash-red-urgent 0.8s infinite;
+        }
+
+        tr.proximity-warning {
+            animation: pulse-yellow-warning 1.5s infinite;
+        }
+
+        tr.proximity-approaching {
+            animation: glow-green-approach 2.5s infinite;
+        }
+
+        .distance-critical {
+            font-size: 14px !important;
+            font-weight: bold !important;
+            color: #ff0000 !important;
+            animation: flash-red-urgent 0.8s infinite;
+        }
+
+        .distance-warning {
+            font-size: 13px !important;
+            font-weight: bold !important;
+            color: #ffff00 !important;
+        }
+
+        .distance-approaching {
+            font-size: 12px !important;
+            color: #00ff00 !important;
         }
 
         .timeline-entry {
@@ -208,6 +303,36 @@
             font-size: 18px;
             color: #ffff00;
         }
+
+        /* Responsive scaling for smaller screens */
+        @media (max-width: 1600px) {
+            table {
+                min-width: 1200px;
+                font-size: 11px;
+            }
+            
+            th {
+                padding: 10px 4px;
+                font-size: 10px;
+            }
+            
+            td {
+                padding: 8px 4px;
+            }
+            
+            .gamma-cell {
+                min-width: 90px;
+            }
+            
+            .wall-strength-cell {
+                min-width: 130px;
+                font-size: 9px;
+            }
+            
+            .max-pain-cell, .pin-probability-cell {
+                min-width: 85px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -218,7 +343,7 @@
         </div>
         <div style="text-align: right;">
             <div class="market-time" style="font-size: 18px; color: #ffff00; font-weight: bold; margin-bottom: 8px;" id="marketTime">--:--:-- ET</div>
-            <span style="font-size: 12px; color: #00ff00; padding: 6px 12px; border: 1px solid #00ff00; border-radius: 3px;" id="updateIndicator">Auto-refresh: 30s</span>
+            <span style="font-size: 12px; color: #00ff00; padding: 6px 12px; border: 1px solid #00ff00; border-radius: 3px;" id="updateIndicator">Auto-refresh: 15s</span>
         </div>
     </div>
 
@@ -234,13 +359,14 @@
                     <th style="background: #331100;">RESISTANCE 2</th>
                     <th style="background: #003300;">SUPPORT 1</th>
                     <th style="background: #003311;">SUPPORT 2</th>
+                    <th style="background: #1a001a;">WALL STRENGTH 🔥<br><small style="opacity:0.7;">OI Changes</small></th>
                     <th style="background: #440044;">MAX PAIN 🎯<br><small style="opacity:0.7;">Target Price</small></th>
                     <th style="background: #004444;">PIN %<br><small style="opacity:0.7;">Probability</small></th>
                 </tr>
             </thead>
             <tbody id="tableBody">
                 <tr>
-                    <td colspan="10" class="loading">LOADING GAMMA DATA...</td>
+                    <td colspan="11" class="loading">LOADING GAMMA DATA...</td>
                 </tr>
             </tbody>
         </table>
@@ -371,55 +497,100 @@
             `;
         }
 
-        function formatWallStrength(wallStrength) {
-            if (!wallStrength || !wallStrength.available) {
-                return '<div style="color: #666; font-size: 11px;">No tracking data</div>';
+        function formatWallStrength(wallStrength, currentPrice) {
+            if (!wallStrength || !wallStrength.tracked_walls || wallStrength.tracked_walls.length === 0) {
+                return '<div style="color: #666; font-size: 11px; padding: 10px;">No walls tracked</div>';
             }
 
-            const changes = wallStrength.walls || [];
+            const walls = wallStrength.tracked_walls;
             
-            if (changes.length === 0) {
-                return '<div style="color: #666; font-size: 11px;">No changes detected</div>';
-            }
+            // Sort by absolute OI change percentage (most significant first)
+            const sortedWalls = [...walls]
+                .filter(w => w.status !== 'STABLE')
+                .sort((a, b) => Math.abs(b.oi_change_pct) - Math.abs(a.oi_change_pct))
+                .slice(0, 3); // Show top 3
 
-            // Show top 3 most significant changes
-            const significantChanges = changes
-                .filter(c => c.pattern !== 'STABLE')
-                .sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct))
-                .slice(0, 3);
-
-            if (significantChanges.length === 0) {
-                return '<div style="color: #666; font-size: 11px;">All walls stable</div>';
+            if (sortedWalls.length === 0) {
+                return '<div style="color: #666; font-size: 11px; padding: 10px;">All walls stable</div>';
             }
 
             let html = '';
             
-            for (const change of significantChanges) {
-                const isBuilding = change.pattern === 'BUILDING';
-                const className = isBuilding ? 'wall-building' : 'wall-weakening';
-                const emoji = isBuilding ? '🔥' : '⚠️';
+            for (const wall of sortedWalls) {
+                const distance = ((wall.strike - currentPrice) / currentPrice) * 100;
+                const distanceStr = `${Math.abs(distance).toFixed(1)}% ${distance > 0 ? 'above' : 'below'}`;
+                
+                // Status-based styling
+                let statusClass = 'wall-stable';
+                let emoji = '○';
+                
+                if (wall.status === 'BUILDING') {
+                    statusClass = 'wall-building';
+                    emoji = '🔥';
+                } else if (wall.status === 'WEAKENING') {
+                    statusClass = 'wall-weakening';
+                    emoji = '⚠️';
+                } else if (wall.status === 'BREAKING') {
+                    statusClass = 'wall-breaking';
+                    emoji = '💥';
+                } else if (wall.status === 'STRONG') {
+                    statusClass = 'wall-strong';
+                    emoji = '✅';
+                }
                 
                 html += `
-                    <div class="${className}" style="margin-bottom: 8px; padding: 4px; background: ${isBuilding ? '#001100' : '#110000'}; border-radius: 3px;">
-                        <div style="font-size: 12px; font-weight: bold;">
-                            ${emoji} $${change.strike.toFixed(2)} ${change.type}
+                    <div class="${statusClass}" style="margin-bottom: 6px; font-size: 11px; line-height: 1.4;">
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">
+                            ${emoji} $${wall.strike.toFixed(2)} ${wall.type}
                         </div>
-                        <div style="font-size: 11px; opacity: 0.9;">
-                            ${change.change_pct > 0 ? '+' : ''}${change.change_pct.toFixed(1)}% from baseline
+                        <div style="font-size: 12px; opacity: 0.95;">
+                            ${wall.status} ${wall.oi_change_pct > 0 ? '+' : ''}${wall.oi_change_pct.toFixed(0)}%
+                        </div>
+                        <div style="font-size: 10px; opacity: 0.8; margin-top: 2px;">
+                            OI: ${wall.current_oi.toLocaleString()} (was ${wall.baseline_oi.toLocaleString()})
                         </div>
                         <div style="font-size: 10px; opacity: 0.7; margin-top: 2px;">
-                            ${change.current_oi.toLocaleString()} OI (was ${change.baseline_oi.toLocaleString()})
+                            📍 ${distanceStr}
                         </div>
                     </div>
                 `;
             }
 
-            // Show baseline time
-            if (wallStrength.baseline_time) {
-                html += `<div style="font-size: 9px; color: #666; margin-top: 4px;">Baseline: ${wallStrength.baseline_time}</div>`;
+            return html;
+        }
+
+        function checkProximity(currentPrice, levels) {
+            /**
+             * Check proximity to gamma walls
+             * Returns: {class: 'proximity-X', closestWall: strike, distance: pct}
+             */
+            if (!levels || levels.length === 0) {
+                return { class: '', closestWall: null, distance: null };
             }
 
-            return html;
+            let minDistance = Infinity;
+            let closestWall = null;
+
+            for (const level of levels) {
+                if (!level || !level.strike) continue;
+                const distance = Math.abs(((level.strike - currentPrice) / currentPrice) * 100);
+                
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestWall = level.strike;
+                }
+            }
+
+            // Proximity thresholds
+            if (minDistance <= 0.5) {
+                return { class: 'proximity-critical', closestWall, distance: minDistance, level: 'CRITICAL' };
+            } else if (minDistance <= 1.0) {
+                return { class: 'proximity-warning', closestWall, distance: minDistance, level: 'WARNING' };
+            } else if (minDistance <= 2.0) {
+                return { class: 'proximity-approaching', closestWall, distance: minDistance, level: 'APPROACHING' };
+            }
+
+            return { class: '', closestWall, distance: minDistance, level: 'SAFE' };
         }
 
         function createRow(data) {
@@ -430,7 +601,7 @@
                     <tr>
                         <td><div class="symbol">${data.symbol}</div></td>
                         <td><div class="price">${formatPrice(data.current_price)}</div></td>
-                        <td colspan="8" style="color: #666;">No gamma data available</td>
+                        <td colspan="9" style="color: #666;">No gamma data available</td>
                     </tr>
                 `;
             }
@@ -461,6 +632,10 @@
             const expiration = oi.expiration || '--';
             const expDisplay = `<div style="font-size: 11px;">${expiration}</div>`;
 
+            // Wall Strength
+            const wallStrength = data.wall_strength || {};
+            const wallDisplay = formatWallStrength(wallStrength, currentPrice);
+
             // Max Pain (from pin_analysis)
             const pinAnalysis = data.pin_analysis || {};
             const maxPain = pinAnalysis.max_pain || 0;
@@ -471,9 +646,23 @@
             const pinPct = pinProbability.percent || 0;
             const pinDisplay = pinPct > 0 ? formatPinProbability(pinProbability, oi.hours_until_expiry) : '<div style="color: #666;">No data</div>';
 
+            // Check proximity to gamma walls
+            const allLevels = [res1, res2, sup1, sup2].filter(l => l !== null);
+            const proximity = checkProximity(currentPrice, allLevels);
+            
+            // Proximity alert badge
+            let proximityBadge = '';
+            if (proximity.level === 'CRITICAL') {
+                proximityBadge = `<div style="position: absolute; top: 5px; right: 5px; background: #ff0000; color: #000; padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 3px; animation: flash-red-urgent 0.8s infinite;">🚨 ${proximity.distance.toFixed(2)}% TO $${proximity.closestWall.toFixed(2)}</div>`;
+            } else if (proximity.level === 'WARNING') {
+                proximityBadge = `<div style="position: absolute; top: 5px; right: 5px; background: #ffff00; color: #000; padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 3px;">⚠️ ${proximity.distance.toFixed(2)}% TO $${proximity.closestWall.toFixed(2)}</div>`;
+            } else if (proximity.level === 'APPROACHING') {
+                proximityBadge = `<div style="position: absolute; top: 5px; right: 5px; background: #00ff00; color: #000; padding: 4px 8px; font-size: 10px; font-weight: bold; border-radius: 3px;">→ ${proximity.distance.toFixed(2)}%</div>`;
+            }
+
             return `
-                <tr>
-                    <td><div class="symbol">${data.symbol}</div></td>
+                <tr class="${proximity.class}" style="position: relative;">
+                    <td><div class="symbol">${data.symbol}</div>${proximityBadge}</td>
                     <td><div class="price">${formatPrice(currentPrice)}</div></td>
                     <td>${expDisplay}</td>
                     <td>${zeroDTEStatus}</td>
@@ -481,6 +670,7 @@
                     <td class="gamma-cell resistance-2">${formatGammaLevel(res2)}</td>
                     <td class="gamma-cell support-1">${formatGammaLevel(sup1)}</td>
                     <td class="gamma-cell support-2">${formatGammaLevel(sup2)}</td>
+                    <td class="wall-strength-cell">${wallDisplay}</td>
                     <td class="max-pain-cell">${maxPainDisplay}</td>
                     <td class="pin-probability-cell">${pinDisplay}</td>
                 </tr>
@@ -531,8 +721,8 @@
 
             await loadData();
             
-            // Auto-refresh every 30 seconds
-            setInterval(loadData, 30000);
+            // Auto-refresh every 15 seconds
+            setInterval(loadData, 15000);
             
             console.log('✅ Gamma + Wall Strength view initialized');
         }
