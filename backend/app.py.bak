@@ -1,21 +1,10 @@
 """
-backend/app.py - COMPLETE VERSION v4.5.5
+backend/app.py - COMPLETE VERSION v4.5.3
 WITH ALERT CONSOLE + WALL STRENGTH + UNUSUAL ACTIVITY + EARNINGS MONITOR
 + REALTIME VOLUME MONITOR + MOMENTUM MONITOR + LIVE GREEKS MONITOR
 
 COMPLETE REPLACEMENT FILE
 Copy this entire file to replace your existing app.py
-
-CHANGES IN v4.5.5:
-- FIXED: Live Greeks Monitor Discord alerter error
-- Disabled Discord alerts for Live Greeks (prevents spam every 10 seconds)
-- Live Greeks Monitor still tracks data, just doesn't send Discord alerts
-
-CHANGES IN v4.5.4:
-- CRITICAL FIX: Added environment variable expansion for config.yaml
-- Fixes ${DISCORD_MOMENTUM_SIGNALS} and all other ${...} variables
-- Added expand_env_vars_in_dict() function to recursively expand env vars
-- All existing functionality preserved
 
 CHANGES IN v4.5.3:
 - Added LiveGreeksMonitor import and initialization
@@ -37,7 +26,6 @@ import logging
 import threading
 import time
 import yaml
-import re
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -258,54 +246,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info(f"📁 Logging to file: {log_file}")
 
-# ========================================
-# CRITICAL FIX: Environment Variable Expansion for config.yaml
-# ========================================
-
-def expand_env_vars_in_dict(config_dict):
-    """
-    Recursively expand ${VAR_NAME} environment variables in config dictionary
-    
-    This fixes the issue where ${DISCORD_MOMENTUM_SIGNALS} was being treated
-    as a literal string instead of being replaced with the actual webhook URL.
-    
-    Args:
-        config_dict: Dictionary, list, or string to process
-    
-    Returns:
-        Processed object with environment variables expanded
-    """
-    if isinstance(config_dict, dict):
-        return {key: expand_env_vars_in_dict(value) for key, value in config_dict.items()}
-    elif isinstance(config_dict, list):
-        return [expand_env_vars_in_dict(item) for item in config_dict]
-    elif isinstance(config_dict, str):
-        # Replace ${VAR_NAME} with actual environment variable value
-        def replace_env_var(match):
-            var_name = match.group(1)
-            env_value = os.getenv(var_name)
-            if env_value is None:
-                logger.warning(f"⚠️ Environment variable ${{{var_name}}} not found, keeping original value")
-                return match.group(0)  # Return original ${VAR} if not found
-            return env_value
-        
-        return re.sub(r'\$\{([^}]+)\}', replace_env_var, config_dict)
-    else:
-        return config_dict
-
-# ========================================
-# Load config.yaml with environment variable expansion
-# ========================================
+# Load config.yaml
 config_yaml = {}
 try:
     config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
     with open(config_path, 'r') as f:
         config_yaml = yaml.safe_load(f)
-    
-    # CRITICAL: Expand ${VAR_NAME} environment variables
-    config_yaml = expand_env_vars_in_dict(config_yaml)
-    
-    logger.info("✅ config.yaml loaded with environment variables expanded")
+    logger.info("✅ config.yaml loaded")
 except Exception as e:
     logger.warning(f"⚠️ Failed to load config.yaml: {str(e)}")
 
@@ -572,7 +519,6 @@ if UNUSUAL_ACTIVITY_AVAILABLE:
         logger.error(f"❌ Unusual Activity Monitor failed: {str(e)}")
 
 # Initialize Opening Range Analyzer
-POLYGON_KEY = POLYGON_API_KEY  # Alias for compatibility
 or_analyzer = None
 if OR_MONITOR_AVAILABLE:
     try:
@@ -606,14 +552,12 @@ if OR_MONITOR_AVAILABLE and or_analyzer:
 live_greeks_monitor = None
 if LIVE_GREEKS_AVAILABLE and analyzer:
     try:
-        # FIXED: Disable Discord alerts for Live Greeks (prevents spam + webhook errors)
-        # Live Greeks update every 10 seconds - Discord alerts would be too noisy
         live_greeks_monitor = LiveGreeksMonitor(
             analyzer=analyzer,
-            discord_alerter=None,  # Disabled to prevent 'webhook_momentum_signals' errors
+            discord_alerter=alert_manager.discord if alert_manager else None,
             check_interval=10  # 10 seconds
         )
-        logger.info("✅ Live Greeks Monitor initialized (Discord alerts disabled)")
+        logger.info("✅ Live Greeks Monitor initialized")
     except Exception as e:
         logger.error(f"❌ Live Greeks Monitor failed: {str(e)}")
 
@@ -682,7 +626,7 @@ def run_live_greeks_monitor():
     """Run live greeks monitor continuously"""
     if live_greeks_monitor:
         try:
-            watchlist = watchlist_manager.load_symbols()
+            watchlist = watchlist_manager.get_watchlist()
             live_greeks_monitor.start(watchlist)
             while True:
                 time.sleep(60)
@@ -1177,7 +1121,7 @@ def health_check():
     
     return jsonify({
         'status': 'healthy',
-        'version': '4.5.5-greeks-fix',
+        'version': '4.5.3-with-live-greeks',
         'polygon_enabled': bool(POLYGON_API_KEY),
         'alerts_enabled': alert_manager is not None,
         'config_manager_enabled': config_manager is not None,
@@ -1233,8 +1177,8 @@ def health_check():
 
 if __name__ == '__main__':
     print("\n" + "=" * 60)
-    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.5.5")
-    print("   (WITH ENV VAR FIX + LIVE GREEKS - NO SPAM)")
+    print("🚀 STARTING PROFESSIONAL TRADING DASHBOARD v4.5.3")
+    print("   (WITH LIVE GREEKS MONITOR)")
     print("=" * 60)
     print(f"\n📊 Dashboard: http://localhost:5001")
     print(f"⚙️  Alert Console: http://localhost:5001/alert-console")
@@ -1380,7 +1324,7 @@ if __name__ == '__main__':
         live_greeks_thread.start()
         print(f"   ✅ Live greeks monitor started")
         print(f"   🕐 Updates every 10 seconds")
-        print(f"   📡 Data tracked (Discord alerts disabled)")
+        print(f"   📡 Provides real-time options greeks")
         print(f"   🎯 Monitors: Watchlist stocks for greek changes")
     
     # Start Relative Strength Monitor
@@ -1429,7 +1373,7 @@ if __name__ == '__main__':
     print(f"\n🎯 ACTIVE FEATURES:")
     print(f"   • Real-Time Volume Monitor - Volume spikes & alerts")
     print(f"   • Momentum Signal Monitor - Price momentum tracking")
-    print(f"   • Live Greeks Monitor - Real-time options greeks (no alerts)")
+    print(f"   • Live Greeks Monitor - Real-time options greeks ✨ NEW")
     print(f"   • Wall Strength Tracker - Monitors gamma walls")
     print(f"   • Unusual Activity Detector - Smart money tracking")
     print(f"   • Alert Management Console - Real-time config")
@@ -1437,8 +1381,6 @@ if __name__ == '__main__':
     print(f"   • Macro News Detector - Fed/Tariffs/Economic")
     print(f"   • Spillover Detector - Related ticker opportunities")
     print(f"   • Earnings Monitor - Pre/Post market tracking")
-    print(f"   • 🔧 ENV VAR FIX - Discord webhooks work! ✅")
-    print(f"   • 🔧 GREEKS FIX - No more spam errors! ✅")
     print("=" * 60 + "\n")
     
     # Start Flask server

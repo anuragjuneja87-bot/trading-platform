@@ -38,7 +38,7 @@ class BenzingaClient:
         Returns:
             List of news articles
         """
-        endpoint = f"{self.base_url}/benzinga/v1/news"
+        endpoint = f"{self.base_url}/benzinga/v2/news"
         
         params = {
             'apiKey': self.api_key,

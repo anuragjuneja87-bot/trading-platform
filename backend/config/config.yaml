@@ -561,9 +561,12 @@ unusual_activity_monitor:
     institutional_threshold: 250000
     aggressive_threshold: 100000
 wall_strength_monitor:
-  enabled: false
+  enabled: true
   check_interval: 300
   market_hours_only: false
+  # ADD THIS SECTION:
+  discord_alerts:
+    enabled: false  # ← Disables Discord only
   thresholds:
     min_oi_change_pct: 10
     strong_change_pct: 20
@@ -586,8 +589,7 @@ wall_strength_monitor:
     lookback_checks: 3
     update_frequency: 5
 realtime_volume_spike_monitor:
-  enabled: true  # FIXED
-  enabled: false
+  enabled: true  # ✅ FIXED - removed duplicate 'enabled: false' that was disabling the monitor
   check_interval: 60
   market_hours_only: false
   thresholds:
@@ -608,7 +610,7 @@ realtime_volume_spike_monitor:
 relative_strength_monitor:
   enabled: true
   check_interval: 30  # Every 30 seconds
-  market_hours_only: false
+  market_hours_only: true
   benchmarks:
     - SPY
     - QQQ
