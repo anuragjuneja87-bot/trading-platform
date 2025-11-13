@@ -1,0 +1,176 @@
+{
+  "symbol": "NVDA",
+  "date": "2025-11-12",
+  "baseline": {
+    "timestamp": "2025-11-12T13:20:51.588988",
+    "symbol": "NVDA",
+    "current_price": 192.405,
+    "walls": [
+      {
+        "strike": 200.0,
+        "type": "RESISTANCE",
+        "total_oi": 94077,
+        "call_oi": 70222,
+        "put_oi": 23855,
+        "volume": 0,
+        "gamma_exposure": 94077,
+        "strength": "STRONG",
+        "distance_pct": 3.95
+      },
+      {
+        "strike": 197.5,
+        "type": "RESISTANCE",
+        "total_oi": 42273,
+        "call_oi": 34426,
+        "put_oi": 7847,
+        "volume": 0,
+        "gamma_exposure": 42273,
+        "strength": "MODERATE",
+        "distance_pct": 2.65
+      },
+      {
+        "strike": 195.0,
+        "type": "RESISTANCE",
+        "total_oi": 134231,
+        "call_oi": 107239,
+        "put_oi": 26992,
+        "volume": 0,
+        "gamma_exposure": 134231,
+        "strength": "STRONG",
+        "distance_pct": 1.35
+      },
+      {
+        "strike": 192.5,
+        "type": "RESISTANCE",
+        "total_oi": 39638,
+        "call_oi": 18723,
+        "put_oi": 20915,
+        "volume": 0,
+        "gamma_exposure": 39638,
+        "strength": "MODERATE",
+        "distance_pct": 0.05
+      },
+      {
+        "strike": 190.0,
+        "type": "SUPPORT",
+        "total_oi": 72576,
+        "call_oi": 41776,
+        "put_oi": 30800,
+        "volume": 0,
+        "gamma_exposure": 72576,
+        "strength": "STRONG",
+        "distance_pct": -1.25
+      },
+      {
+        "strike": 187.5,
+        "type": "SUPPORT",
+        "total_oi": 31435,
+        "call_oi": 13521,
+        "put_oi": 17914,
+        "volume": 0,
+        "gamma_exposure": 31435,
+        "strength": "MODERATE",
+        "distance_pct": -2.55
+      },
+      {
+        "strike": 185.0,
+        "type": "SUPPORT",
+        "total_oi": 80588,
+        "call_oi": 32953,
+        "put_oi": 47635,
+        "volume": 0,
+        "gamma_exposure": 80588,
+        "strength": "STRONG",
+        "distance_pct": -3.85
+      }
+    ]
+  },
+  "baseline_saved_at": "2025-11-12T13:20:51.592992",
+  "snapshots": [
+    {
+      "timestamp": "2025-11-12T13:17:29.624875",
+      "symbol": "NVDA",
+      "current_price": 192.235,
+      "walls": [
+        {
+          "strike": 200.0,
+          "type": "RESISTANCE",
+          "total_oi": 94077,
+          "call_oi": 70222,
+          "put_oi": 23855,
+          "volume": 0,
+          "gamma_exposure": 94077,
+          "strength": "STRONG",
+          "distance_pct": 4.04
+        },
+        {
+          "strike": 197.5,
+          "type": "RESISTANCE",
+          "total_oi": 42273,
+          "call_oi": 34426,
+          "put_oi": 7847,
+          "volume": 0,
+          "gamma_exposure": 42273,
+          "strength": "MODERATE",
+          "distance_pct": 2.74
+        },
+        {
+          "strike": 195.0,
+          "type": "RESISTANCE",
+          "total_oi": 134231,
+          "call_oi": 107239,
+          "put_oi": 26992,
+          "volume": 0,
+          "gamma_exposure": 134231,
+          "strength": "STRONG",
+          "distance_pct": 1.44
+        },
+        {
+          "strike": 192.5,
+          "type": "RESISTANCE",
+          "total_oi": 39638,
+          "call_oi": 18723,
+          "put_oi": 20915,
+          "volume": 0,
+          "gamma_exposure": 39638,
+          "strength": "MODERATE",
+          "distance_pct": 0.14
+        },
+        {
+          "strike": 190.0,
+          "type": "SUPPORT",
+          "total_oi": 72576,
+          "call_oi": 41776,
+          "put_oi": 30800,
+          "volume": 0,
+          "gamma_exposure": 72576,
+          "strength": "STRONG",
+          "distance_pct": -1.16
+        },
+        {
+          "strike": 187.5,
+          "type": "SUPPORT",
+          "total_oi": 31435,
+          "call_oi": 13521,
+          "put_oi": 17914,
+          "volume": 0,
+          "gamma_exposure": 31435,
+          "strength": "MODERATE",
+          "distance_pct": -2.46
+        },
+        {
+          "strike": 185.0,
+          "type": "SUPPORT",
+          "total_oi": 80588,
+          "call_oi": 32953,
+          "put_oi": 47635,
+          "volume": 0,
+          "gamma_exposure": 80588,
+          "strength": "STRONG",
+          "distance_pct": -3.76
+        }
+      ]
+    }
+  ],
+  "alerts": []
+}

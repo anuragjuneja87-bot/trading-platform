@@ -1,0 +1,242 @@
+{
+  "symbol": "META",
+  "date": "2025-11-12",
+  "baseline": {
+    "timestamp": "2025-11-12T13:18:01.081993",
+    "symbol": "META",
+    "current_price": 613.27,
+    "walls": [
+      {
+        "strike": 635.0,
+        "type": "RESISTANCE",
+        "total_oi": 4690,
+        "call_oi": 2679,
+        "put_oi": 2011,
+        "volume": 0,
+        "gamma_exposure": 4690,
+        "strength": "WEAK",
+        "distance_pct": 3.54
+      },
+      {
+        "strike": 632.5,
+        "type": "RESISTANCE",
+        "total_oi": 2756,
+        "call_oi": 1462,
+        "put_oi": 1294,
+        "volume": 0,
+        "gamma_exposure": 2756,
+        "strength": "WEAK",
+        "distance_pct": 3.14
+      },
+      {
+        "strike": 630.0,
+        "type": "RESISTANCE",
+        "total_oi": 7126,
+        "call_oi": 4235,
+        "put_oi": 2891,
+        "volume": 0,
+        "gamma_exposure": 7126,
+        "strength": "WEAK",
+        "distance_pct": 2.73
+      },
+      {
+        "strike": 627.5,
+        "type": "RESISTANCE",
+        "total_oi": 3212,
+        "call_oi": 1500,
+        "put_oi": 1712,
+        "volume": 0,
+        "gamma_exposure": 3212,
+        "strength": "WEAK",
+        "distance_pct": 2.32
+      },
+      {
+        "strike": 625.0,
+        "type": "RESISTANCE",
+        "total_oi": 5284,
+        "call_oi": 2412,
+        "put_oi": 2872,
+        "volume": 0,
+        "gamma_exposure": 5284,
+        "strength": "WEAK",
+        "distance_pct": 1.91
+      },
+      {
+        "strike": 612.5,
+        "type": "SUPPORT",
+        "total_oi": 1904,
+        "call_oi": 617,
+        "put_oi": 1287,
+        "volume": 0,
+        "gamma_exposure": 1904,
+        "strength": "WEAK",
+        "distance_pct": -0.13
+      },
+      {
+        "strike": 610.0,
+        "type": "SUPPORT",
+        "total_oi": 4251,
+        "call_oi": 1103,
+        "put_oi": 3148,
+        "volume": 0,
+        "gamma_exposure": 4251,
+        "strength": "WEAK",
+        "distance_pct": -0.53
+      },
+      {
+        "strike": 607.5,
+        "type": "SUPPORT",
+        "total_oi": 1090,
+        "call_oi": 304,
+        "put_oi": 786,
+        "volume": 0,
+        "gamma_exposure": 1090,
+        "strength": "WEAK",
+        "distance_pct": -0.94
+      },
+      {
+        "strike": 605.0,
+        "type": "SUPPORT",
+        "total_oi": 3628,
+        "call_oi": 777,
+        "put_oi": 2851,
+        "volume": 0,
+        "gamma_exposure": 3628,
+        "strength": "WEAK",
+        "distance_pct": -1.35
+      },
+      {
+        "strike": 602.5,
+        "type": "SUPPORT",
+        "total_oi": 1956,
+        "call_oi": 145,
+        "put_oi": 1811,
+        "volume": 0,
+        "gamma_exposure": 1956,
+        "strength": "WEAK",
+        "distance_pct": -1.76
+      }
+    ]
+  },
+  "baseline_saved_at": "2025-11-12T13:18:01.082347",
+  "snapshots": [
+    {
+      "timestamp": "2025-11-12T13:17:20.696037",
+      "symbol": "META",
+      "current_price": 613.27,
+      "walls": [
+        {
+          "strike": 635.0,
+          "type": "RESISTANCE",
+          "total_oi": 4690,
+          "call_oi": 2679,
+          "put_oi": 2011,
+          "volume": 0,
+          "gamma_exposure": 4690,
+          "strength": "WEAK",
+          "distance_pct": 3.54
+        },
+        {
+          "strike": 632.5,
+          "type": "RESISTANCE",
+          "total_oi": 2756,
+          "call_oi": 1462,
+          "put_oi": 1294,
+          "volume": 0,
+          "gamma_exposure": 2756,
+          "strength": "WEAK",
+          "distance_pct": 3.14
+        },
+        {
+          "strike": 630.0,
+          "type": "RESISTANCE",
+          "total_oi": 7126,
+          "call_oi": 4235,
+          "put_oi": 2891,
+          "volume": 0,
+          "gamma_exposure": 7126,
+          "strength": "WEAK",
+          "distance_pct": 2.73
+        },
+        {
+          "strike": 627.5,
+          "type": "RESISTANCE",
+          "total_oi": 3212,
+          "call_oi": 1500,
+          "put_oi": 1712,
+          "volume": 0,
+          "gamma_exposure": 3212,
+          "strength": "WEAK",
+          "distance_pct": 2.32
+        },
+        {
+          "strike": 625.0,
+          "type": "RESISTANCE",
+          "total_oi": 5284,
+          "call_oi": 2412,
+          "put_oi": 2872,
+          "volume": 0,
+          "gamma_exposure": 5284,
+          "strength": "WEAK",
+          "distance_pct": 1.91
+        },
+        {
+          "strike": 612.5,
+          "type": "SUPPORT",
+          "total_oi": 1904,
+          "call_oi": 617,
+          "put_oi": 1287,
+          "volume": 0,
+          "gamma_exposure": 1904,
+          "strength": "WEAK",
+          "distance_pct": -0.13
+        },
+        {
+          "strike": 610.0,
+          "type": "SUPPORT",
+          "total_oi": 4251,
+          "call_oi": 1103,
+          "put_oi": 3148,
+          "volume": 0,
+          "gamma_exposure": 4251,
+          "strength": "WEAK",
+          "distance_pct": -0.53
+        },
+        {
+          "strike": 607.5,
+          "type": "SUPPORT",
+          "total_oi": 1090,
+          "call_oi": 304,
+          "put_oi": 786,
+          "volume": 0,
+          "gamma_exposure": 1090,
+          "strength": "WEAK",
+          "distance_pct": -0.94
+        },
+        {
+          "strike": 605.0,
+          "type": "SUPPORT",
+          "total_oi": 3628,
+          "call_oi": 777,
+          "put_oi": 2851,
+          "volume": 0,
+          "gamma_exposure": 3628,
+          "strength": "WEAK",
+          "distance_pct": -1.35
+        },
+        {
+          "strike": 602.5,
+          "type": "SUPPORT",
+          "total_oi": 1956,
+          "call_oi": 145,
+          "put_oi": 1811,
+          "volume": 0,
+          "gamma_exposure": 1956,
+          "strength": "WEAK",
+          "distance_pct": -1.76
+        }
+      ]
+    }
+  ],
+  "alerts": []
+}

@@ -1,0 +1,242 @@
+{
+  "symbol": "AMD",
+  "date": "2025-11-12",
+  "baseline": {
+    "timestamp": "2025-11-12T13:23:32.849241",
+    "symbol": "AMD",
+    "current_price": 255.01,
+    "walls": [
+      {
+        "strike": 267.5,
+        "type": "RESISTANCE",
+        "total_oi": 2542,
+        "call_oi": 2414,
+        "put_oi": 128,
+        "volume": 0,
+        "gamma_exposure": 2542,
+        "strength": "WEAK",
+        "distance_pct": 4.9
+      },
+      {
+        "strike": 265.0,
+        "type": "RESISTANCE",
+        "total_oi": 9680,
+        "call_oi": 9026,
+        "put_oi": 654,
+        "volume": 0,
+        "gamma_exposure": 9680,
+        "strength": "WEAK",
+        "distance_pct": 3.92
+      },
+      {
+        "strike": 262.5,
+        "type": "RESISTANCE",
+        "total_oi": 3385,
+        "call_oi": 3064,
+        "put_oi": 321,
+        "volume": 0,
+        "gamma_exposure": 3385,
+        "strength": "WEAK",
+        "distance_pct": 2.94
+      },
+      {
+        "strike": 260.0,
+        "type": "RESISTANCE",
+        "total_oi": 33346,
+        "call_oi": 32163,
+        "put_oi": 1183,
+        "volume": 0,
+        "gamma_exposure": 33346,
+        "strength": "MODERATE",
+        "distance_pct": 1.96
+      },
+      {
+        "strike": 257.5,
+        "type": "RESISTANCE",
+        "total_oi": 6868,
+        "call_oi": 6105,
+        "put_oi": 763,
+        "volume": 0,
+        "gamma_exposure": 6868,
+        "strength": "WEAK",
+        "distance_pct": 0.98
+      },
+      {
+        "strike": 255.0,
+        "type": "SUPPORT",
+        "total_oi": 13645,
+        "call_oi": 12293,
+        "put_oi": 1352,
+        "volume": 0,
+        "gamma_exposure": 13645,
+        "strength": "WEAK",
+        "distance_pct": -0.0
+      },
+      {
+        "strike": 252.5,
+        "type": "SUPPORT",
+        "total_oi": 15485,
+        "call_oi": 14795,
+        "put_oi": 690,
+        "volume": 0,
+        "gamma_exposure": 15485,
+        "strength": "WEAK",
+        "distance_pct": -0.98
+      },
+      {
+        "strike": 250.0,
+        "type": "SUPPORT",
+        "total_oi": 26388,
+        "call_oi": 23236,
+        "put_oi": 3152,
+        "volume": 0,
+        "gamma_exposure": 26388,
+        "strength": "MODERATE",
+        "distance_pct": -1.96
+      },
+      {
+        "strike": 247.5,
+        "type": "SUPPORT",
+        "total_oi": 5177,
+        "call_oi": 3944,
+        "put_oi": 1233,
+        "volume": 0,
+        "gamma_exposure": 5177,
+        "strength": "WEAK",
+        "distance_pct": -2.94
+      },
+      {
+        "strike": 245.0,
+        "type": "SUPPORT",
+        "total_oi": 11760,
+        "call_oi": 9122,
+        "put_oi": 2638,
+        "volume": 0,
+        "gamma_exposure": 11760,
+        "strength": "WEAK",
+        "distance_pct": -3.93
+      }
+    ]
+  },
+  "baseline_saved_at": "2025-11-12T13:23:32.850846",
+  "snapshots": [
+    {
+      "timestamp": "2025-11-12T13:17:37.371618",
+      "symbol": "AMD",
+      "current_price": 255.1293,
+      "walls": [
+        {
+          "strike": 267.5,
+          "type": "RESISTANCE",
+          "total_oi": 2542,
+          "call_oi": 2414,
+          "put_oi": 128,
+          "volume": 0,
+          "gamma_exposure": 2542,
+          "strength": "WEAK",
+          "distance_pct": 4.85
+        },
+        {
+          "strike": 265.0,
+          "type": "RESISTANCE",
+          "total_oi": 9680,
+          "call_oi": 9026,
+          "put_oi": 654,
+          "volume": 0,
+          "gamma_exposure": 9680,
+          "strength": "WEAK",
+          "distance_pct": 3.87
+        },
+        {
+          "strike": 262.5,
+          "type": "RESISTANCE",
+          "total_oi": 3385,
+          "call_oi": 3064,
+          "put_oi": 321,
+          "volume": 0,
+          "gamma_exposure": 3385,
+          "strength": "WEAK",
+          "distance_pct": 2.89
+        },
+        {
+          "strike": 260.0,
+          "type": "RESISTANCE",
+          "total_oi": 33346,
+          "call_oi": 32163,
+          "put_oi": 1183,
+          "volume": 0,
+          "gamma_exposure": 33346,
+          "strength": "MODERATE",
+          "distance_pct": 1.91
+        },
+        {
+          "strike": 257.5,
+          "type": "RESISTANCE",
+          "total_oi": 6868,
+          "call_oi": 6105,
+          "put_oi": 763,
+          "volume": 0,
+          "gamma_exposure": 6868,
+          "strength": "WEAK",
+          "distance_pct": 0.93
+        },
+        {
+          "strike": 255.0,
+          "type": "SUPPORT",
+          "total_oi": 13645,
+          "call_oi": 12293,
+          "put_oi": 1352,
+          "volume": 0,
+          "gamma_exposure": 13645,
+          "strength": "WEAK",
+          "distance_pct": -0.05
+        },
+        {
+          "strike": 252.5,
+          "type": "SUPPORT",
+          "total_oi": 15485,
+          "call_oi": 14795,
+          "put_oi": 690,
+          "volume": 0,
+          "gamma_exposure": 15485,
+          "strength": "WEAK",
+          "distance_pct": -1.03
+        },
+        {
+          "strike": 250.0,
+          "type": "SUPPORT",
+          "total_oi": 26388,
+          "call_oi": 23236,
+          "put_oi": 3152,
+          "volume": 0,
+          "gamma_exposure": 26388,
+          "strength": "MODERATE",
+          "distance_pct": -2.01
+        },
+        {
+          "strike": 247.5,
+          "type": "SUPPORT",
+          "total_oi": 5177,
+          "call_oi": 3944,
+          "put_oi": 1233,
+          "volume": 0,
+          "gamma_exposure": 5177,
+          "strength": "WEAK",
+          "distance_pct": -2.99
+        },
+        {
+          "strike": 245.0,
+          "type": "SUPPORT",
+          "total_oi": 11760,
+          "call_oi": 9122,
+          "put_oi": 2638,
+          "volume": 0,
+          "gamma_exposure": 11760,
+          "strength": "WEAK",
+          "distance_pct": -3.97
+        }
+      ]
+    }
+  ],
+  "alerts": []
+}

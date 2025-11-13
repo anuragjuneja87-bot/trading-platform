@@ -1049,6 +1049,61 @@ class EnhancedProfessionalAnalyzer:
             'note': 'Using Tradier gamma walls for options analysis'
         }
     
+    def _transform_wall_strength_for_dashboard(self, wall_strength_raw: Dict) -> Dict:
+        """
+        Transform wall strength output to dashboard-compatible format
+        Converts: 'changes' + 'pattern' -> 'tracked_walls' + 'status'
+        Preserves all production data
+        """
+        if not wall_strength_raw or not wall_strength_raw.get('available'):
+            return wall_strength_raw
+        
+        # Transform 'changes' to 'tracked_walls'
+        tracked_walls = []
+        changes = wall_strength_raw.get('changes', [])
+        
+        for change in changes:
+            # Map pattern to status
+            pattern = change.get('pattern', 'STABLE')
+            
+            # Determine status based on pattern and change percentage
+            change_pct = change.get('change_pct', 0)
+            if pattern == 'BUILDING':
+                if abs(change_pct) >= 35:
+                    status = 'STRONG'
+                else:
+                    status = 'BUILDING'
+            elif pattern == 'WEAKENING':
+                if abs(change_pct) >= 25:
+                    status = 'BREAKING'
+                else:
+                    status = 'WEAKENING'
+            else:
+                status = 'STABLE'
+            
+            # Skip STABLE walls to reduce noise
+            if status == 'STABLE':
+                continue
+            
+            tracked_walls.append({
+                'strike': change['strike'],
+                'type': change['type'],
+                'status': status,
+                'oi_change_pct': change['change_pct'],
+                'baseline_oi': change['baseline_oi'],
+                'current_oi': change['current_oi'],
+                'distance_pct': change.get('distance_pct', 0)
+            })
+        
+        # Return dashboard-compatible format
+        return {
+            'available': True,
+            'baseline_time': wall_strength_raw.get('baseline_time'),
+            'tracked_walls': tracked_walls,
+            'walls_tracked': wall_strength_raw.get('walls_tracked', 0),
+            'snapshot_count': wall_strength_raw.get('snapshot_count', 0)
+        }
+    
     def analyze_open_interest(self, symbol: str, current_price: float) -> Dict:
         """
         Use ThetaData for gamma walls analysis
@@ -1514,9 +1569,31 @@ class EnhancedProfessionalAnalyzer:
             pin_analysis = {}
             if self.pin_calculator and open_interest.get('expires_today'):
                 try:
-                    # Get options data for pin probability
-                    options_data = []  # You may need to populate this from your options flow
-                    gamma_data = {'net_gex': {'total': 0}}  # From your GEX calculator if available
+                    # Get options data from gamma analysis (already fetched)
+                    gamma_levels = open_interest.get('gamma_levels', [])
+                    
+                    # Convert gamma_levels to options format for pin calculator
+                    options_data = []
+                    for level in gamma_levels:
+                        # Add call option
+                        if level.get('call_oi', 0) > 0:
+                            options_data.append({
+                                'strike': level['strike'],
+                                'open_interest': level['call_oi'],
+                                'option_type': 'call'
+                            })
+                        # Add put option
+                        if level.get('put_oi', 0) > 0:
+                            options_data.append({
+                                'strike': level['strike'],
+                                'open_interest': level['put_oi'],
+                                'option_type': 'put'
+                            })
+                    
+                    # Calculate total gamma from gamma_levels
+                    total_gamma = sum(level.get('gamma_exposure', 0) for level in gamma_levels)
+                    gamma_data = {'net_gex': {'total': total_gamma}}
+                    
                     expiration_date = open_interest.get('expiration', '')
                     
                     pin_analysis = self.pin_calculator.analyze_pin_probability(
@@ -1569,14 +1646,19 @@ class EnhancedProfessionalAnalyzer:
             wall_strength = {}
             if open_interest.get('available'):
                 try:
-                    wall_strength = self.wall_tracker.track_wall_strength(
+                    wall_strength_raw = self.wall_tracker.track_wall_strength(
                         symbol, current_price, open_interest
                     )
                     
-                    if self.debug_mode and wall_strength.get('tracking_active'):
-                        self.logger.debug(f"Wall Strength Tracking: {len(wall_strength.get('tracked_walls', []))} walls monitored")
-                        for wall_alert in wall_strength.get('alerts', []):
-                            self.logger.debug(f"  ALERT: {wall_alert['alert_type']} at ${wall_alert['strike']}")
+                    # Transform to dashboard format
+                    wall_strength = self._transform_wall_strength_for_dashboard(wall_strength_raw)
+                    
+                    if self.debug_mode and wall_strength.get('available'):
+                        tracked = wall_strength.get('tracked_walls', [])
+                        self.logger.debug(f"Wall Strength Tracking: {len(tracked)} walls monitored")
+                        for wall in tracked:
+                            if wall.get('status') != 'STABLE':
+                                self.logger.debug(f"  {wall['status']}: ${wall['strike']} {wall['type']} ({wall['oi_change_pct']:+.1f}%)")
                             
                 except Exception as e:
                     self.logger.error(f"Wall strength tracking failed: {str(e)}")

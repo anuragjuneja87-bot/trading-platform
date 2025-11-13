@@ -561,7 +561,7 @@ unusual_activity_monitor:
     institutional_threshold: 250000
     aggressive_threshold: 100000
 wall_strength_monitor:
-  enabled: true
+  enabled: false
   check_interval: 300
   market_hours_only: false
   # ADD THIS SECTION:
@@ -609,7 +609,7 @@ realtime_volume_spike_monitor:
 # ==================== RELATIVE STRENGTH MONITOR ====================
 relative_strength_monitor:
   enabled: true
-  check_interval: 30  # Every 30 seconds
+  check_interval: 60  # Every 60 seconds (was 30s)
   market_hours_only: true
   benchmarks:
     - SPY
@@ -624,11 +624,11 @@ relative_strength_monitor:
   filters:
     watchlist_only: true
     min_price: 5.0
-    max_alerts_per_symbol_per_day: 20  # ⬆️ Was 15 - NOW 20 (more alerts)
+    max_alerts_per_symbol_per_day: 2  # With 4-hour cooldown, max 2 per day
     exclude_benchmarks: true
   cooldown_minutes:
-    premarket: 3      # ⬇️ Was 5 - NOW 3 min (faster re-alerts)
-    market_hours: 2   # ⬇️ Was 3 - NOW 2 min
+    premarket: 240    # 4 hours - alert once per pre-market session
+    market_hours: 240 # 4 hours - alert once per trading session (stops spam)
   schedule:
     premarket_start: "07:00"
     premarket_end: "09:25"

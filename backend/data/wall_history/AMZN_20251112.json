@@ -1,0 +1,176 @@
+{
+  "symbol": "AMZN",
+  "date": "2025-11-12",
+  "baseline": {
+    "timestamp": "2025-11-12T13:23:01.905277",
+    "symbol": "AMZN",
+    "current_price": 245.32,
+    "walls": [
+      {
+        "strike": 252.5,
+        "type": "RESISTANCE",
+        "total_oi": 8683,
+        "call_oi": 7189,
+        "put_oi": 1494,
+        "volume": 0,
+        "gamma_exposure": 8683,
+        "strength": "WEAK",
+        "distance_pct": 2.93
+      },
+      {
+        "strike": 250.0,
+        "type": "RESISTANCE",
+        "total_oi": 23086,
+        "call_oi": 19245,
+        "put_oi": 3841,
+        "volume": 0,
+        "gamma_exposure": 23086,
+        "strength": "MODERATE",
+        "distance_pct": 1.91
+      },
+      {
+        "strike": 247.5,
+        "type": "RESISTANCE",
+        "total_oi": 16648,
+        "call_oi": 12334,
+        "put_oi": 4314,
+        "volume": 0,
+        "gamma_exposure": 16648,
+        "strength": "WEAK",
+        "distance_pct": 0.89
+      },
+      {
+        "strike": 245.0,
+        "type": "SUPPORT",
+        "total_oi": 13214,
+        "call_oi": 6625,
+        "put_oi": 6589,
+        "volume": 0,
+        "gamma_exposure": 13214,
+        "strength": "WEAK",
+        "distance_pct": -0.13
+      },
+      {
+        "strike": 242.5,
+        "type": "SUPPORT",
+        "total_oi": 5653,
+        "call_oi": 2595,
+        "put_oi": 3058,
+        "volume": 0,
+        "gamma_exposure": 5653,
+        "strength": "WEAK",
+        "distance_pct": -1.15
+      },
+      {
+        "strike": 240.0,
+        "type": "SUPPORT",
+        "total_oi": 12274,
+        "call_oi": 4511,
+        "put_oi": 7763,
+        "volume": 0,
+        "gamma_exposure": 12274,
+        "strength": "WEAK",
+        "distance_pct": -2.17
+      },
+      {
+        "strike": 237.5,
+        "type": "SUPPORT",
+        "total_oi": 1643,
+        "call_oi": 1643,
+        "put_oi": 0,
+        "volume": 0,
+        "gamma_exposure": 1643,
+        "strength": "WEAK",
+        "distance_pct": -3.19
+      }
+    ]
+  },
+  "baseline_saved_at": "2025-11-12T13:23:01.917549",
+  "snapshots": [
+    {
+      "timestamp": "2025-11-12T13:17:34.241231",
+      "symbol": "AMZN",
+      "current_price": 245.27,
+      "walls": [
+        {
+          "strike": 252.5,
+          "type": "RESISTANCE",
+          "total_oi": 8683,
+          "call_oi": 7189,
+          "put_oi": 1494,
+          "volume": 0,
+          "gamma_exposure": 8683,
+          "strength": "WEAK",
+          "distance_pct": 2.95
+        },
+        {
+          "strike": 250.0,
+          "type": "RESISTANCE",
+          "total_oi": 23086,
+          "call_oi": 19245,
+          "put_oi": 3841,
+          "volume": 0,
+          "gamma_exposure": 23086,
+          "strength": "MODERATE",
+          "distance_pct": 1.93
+        },
+        {
+          "strike": 247.5,
+          "type": "RESISTANCE",
+          "total_oi": 16648,
+          "call_oi": 12334,
+          "put_oi": 4314,
+          "volume": 0,
+          "gamma_exposure": 16648,
+          "strength": "WEAK",
+          "distance_pct": 0.91
+        },
+        {
+          "strike": 245.0,
+          "type": "SUPPORT",
+          "total_oi": 13214,
+          "call_oi": 6625,
+          "put_oi": 6589,
+          "volume": 0,
+          "gamma_exposure": 13214,
+          "strength": "WEAK",
+          "distance_pct": -0.11
+        },
+        {
+          "strike": 242.5,
+          "type": "SUPPORT",
+          "total_oi": 5653,
+          "call_oi": 2595,
+          "put_oi": 3058,
+          "volume": 0,
+          "gamma_exposure": 5653,
+          "strength": "WEAK",
+          "distance_pct": -1.13
+        },
+        {
+          "strike": 240.0,
+          "type": "SUPPORT",
+          "total_oi": 12274,
+          "call_oi": 4511,
+          "put_oi": 7763,
+          "volume": 0,
+          "gamma_exposure": 12274,
+          "strength": "WEAK",
+          "distance_pct": -2.15
+        },
+        {
+          "strike": 237.5,
+          "type": "SUPPORT",
+          "total_oi": 1643,
+          "call_oi": 1643,
+          "put_oi": 0,
+          "volume": 0,
+          "gamma_exposure": 1643,
+          "strength": "WEAK",
+          "distance_pct": -3.17
+        }
+      ]
+    }
+  ],
+  "alerts": []
+}

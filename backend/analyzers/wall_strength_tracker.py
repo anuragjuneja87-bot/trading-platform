@@ -43,10 +43,94 @@ class WallStrengthTracker:
             'breaking': 25    # -25% → 🚨 (was 40% - TOO HIGH)
         }
         
+        # Load persisted baselines from today
+        self._load_all_baselines()
+        
         self.logger.info("✅ Wall Strength Tracker initialized (DAY TRADER MODE)")
         self.logger.info(f"   📁 Storage: {self.storage_path}")
         self.logger.info(f"   🔥 Building thresholds: {self.building_thresholds['moderate']}% / {self.building_thresholds['strong']}% / {self.building_thresholds['very_strong']}%")
         self.logger.info(f"   ⚠️ Weakening thresholds: {self.weakening_thresholds['slight']}% / {self.weakening_thresholds['moderate']}% / {self.weakening_thresholds['breaking']}%")
+        if self.baseline:
+            self.logger.info(f"   💾 Loaded {len(self.baseline)} persisted baselines from disk")
+    
+    def _load_all_baselines(self):
+        """Load all baselines from today's files on initialization"""
+        try:
+            today_str = datetime.now().strftime('%Y%m%d')
+            
+            # Find all files from today
+            today_files = list(self.storage_path.glob(f"*_{today_str}.json"))
+            
+            for file_path in today_files:
+                try:
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    
+                    symbol = data.get('symbol')
+                    baseline = data.get('baseline')
+                    
+                    if symbol and baseline:
+                        self.baseline[symbol] = baseline
+                        self.logger.debug(f"💾 Loaded baseline for {symbol} from {file_path.name}")
+                        
+                except Exception as e:
+                    self.logger.error(f"Error loading baseline from {file_path}: {str(e)}")
+                    
+        except Exception as e:
+            self.logger.error(f"Error loading baselines: {str(e)}")
+    
+    def _save_baseline(self, symbol: str):
+        """Save baseline to disk immediately after setting"""
+        try:
+            file_path = self.storage_path / f"{symbol}_{datetime.now().strftime('%Y%m%d')}.json"
+            
+            # Load existing data if file exists
+            existing_data = {}
+            if file_path.exists():
+                with open(file_path, 'r') as f:
+                    existing_data = json.load(f)
+            
+            # Update baseline only (preserve snapshots/alerts)
+            existing_data.update({
+                'symbol': symbol,
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'baseline': self.baseline.get(symbol),
+                'baseline_saved_at': datetime.now().isoformat()
+            })
+            
+            # Preserve existing snapshots and alerts
+            if 'snapshots' not in existing_data:
+                existing_data['snapshots'] = self.snapshots.get(symbol, [])
+            if 'alerts' not in existing_data:
+                existing_data['alerts'] = self.alerts_generated.get(symbol, [])
+            
+            with open(file_path, 'w') as f:
+                json.dump(existing_data, f, indent=2)
+            
+            self.logger.debug(f"💾 Saved baseline for {symbol}")
+            
+        except Exception as e:
+            self.logger.error(f"Error saving baseline for {symbol}: {str(e)}")
+    
+    def _is_baseline_stale(self, symbol: str) -> bool:
+        """Check if baseline is from a previous day and should be reset"""
+        if symbol not in self.baseline:
+            return True
+        
+        try:
+            baseline_time = datetime.fromisoformat(self.baseline[symbol]['timestamp'])
+            now = datetime.now()
+            
+            # If baseline is from previous day, it's stale
+            if baseline_time.date() < now.date():
+                self.logger.info(f"🔄 Baseline for {symbol} is stale (from {baseline_time.date()}), will reset")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error checking baseline staleness for {symbol}: {str(e)}")
+            return True
     
     def capture_snapshot(self, symbol: str, current_price: float, gamma_data: Dict) -> Dict:
         """Capture current gamma wall snapshot"""
@@ -86,10 +170,12 @@ class WallStrengthTracker:
             # Store snapshot
             self.snapshots[symbol].append(snapshot)
             
-            # Set baseline if first snapshot of the day
-            if symbol not in self.baseline:
+            # Set baseline if first snapshot of the day OR if baseline is from previous day
+            if symbol not in self.baseline or self._is_baseline_stale(symbol):
                 self.baseline[symbol] = snapshot
                 self.logger.info(f"📊 Baseline set for {symbol}: {len(walls)} walls")
+                # Persist baseline to disk immediately
+                self._save_baseline(symbol)
             
             return snapshot
             
