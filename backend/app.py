@@ -406,7 +406,7 @@ except Exception as e:
 
 # Initialize all monitors with OPTIMIZED REAL-TIME INTERVALS
 openai_monitor = None
-if OPENAI_MONITOR_AVAILABLE and unified_news_engine and alert_manager:
+if OPENAI_MONITOR_AVAILABLE and unified_news_engine and alert_manager and config_yaml.get('openai_monitor', {}).get('enabled', False):
     try:
         from monitors.openai_news_monitor import OpenAINewsMonitor
         openai_monitor = OpenAINewsMonitor(
@@ -420,7 +420,7 @@ if OPENAI_MONITOR_AVAILABLE and unified_news_engine and alert_manager:
 
 # Market Impact Monitor - Watchlist news to DISCORD_NEWS_ONLY
 market_impact_monitor = None
-if MARKET_IMPACT_AVAILABLE:
+if MARKET_IMPACT_AVAILABLE and config_yaml.get('market_impact_monitor', {}).get('enabled', False):
     try:
         market_impact_monitor = MarketImpactMonitor(
             polygon_api_key=POLYGON_API_KEY,
@@ -482,7 +482,7 @@ except Exception as e:
     logger.error(f"❌ Spillover Detector failed: {str(e)}")
 
 extended_hours_monitor = None
-if EXTENDED_HOURS_MONITOR_AVAILABLE:
+if EXTENDED_HOURS_MONITOR_AVAILABLE and config_yaml.get('extended_hours_volume_monitor', {}).get('enabled', False):
     try:
         extended_hours_monitor = ExtendedHoursVolumeMonitor(
             polygon_api_key=POLYGON_API_KEY,
@@ -495,7 +495,7 @@ if EXTENDED_HOURS_MONITOR_AVAILABLE:
         logger.error(f"❌ Extended Hours Volume Monitor failed: {str(e)}")
 
 realtime_monitor = None
-if REALTIME_MONITOR_AVAILABLE:
+if REALTIME_MONITOR_AVAILABLE and config_yaml.get('realtime_volume_spike_monitor', {}).get('enabled', False):
     try:
         realtime_monitor = RealtimeVolumeSpikeMonitor(
             polygon_api_key=POLYGON_API_KEY,
@@ -508,7 +508,7 @@ if REALTIME_MONITOR_AVAILABLE:
         logger.error(f"❌ Real-Time Volume Spike Monitor failed: {str(e)}")
 
 momentum_monitor = None
-if MOMENTUM_MONITOR_AVAILABLE:
+if MOMENTUM_MONITOR_AVAILABLE and config_yaml.get('momentum_signal_monitor', {}).get('enabled', False):
     try:
         momentum_monitor = MomentumSignalMonitor(
             polygon_api_key=POLYGON_API_KEY,
@@ -521,7 +521,7 @@ if MOMENTUM_MONITOR_AVAILABLE:
         logger.error(f"❌ Momentum Signal Monitor failed: {str(e)}")
 
 odte_monitor = None
-if ODTE_MONITOR_AVAILABLE:
+if ODTE_MONITOR_AVAILABLE and config_yaml.get('odte_gamma_monitor', {}).get('enabled', False):
     try:
         odte_monitor = ODTEGammaMonitor(
             polygon_api_key=POLYGON_API_KEY,
@@ -536,7 +536,7 @@ if ODTE_MONITOR_AVAILABLE:
         logger.error(f"❌ 0DTE Gamma Monitor failed: {str(e)}")
 
 wall_strength_monitor = None
-if WALL_STRENGTH_AVAILABLE:
+if WALL_STRENGTH_AVAILABLE and config_yaml.get('wall_strength_monitor', {}).get('enabled', False):
     try:
         if hasattr(analyzer, 'wall_tracker'):
             wall_strength_monitor = WallStrengthMonitor(
@@ -554,7 +554,7 @@ if WALL_STRENGTH_AVAILABLE:
         logger.error(f"❌ Wall Strength Monitor failed: {str(e)}")
 
 unusual_activity_monitor = None
-if UNUSUAL_ACTIVITY_AVAILABLE:
+if UNUSUAL_ACTIVITY_AVAILABLE and config_yaml.get('unusual_activity_monitor', {}).get('enabled', False):
     try:
         if hasattr(analyzer, 'unusual_activity_detector'):
             unusual_activity_monitor = UnusualActivityMonitor(
@@ -584,7 +584,7 @@ if OR_MONITOR_AVAILABLE:
 
 # Initialize Relative Strength Monitor
 rs_monitor = None
-if RS_MONITOR_AVAILABLE:
+if RS_MONITOR_AVAILABLE and config_yaml.get('relative_strength_monitor', {}).get('enabled', False):
     try:
         rs_monitor = RelativeStrengthMonitor(analyzer, config_yaml)
         logger.info("✅ Relative Strength Monitor initialized")
@@ -594,7 +594,7 @@ if RS_MONITOR_AVAILABLE:
 
 # Initialize Opening Range Monitor
 or_monitor = None
-if OR_MONITOR_AVAILABLE and or_analyzer:
+if OR_MONITOR_AVAILABLE and or_analyzer and config_yaml.get('opening_range_monitor', {}).get('enabled', False):
     try:
         or_monitor = OpeningRangeMonitor(analyzer, or_analyzer, config_yaml)
         logger.info("✅ Opening Range Monitor initialized")

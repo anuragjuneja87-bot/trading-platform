@@ -68,7 +68,7 @@ discord:
       momentum_shift: 16776960
       monitor: 8947848
 realtime_volume_spike:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   market_hours:
     thresholds:
       elevated: 1.0
@@ -107,7 +107,7 @@ realtime_volume_spike:
     vwap_filter:
       enabled: false
 news_monitoring:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   max_alerts_per_symbol_per_day: 10
   check_interval_seconds: 180
   min_impact_level: MEDIUM
@@ -128,7 +128,7 @@ news_monitoring:
   - lawsuit
   - halted
 market_impact_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 180
   lookback_hours: 2
   max_alerts_per_hour: 20
@@ -249,14 +249,14 @@ market_impact_monitor:
     - PINS
     - RBLX
 earnings_monitoring:
-  enabled: true
-  weekly_enabled: true
+  enabled: false  # DISABLED - Options-only mode
+  weekly_enabled: false
   weekly_day: 0
   weekly_time: 07:00
-  realtime_enabled: true
+  realtime_enabled: false
   realtime_check_interval: 300
 openai_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 60
   lookback_hours: 2
   max_alerts_per_hour: 10
@@ -284,7 +284,7 @@ openai_monitor:
   - AMZN
   - ORCL
 extended_hours_volume_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 120
   market_hours_only: false
   premarket:
@@ -310,7 +310,7 @@ extended_hours_volume_monitor:
     min_price: 5.0
   cooldown_minutes: 5
 momentum_signal_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 120
   market_hours_only: false
   thresholds:
@@ -342,7 +342,7 @@ momentum_signal_monitor:
     calculate_targets: true
     include_interpretation: true
 earnings_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   premarket_window:
     start_time: 05:00
     end_time: 08:00
@@ -378,7 +378,7 @@ odte_gamma_monitor:
   watchlist_only: true
   require_odte: true
 volume_analysis:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode (no RVOL needed)
   rvol_high_threshold: 2.0
   rvol_extreme_threshold: 3.0
   rvol_lookback_days: 20
@@ -589,7 +589,7 @@ wall_strength_monitor:
     lookback_checks: 3
     update_frequency: 5
 realtime_volume_spike_monitor:
-  enabled: true  # ✅ FIXED - removed duplicate 'enabled: false' that was disabling the monitor
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 60
   market_hours_only: false
   thresholds:
@@ -608,7 +608,7 @@ realtime_volume_spike_monitor:
     extreme_spike: 1
 # ==================== RELATIVE STRENGTH MONITOR ====================
 relative_strength_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 60  # Every 60 seconds (was 30s)
   market_hours_only: true
   benchmarks:
@@ -636,7 +636,7 @@ relative_strength_monitor:
 
 # ==================== OPENING RANGE MONITOR ====================
 opening_range_monitor:
-  enabled: true
+  enabled: false  # DISABLED - Options-only mode
   check_interval: 10  # ⬇️ Was 15s - NOW 10s (faster detection)
   market_hours_only: true
   thresholds:

@@ -1,0 +1,176 @@
+{
+  "symbol": "AAPL",
+  "date": "2025-11-13",
+  "baseline": {
+    "timestamp": "2025-11-13T07:01:41.593006",
+    "symbol": "AAPL",
+    "current_price": 273.51,
+    "walls": [
+      {
+        "strike": 280.0,
+        "type": "RESISTANCE",
+        "total_oi": 28749,
+        "call_oi": 27290,
+        "put_oi": 1459,
+        "volume": 0,
+        "gamma_exposure": 28749,
+        "strength": "MODERATE",
+        "distance_pct": 2.37
+      },
+      {
+        "strike": 277.5,
+        "type": "RESISTANCE",
+        "total_oi": 41675,
+        "call_oi": 39381,
+        "put_oi": 2294,
+        "volume": 0,
+        "gamma_exposure": 41675,
+        "strength": "MODERATE",
+        "distance_pct": 1.46
+      },
+      {
+        "strike": 275.0,
+        "type": "RESISTANCE",
+        "total_oi": 30562,
+        "call_oi": 26603,
+        "put_oi": 3959,
+        "volume": 0,
+        "gamma_exposure": 30562,
+        "strength": "MODERATE",
+        "distance_pct": 0.54
+      },
+      {
+        "strike": 272.5,
+        "type": "SUPPORT",
+        "total_oi": 17889,
+        "call_oi": 9008,
+        "put_oi": 8881,
+        "volume": 0,
+        "gamma_exposure": 17889,
+        "strength": "WEAK",
+        "distance_pct": -0.37
+      },
+      {
+        "strike": 270.0,
+        "type": "SUPPORT",
+        "total_oi": 24686,
+        "call_oi": 12391,
+        "put_oi": 12295,
+        "volume": 0,
+        "gamma_exposure": 24686,
+        "strength": "MODERATE",
+        "distance_pct": -1.28
+      },
+      {
+        "strike": 267.5,
+        "type": "SUPPORT",
+        "total_oi": 12121,
+        "call_oi": 3973,
+        "put_oi": 8148,
+        "volume": 0,
+        "gamma_exposure": 12121,
+        "strength": "WEAK",
+        "distance_pct": -2.2
+      },
+      {
+        "strike": 265.0,
+        "type": "SUPPORT",
+        "total_oi": 11908,
+        "call_oi": 3599,
+        "put_oi": 8309,
+        "volume": 0,
+        "gamma_exposure": 11908,
+        "strength": "WEAK",
+        "distance_pct": -3.11
+      }
+    ]
+  },
+  "baseline_saved_at": "2025-11-13T07:01:41.593325",
+  "snapshots": [
+    {
+      "timestamp": "2025-11-13T07:00:28.712255",
+      "symbol": "AAPL",
+      "current_price": 273.12,
+      "walls": [
+        {
+          "strike": 280.0,
+          "type": "RESISTANCE",
+          "total_oi": 28749,
+          "call_oi": 27290,
+          "put_oi": 1459,
+          "volume": 0,
+          "gamma_exposure": 28749,
+          "strength": "MODERATE",
+          "distance_pct": 2.52
+        },
+        {
+          "strike": 277.5,
+          "type": "RESISTANCE",
+          "total_oi": 41675,
+          "call_oi": 39381,
+          "put_oi": 2294,
+          "volume": 0,
+          "gamma_exposure": 41675,
+          "strength": "MODERATE",
+          "distance_pct": 1.6
+        },
+        {
+          "strike": 275.0,
+          "type": "RESISTANCE",
+          "total_oi": 30562,
+          "call_oi": 26603,
+          "put_oi": 3959,
+          "volume": 0,
+          "gamma_exposure": 30562,
+          "strength": "MODERATE",
+          "distance_pct": 0.69
+        },
+        {
+          "strike": 272.5,
+          "type": "SUPPORT",
+          "total_oi": 17889,
+          "call_oi": 9008,
+          "put_oi": 8881,
+          "volume": 0,
+          "gamma_exposure": 17889,
+          "strength": "WEAK",
+          "distance_pct": -0.23
+        },
+        {
+          "strike": 270.0,
+          "type": "SUPPORT",
+          "total_oi": 24686,
+          "call_oi": 12391,
+          "put_oi": 12295,
+          "volume": 0,
+          "gamma_exposure": 24686,
+          "strength": "MODERATE",
+          "distance_pct": -1.14
+        },
+        {
+          "strike": 267.5,
+          "type": "SUPPORT",
+          "total_oi": 12121,
+          "call_oi": 3973,
+          "put_oi": 8148,
+          "volume": 0,
+          "gamma_exposure": 12121,
+          "strength": "WEAK",
+          "distance_pct": -2.06
+        },
+        {
+          "strike": 265.0,
+          "type": "SUPPORT",
+          "total_oi": 11908,
+          "call_oi": 3599,
+          "put_oi": 8309,
+          "volume": 0,
+          "gamma_exposure": 11908,
+          "strength": "WEAK",
+          "distance_pct": -2.97
+        }
+      ]
+    }
+  ],
+  "alerts": []
+}
